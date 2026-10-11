@@ -1,0 +1,395 @@
+'use client';
+
+import React, { useState } from 'react';
+import { 
+  ChevronRight, 
+  ChevronDown, 
+  Flame, 
+  Milestone as MilestoneIcon, 
+  ClipboardCheck, 
+  FolderKanban, 
+  Play, 
+  CheckCircle2, 
+  MoreVertical, 
+  Plus, 
+  Link2, 
+  FileText, 
+  Trash2, 
+  Edit2 
+} from 'lucide-react';
+import { ConstructionTask, TaskDependency, ScheduleStatus, TaskType } from '@/lib/construction-planning/types';
+import { formatDisplayDate } from '@/lib/construction-planning/schedule-utils';
+import { TaskNode } from '@/lib/construction-planning/task-utils';
+
+interface ConstructionTaskRowProps {
+  node: TaskNode;
+  isExpanded: boolean;
+  onToggleExpand: (taskId: string) => void;
+  onSelectTask: (task: ConstructionTask) => void;
+  onStartTask: (taskId: string) => void;
+  onRecordProgress: (task: ConstructionTask) => void;
+  onCompleteTask: (taskId: string) => void;
+  onAddChildTask: (parentTask: ConstructionTask) => void;
+  onEditTask: (task: ConstructionTask) => void;
+  onDeleteTask: (task: ConstructionTask) => void;
+  dependencies: TaskDependency[];
+  onOpenDependencyManager: (task: ConstructionTask) => void;
+}
+
+export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
+  node,
+  isExpanded,
+  onToggleExpand,
+  onSelectTask,
+  onStartTask,
+  onRecordProgress,
+  onCompleteTask,
+  onAddChildTask,
+  onEditTask,
+  onDeleteTask,
+  dependencies,
+  onOpenDependencyManager,
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const hasChildren = node.children && node.children.length > 0;
+  const isWorkPackage = node.type === 'work_package';
+  const isMilestone = node.type === 'milestone';
+
+  const taskPredecessors = dependencies.filter((d) => d.successorId === node.id);
+  const taskSuccessors = dependencies.filter((d) => d.predecessorId === node.id);
+
+  // Status badge styling
+  const getStatusBadge = (status: ScheduleStatus) => {
+    switch (status) {
+      case 'completed':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Completed</span>;
+      case 'in_progress':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">In Progress</span>;
+      case 'ready_to_start':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">Ready</span>;
+      case 'delayed':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">Delayed</span>;
+      case 'at_risk':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">At Risk</span>;
+      case 'blocked':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-900 border border-red-300">Blocked</span>;
+      case 'on_hold':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-800 border border-zinc-300">On Hold</span>;
+      default:
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-300">Not Started</span>;
+    }
+  };
+
+  // Task type icon / indicator
+  const getTypeBadge = (type: TaskType) => {
+    switch (type) {
+      case 'work_package':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300">
+            <FolderKanban className="w-3 h-3 text-slate-600" />
+            PKG
+          </span>
+        );
+      case 'milestone':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+            <MilestoneIcon className="w-3 h-3 text-amber-700" />
+            MS
+          </span>
+        );
+      case 'inspection':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-sky-900 bg-sky-100 px-1.5 py-0.5 rounded border border-sky-300">
+            <ClipboardCheck className="w-3 h-3 text-sky-700" />
+            QC
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+            Task
+          </span>
+        );
+    }
+  };
+
+  const indentPadding = Math.min(node.level * 20, 80);
+
+  return (
+    <tr 
+      className={`group border-b border-slate-200/80 hover:bg-slate-50/90 transition-colors ${
+        isWorkPackage ? 'bg-slate-50/70 font-medium' : 'bg-white'
+      } ${node.isCritical ? 'border-l-4 border-l-purple-600' : 'border-l-4 border-l-transparent'}`}
+    >
+      {/* 1. Hierarchy & Task Name (STICKY FROZEN LEFT) */}
+      <td 
+        className={`py-2 px-3 text-xs sticky left-0 z-10 border-r border-slate-200/90 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] transition-colors ${
+          isWorkPackage ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-white group-hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex items-center gap-1.5" style={{ paddingLeft: `${indentPadding}px` }}>
+          {/* Expand/Collapse Button */}
+          {hasChildren ? (
+            <button
+              onClick={() => onToggleExpand(node.id)}
+              className="p-1 rounded hover:bg-slate-200/80 text-slate-600 transition-colors shrink-0"
+              title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-800" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-800" />
+              )}
+            </button>
+          ) : (
+            <span className="w-5 shrink-0 inline-block" />
+          )}
+
+          {/* Critical Path flame indicator */}
+          {node.isCritical && (
+            <span 
+              className="shrink-0 text-purple-700 bg-purple-100 p-0.5 rounded border border-purple-300" 
+              title="Critical Path Activity (Zero float)"
+            >
+              <Flame className="w-3 h-3 text-purple-600" />
+            </span>
+          )}
+
+          {/* Task Code */}
+          <span className="font-mono text-[11px] text-slate-600 font-bold shrink-0">
+            {node.code}
+          </span>
+
+          {/* Task Name Link */}
+          <button
+            onClick={() => onSelectTask(node)}
+            className={`text-left text-xs truncate max-w-[200px] sm:max-w-[260px] lg:max-w-[320px] hover:text-indigo-600 hover:underline transition-colors ${
+              isWorkPackage ? 'font-bold text-slate-900' : 'font-medium text-slate-800'
+            }`}
+            title={node.name}
+          >
+            {node.name}
+          </button>
+
+          {node.floor && (
+            <span className="hidden 2xl:inline-block text-[9px] font-medium px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded shrink-0 border border-slate-200">
+              {node.floor}
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* 2. Type */}
+      <td className="py-2 px-2 text-xs text-center whitespace-nowrap">
+        {getTypeBadge(node.type)}
+      </td>
+
+      {/* 3. Status */}
+      <td className="py-2 px-2 text-xs text-center whitespace-nowrap">
+        {getStatusBadge(node.status)}
+      </td>
+
+      {/* 4. Progress */}
+      <td className="py-2 px-2 text-xs min-w-[105px]">
+        <div className="flex items-center gap-1.5">
+          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                node.progress === 100 
+                  ? 'bg-emerald-500' 
+                  : node.status === 'delayed' 
+                    ? 'bg-rose-500' 
+                    : node.status === 'at_risk'
+                      ? 'bg-amber-500'
+                      : 'bg-indigo-600'
+              }`}
+              style={{ width: `${node.progress}%` }}
+            />
+          </div>
+          <span className="text-[11px] font-bold text-slate-800 w-8 text-right font-mono">
+            {node.progress}%
+          </span>
+        </div>
+      </td>
+
+      {/* 5. Schedule (Plan vs Actual) - Fixed Bullet Entity */}
+      <td className="py-2 px-2.5 text-xs whitespace-nowrap">
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5 text-slate-800">
+            <span className="text-slate-500 text-[10px] font-bold">PLAN:</span>
+            <span className="font-semibold text-[11px] text-slate-900">
+              {formatDisplayDate(node.plannedStartDate)} &rarr; {formatDisplayDate(node.plannedEndDate)}
+            </span>
+            <span className="text-[10px] font-mono text-slate-500 font-medium">({node.plannedDurationDays}d)</span>
+          </div>
+          
+          <div className="flex items-center gap-1.5 text-[10px]">
+            <span className="text-slate-500 font-bold">ACTUAL:</span>
+            {node.actualStartDate ? (
+              <span className="text-emerald-800 font-semibold">
+                Started {formatDisplayDate(node.actualStartDate)}
+                {node.actualEndDate ? ` • Finished ${formatDisplayDate(node.actualEndDate)}` : ' • In progress on site'}
+              </span>
+            ) : (
+              <span className="text-slate-400 italic">Not started on site</span>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* 6. Forecast Finish & Variance (Clear High-Contrast Colors) */}
+      <td className="py-2 px-2 text-xs whitespace-nowrap font-mono">
+        <div className="flex items-center gap-1.5">
+          <span className={`text-[11px] font-semibold ${node.varianceDays > 0 ? 'text-rose-700 font-bold' : 'text-slate-900'}`}>
+            {formatDisplayDate(node.forecastEndDate)}
+          </span>
+          {node.varianceDays > 0 && (
+            <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
+              +{node.varianceDays}d
+            </span>
+          )}
+          {node.varianceDays < 0 && (
+            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">
+              {node.varianceDays}d
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* 7. Dependencies (Predecessors & Successors - "Sub / Pub") ALWAYS VISIBLE */}
+      <td className="py-2 px-2 text-xs text-center whitespace-nowrap">
+        <button
+          onClick={() => onOpenDependencyManager(node)}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-semibold text-slate-700 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-300 transition-colors shadow-2xs"
+          title={`${taskPredecessors.length} Predecessors, ${taskSuccessors.length} Successors. Click to inspect & edit.`}
+        >
+          <Link2 className="w-3 h-3 text-indigo-600" />
+          <span>{taskPredecessors.length} / {taskSuccessors.length}</span>
+        </button>
+      </td>
+
+      {/* 8. Actions (Clean Non-Overlapping Column) */}
+      <td className="py-2 px-3 text-xs text-right whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1.5 relative">
+          
+          {/* Quick Execution Buttons */}
+          {!isWorkPackage && node.status !== 'completed' && (
+            <>
+              {!node.actualStartDate && (
+                <button
+                  onClick={() => onStartTask(node.id)}
+                  className="px-2 py-1 text-[10px] font-bold rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors inline-flex items-center gap-1 shadow-2xs"
+                  title="Record actual start date"
+                >
+                  <Play className="w-2.5 h-2.5 fill-indigo-600 text-indigo-600" />
+                  <span>Start</span>
+                </button>
+              )}
+
+              {node.actualStartDate && (
+                <button
+                  onClick={() => onRecordProgress(node)}
+                  className="px-2 py-1 text-[10px] font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors inline-flex items-center gap-1 shadow-2xs"
+                  title="Record daily progress"
+                >
+                  <FileText className="w-2.5 h-2.5 text-emerald-700" />
+                  <span>Log</span>
+                </button>
+              )}
+
+              {node.actualStartDate && node.progress < 100 && (
+                <button
+                  onClick={() => onCompleteTask(node.id)}
+                  className="px-2 py-1 text-[10px] font-semibold rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition-colors inline-flex items-center gap-1"
+                  title="Mark 100% completed"
+                >
+                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                  <span>Done</span>
+                </button>
+              )}
+            </>
+          )}
+
+          {/* 3-Dots Dropdown with High Z-Index & Dark Text */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors border border-transparent hover:border-slate-300"
+              title="More actions"
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </button>
+
+            {showMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowMenu(false)} 
+                />
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-left text-xs font-medium whitespace-nowrap">
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onSelectTask(node);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-slate-800 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-slate-500" />
+                    <span>View Task Details</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onEditTask(node);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-slate-800 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Edit Activity</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onAddChildTask(node);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-slate-800 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Add Subtask</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onOpenDependencyManager(node);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-slate-800 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Manage Dependencies</span>
+                  </button>
+
+                  <div className="my-1 border-t border-slate-100" />
+
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onDeleteTask(node);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 transition-colors font-semibold"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Delete Activity</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+};
