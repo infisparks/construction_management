@@ -96,7 +96,7 @@ export function generateSiteExpensesPdf(
   let currentY = margin;
 
   // 1. Top Decorative Accent Strip
-  doc.setFillColor(124, 58, 237); // Purple 600
+  doc.setFillColor(4, 47, 56); // Deep Spruce / Teal #042f38
   doc.rect(0, 0, pageWidth, 5, 'F');
 
   // 2. Header Container
@@ -108,7 +108,7 @@ export function generateSiteExpensesPdf(
   // Title & Project Info
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.setTextColor(30, 27, 75);
+  doc.setTextColor(4, 47, 56); // Deep Spruce / Teal
   doc.text('SITE BILLS, DAILY EXPENSES & PETTY CASH STATEMENT', margin + 6, currentY + 9);
 
   doc.setFont('helvetica', 'normal');
@@ -128,14 +128,14 @@ export function generateSiteExpensesPdf(
   doc.text(`Generated: ${todayStr}  •  By: ${generatedBy}`, margin + 6, currentY + 22);
 
   // Right Header Badge
-  doc.setFillColor(243, 232, 255); // Purple 100
+  doc.setFillColor(219, 238, 242); // Light Teal 100
   doc.roundedRect(pageWidth - margin - 58, currentY + 6, 52, 16, 3, 3, 'F');
-  doc.setDrawColor(216, 180, 254);
+  doc.setDrawColor(184, 223, 229); // Border 200
   doc.roundedRect(pageWidth - margin - 58, currentY + 6, 52, 16, 3, 3, 'S');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(107, 33, 168);
+  doc.setTextColor(4, 47, 56); // Deep Spruce / Teal
   doc.text('SITE EXPENSE LEDGER', pageWidth - margin - 53, currentY + 12);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -378,7 +378,7 @@ export function generateSingleExpenseVoucherPdf(
   // Right Header: Document Title & Voucher Reference
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.setTextColor(79, 70, 229); // Indigo 600
+  doc.setTextColor(4, 47, 56);
   doc.text('PAYMENT VOUCHER SLIP', pageWidth - margin, currentY + 4.5, { align: 'right' });
 
   doc.setFont('helvetica', 'bold');
@@ -509,7 +509,7 @@ export function generateSingleExpenseVoucherPdf(
             halign: 'right',
             fontStyle: 'bold',
             fontSize: 10.5,
-            textColor: [79, 70, 229], // Indigo 600
+            textColor: [4, 47, 56], // Deep Spruce / Teal #042f38
             fillColor: [248, 250, 252], // Slate 50
             cellPadding: { top: 4.5, bottom: 4.5, right: 4 },
           },
@@ -557,7 +557,7 @@ export function generateSingleExpenseVoucherPdf(
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(79, 70, 229); // Indigo 600
+  doc.setTextColor(4, 47, 56);
   doc.text(numberToWordsINR(expense.amount), margin + 35, currentY + 6);
 
   currentY += 14;

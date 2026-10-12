@@ -33,7 +33,7 @@ export function generateSubcontractorBillPdf(
   let currentY = margin;
 
   // --- Header Brand Bar ---
-  doc.setFillColor(79, 70, 229); // #4F46E5 (Indigo 600)
+  doc.setFillColor(4, 47, 56); // #042f38
   doc.rect(margin, currentY, pageWidth - margin * 2, 3, 'F');
   currentY += 8;
 
@@ -52,7 +52,7 @@ export function generateSubcontractorBillPdf(
   // Title on right side
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('SUB-CONTRACTOR BILL', pageWidth - margin, currentY, { align: 'right' });
 
   doc.setFont('helvetica', 'bold');
@@ -122,7 +122,7 @@ export function generateSubcontractorBillPdf(
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('PROJECT & SITE DETAILS', margin + 3, currentY + 5);
 
   doc.setFont('helvetica', 'bold');
@@ -146,7 +146,7 @@ export function generateSubcontractorBillPdf(
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('SUB-CONTRACTOR / VENDOR', box2X + 3, currentY + 5);
 
   doc.setFont('helvetica', 'bold');
@@ -182,7 +182,7 @@ export function generateSubcontractorBillPdf(
     body: tableRows,
     theme: 'grid',
     headStyles: {
-      fillColor: [79, 70, 229],
+      fillColor: [4, 47, 56],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 8,
@@ -238,7 +238,7 @@ export function generateSubcontractorBillPdf(
   let leftY = currentY + 4;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('DEDUCTIONS & RETENTIONS AUDIT', margin + 3, leftY);
   leftY += 4.5;
 
@@ -290,7 +290,7 @@ export function generateSubcontractorBillPdf(
   leftY += 2;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('BILL NOTES & REMARKS:', margin + 3, leftY);
   leftY += 3.5;
   doc.setFont('helvetica', 'normal');
@@ -312,7 +312,7 @@ export function generateSubcontractorBillPdf(
     doc.setFont('helvetica', isBold ? 'bold' : 'normal');
     doc.setFontSize(isBold ? 8.5 : 8);
     if (isPurple) {
-      doc.setTextColor(79, 70, 229);
+      doc.setTextColor(4, 47, 56);
     } else if (isMinus) {
       doc.setTextColor(220, 38, 38);
     } else {
@@ -355,7 +355,7 @@ export function generateSubcontractorBillPdf(
 
   // Highlight Box for Grand Total
   rightY += 1;
-  doc.setFillColor(79, 70, 229);
+  doc.setFillColor(4, 47, 56);
   doc.roundedRect(sumBoxX + 2, rightY - 1, sumBoxWidth - 4, 10, 1.5, 1.5, 'F');
 
   doc.setFont('helvetica', 'bold');

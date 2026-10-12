@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATM Account Registration Portal | Supabase</title>
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Supabase JS v2 Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* CSS RESET & VARIABLES */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* Color System */
+      --primary: #065F46;
+      --primary-hover: #044E3A;
+      --primary-light: #ECFDF5;
+      --primary-text: #064E3B;
+      --bg-main: #F5F6F8;
+      --bg-card: #FFFFFF;
+      --border: #E5E7EB;
+      --border-focus: #059669;
+      --text-primary: #111827;
+      --text-secondary: #6B7280;
+      --text-tertiary: #9CA3AF;
+      --error: #EF4444;
+      --error-bg: #FEF2F2;
+      --success: #10B981;
+      --success-bg: #ECFDF5;
+      
+      /* Spacing Scale */
+      --sp-xs: 4px;
+      --sp-sm: 8px;
+      --sp-md: 12px;
+      --sp-lg: 16px;
+      --sp-xl: 24px;
+      
+      /* Radii */
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+      
+      /* Typography */
+      --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-title: 22px;
+      --font-section: 17px;
+      --font-body: 14px;
+      --font-label: 13px;
+      --font-small: 12px;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-size: var(--font-body);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 260px;
+      background-color: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 40;
+      transition: transform 0.25s ease;
+    }
+
+    .sidebar-header {
+      padding: var(--sp-xl) var(--sp-lg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-md);
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #065F46, #059669);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+
+    .brand-subtitle {
+      font-size: var(--font-small);
+      color: var(--text-secondary);
+    }
+
+    .sidebar-nav {
+      padding: var(--sp-lg) var(--sp-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-xs);
+      flex: 1;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-md);
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: var(--font-body);
+      font-weight: 500;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .nav-item:hover {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background-color: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .nav-item svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+      padding: var(--sp-lg);
+      border-top: 1px solid var(--border);
+    }
+
+    .system-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-sm);
+      font-size: var(--font-small);
+      color: var(--text-secondary);
+      padding: var(--sp-sm) var(--sp-md);
+      background-color: var(--bg-main);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-full);
+      background-color: var(--success);
+      box-shadow: 0 0 0 2px var(--success-bg);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* MAIN WRAPPER */
+    .main-wrapper {
+      margin-left: 260px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* TOP HEADER */
+    .topbar {
+      height: 64px;
+      background-color: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--sp-xl);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-md);
+    }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      padding: 6px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      color: var(--text-primary);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-sm);
+      font-size: var(--font-body);
+      color: var(--text-secondary);
+    }
+
+    .breadcrumb-current {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-md);
+    }
+
+    .db-status-pill {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-xs);
+      font-size: var(--font-small);
+      color: var(--text-secondary);
+      background-color: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      padding: 4px 10px;
+    }
+
+    /* PAGE CONTENT */
+    .page-content {
+      padding: var(--sp-xl);
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-xl);
+    }
+
+    /* PAGE TITLE */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: var(--sp-md);
+    }
+
+    .page-title {
+      font-size: var(--font-title);
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .page-subtitle {
+      font-size: var(--font-body);
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* STATS GRID */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--sp-lg);
+    }
+
+    .stat-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--sp-lg) var(--sp-xl);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-xs);
+    }
+
+    .stat-label {
+      font-size: var(--font-label);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .stat-meta {
+      font-size: var(--font-small);
+      color: var(--text-tertiary);
+    }
+
+    /* CARD COMPONENT */
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--sp-xl);
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+    }
+
+    .card-header {
+      margin-bottom: var(--sp-lg);
+      padding-bottom: var(--sp-md);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title {
+      font-size: var(--font-section);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .section-subtitle {
+      font-size: var(--font-label);
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* FORM STYLES */
+    .form-section-title {
+      font-size: var(--font-label);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      font-weight: 600;
+      margin-bottom: var(--sp-md);
+      margin-top: var(--sp-sm);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--sp-lg);
+      margin-bottom: var(--sp-lg);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .form-label {
+      font-size: var(--font-label);
+      font-weight: 500;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .req {
+      color: var(--error);
+      font-weight: 600;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .form-input {
+      width: 100%;
+      height: 42px;
+      padding: 10px 12px;
+      font-size: var(--font-body);
+      font-family: inherit;
+      color: var(--text-primary);
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .form-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+    }
+
+    .form-input:disabled {
+      background-color: var(--bg-main);
+      color: var(--text-secondary);
+      cursor: not-allowed;
+    }
+
+    .input-hint {
+      font-size: var(--font-small);
+      color: var(--text-secondary);
+    }
+
+    .input-addon-btn {
+      position: absolute;
+      right: 6px;
+      height: 30px;
+      padding: 0 var(--sp-sm);
+      font-size: var(--font-small);
+      font-weight: 500;
+      background-color: var(--primary-light);
+      color: var(--primary);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: background-color 0.15s;
+    }
+
+    .input-addon-btn:hover {
+      background-color: #E0E7FF;
+    }
+
+    /* BUTTONS */
+    .button-group {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: var(--sp-md);
+      margin-top: var(--sp-xl);
+      padding-top: var(--sp-lg);
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sp-sm);
+      height: 40px;
+      padding: 0 var(--sp-lg);
+      font-size: var(--font-body);
+      font-weight: 500;
+      font-family: inherit;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #FFFFFF;
+      border: 1px solid var(--primary);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background-color: var(--bg-main);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* SPINNER */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #FFFFFF;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ALERTS */
+    .alert {
+      padding: var(--sp-md) var(--sp-lg);
+      border-radius: var(--radius-md);
+      font-size: var(--font-body);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-md);
+      margin-bottom: var(--sp-lg);
+    }
+
+    .alert-error {
+      background-color: var(--error-bg);
+      border: 1px solid #FECACA;
+      color: var(--error);
+    }
+
+    .alert-success {
+      background-color: var(--success-bg);
+      border: 1px solid #A7F3D0;
+      color: #065F46;
+    }
+
+    /* TABLE SECTION */
+    .table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--sp-lg);
+      gap: var(--sp-md);
+      flex-wrap: wrap;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      width: 320px;
+      max-width: 100%;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-tertiary);
+      width: 16px;
+      height: 16px;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 8px 12px 8px 36px;
+      font-size: var(--font-body);
+      font-family: inherit;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background-color: var(--bg-card);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: var(--font-body);
+    }
+
+    .data-table th {
+      background-color: var(--bg-main);
+      color: var(--text-secondary);
+      font-size: var(--font-label);
+      font-weight: 600;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text-primary);
+    }
+
+    .data-table tbody tr {
+      transition: background-color 0.1s ease;
+    }
+
+    .data-table tbody tr:hover {
+      background-color: #F9FAFB;
+    }
+
+    .data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* USER AVATAR & NAME */
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-md);
+    }
+
+    .user-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-full);
+      background-color: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+
+    .user-meta-name {
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .user-meta-sub {
+      font-size: var(--font-small);
+      color: var(--text-secondary);
+      font-family: monospace;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-small);
+      font-weight: 500;
+      line-height: 1.2;
+    }
+
+    .badge-account {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      font-weight: 600;
+      background-color: #F3F4F6;
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      letter-spacing: 0.5px;
+    }
+
+    .badge-status {
+      background-color: var(--success-bg);
+      color: #065F46;
+    }
+
+    .badge-location {
+      background-color: #F3F4F6;
+      color: var(--text-secondary);
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    /* ACTION BUTTONS */
+    .action-btn {
+      background: none;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-small);
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .action-btn:hover {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      border-color: #D1D5DB;
+    }
+
+    .action-btn.delete:hover {
+      background-color: var(--error-bg);
+      color: var(--error);
+      border-color: #FCA5A5;
+    }
+
+    /* MOBILE CARDS (Rule 7) */
+    .mobile-cards-list {
+      display: none;
+      flex-direction: column;
+      gap: var(--sp-md);
+    }
+
+    .mobile-card-item {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--sp-lg);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-md);
+    }
+
+    .mobile-card-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: var(--font-body);
+    }
+
+    .mobile-card-label {
+      font-size: var(--font-small);
+      color: var(--text-secondary);
+    }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(17, 24, 39, 0.4);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: var(--sp-lg);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-dialog {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-header {
+      padding: var(--sp-lg) var(--sp-xl);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .modal-close-btn {
+      background: none;
+      border: none;
+      padding: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+    }
+
+    .modal-close-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .modal-body {
+      padding: var(--sp-xl);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-lg);
+    }
+
+    /* ATM CARD VISUAL */
+    .atm-card-preview {
+      background: linear-gradient(135deg, #022C22 0%, #064E3B 50%, #065F46 100%);
+      color: #FFFFFF;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      position: relative;
+      box-shadow: 0 8px 16px -2px rgba(67, 56, 202, 0.25);
+      overflow: hidden;
+    }
+
+    .atm-card-preview::after {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 160px;
+      height: 160px;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%);
+      border-radius: 50%;
+    }
+
+    .atm-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .atm-bank-name {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+
+    .atm-chip {
+      width: 32px;
+      height: 24px;
+      background: #E0C875;
+      border-radius: 4px;
+      border: 1px solid #CA8A04;
+    }
+
+    .atm-card-number {
+      font-family: ui-monospace, monospace;
+      font-size: 19px;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    .atm-card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .atm-card-holder-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.7;
+    }
+
+    .atm-card-holder-name {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .atm-card-network {
+      font-size: 14px;
+      font-weight: 700;
+      font-style: italic;
+      letter-spacing: 1px;
+      color: #F59E0B;
+    }
+
+    .modal-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: var(--font-body);
+    }
+
+    .modal-detail-label {
+      color: var(--text-secondary);
+      font-size: var(--font-label);
+    }
+
+    .modal-detail-val {
+      font-weight: 500;
+      color: var(--text-primary);
+      text-align: right;
+      word-break: break-all;
+    }
+
+    .modal-footer {
+      padding: var(--sp-lg) var(--sp-xl);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--sp-md);
+    }
+
+    /* TOAST */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-sm);
+    }
+
+    .toast {
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      background-color: var(--text-primary);
+      color: #FFFFFF;
+      font-size: var(--font-body);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-md);
+      animation: slideIn 0.2s ease;
+    }
+
+    .toast.success {
+      background-color: #065F46;
+    }
+
+    .toast.error {
+      background-color: #991B1B;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* RESPONSIVE DESIGN (RULE 7) */
+    @media (max-width: 900px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.3);
+        z-index: 35;
+        display: none;
+      }
+
+      .sidebar-backdrop.open {
+        display: block;
+      }
+
+      .main-wrapper {
+        margin-left: 0;
+      }
+
+      .menu-toggle {
+        display: block;
+      }
+
+      .page-content {
+        padding: var(--sp-lg);
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .button-group {
+        flex-direction: column-reverse;
+      }
+
+      .button-group .btn {
+        width: 100%;
+      }
+
+      .table-container {
+        display: none;
+      }
+
+      .mobile-cards-list {
+        display: flex;
+      }
+
+      .search-input-wrapper {
+        width: 100%;
+      }
+
+      .modal-dialog {
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MOBILE SIDEBAR BACKDROP -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+  <!-- FIXED LEFT SIDEBAR (RULE 11) -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <line x1="2" y1="10" x2="22" y2="10"></line>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">CoreBanking ATM</div>
+        <div class="brand-subtitle">Registration Desk</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" href="index.html#registration">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <line x1="19" y1="8" x2="19" y2="14"></line>
+          <line x1="22" y1="11" x2="16" y2="11"></line>
+        </svg>
+        New Registration
+      </a>
+      <a class="nav-item" href="transactions.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        Credit / Debit Cash
+      </a>
+      <a class="nav-item" href="index.html#accountsList">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        All ATM Users
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="system-badge">
+        <span class="status-dot"></span>
+        <span>Supabase: Online</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN WRAPPER -->
+  <div class="main-wrapper">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="breadcrumb">
+          <span>Portal</span>
+          <span>/</span>
+          <span class="breadcrumb-current">ATM Account Registration</span>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="db-status-pill">
+          <span class="status-dot"></span>
+          <span>xlrxbpaqmzebgnsnogrv.supabase.co</span>
+        </div>
+        <button class="btn btn-secondary" onclick="fetchAccounts()" style="height: 34px; padding: 0 12px; font-size: 13px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN PAGE CONTENT -->
+    <main class="page-content">
+
+      <!-- PAGE HEADER -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">ATM Account Registration</h1>
+          <p class="page-subtitle">Register and issue banking credentials to new customer accounts in Supabase database.</p>
+        </div>
+      </div>
+
+      <!-- METRIC CARDS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Accounts</div>
+          <div class="stat-value" id="statTotalAccounts">-</div>
+          <div class="stat-meta">Active records in public."user"</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Locations Registered</div>
+          <div class="stat-value" id="statUniqueLocations">-</div>
+          <div class="stat-meta">Unique branches active</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Database Connection</div>
+          <div class="stat-value" style="color: var(--success); font-size: 20px; display: flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            Connected
+          </div>
+          <div class="stat-meta">PostgreSQL / Supabase REST API</div>
+        </div>
+      </div>
+
+      <!-- SECTION 1: REGISTRATION FORM (RULES 1, 4, 5, 9) -->
+      <section class="card" id="registration">
+        <div class="card-header">
+          <div>
+            <h2 class="section-title">New Account Information</h2>
+            <p class="section-subtitle">Fill in the customer information and assign a unique bank account number.</p>
+          </div>
+        </div>
+
+        <!-- INLINE ALERT BOX -->
+        <div id="formAlert" style="display: none;"></div>
+
+        <form id="accountForm" onsubmit="handleRegistration(event)">
+          
+          <div class="form-section-title">1. Customer Information</div>
+          <div class="form-grid">
+            <!-- FULL NAME -->
+            <div class="form-group">
+              <label class="form-label" for="userName">
+                Full Name <span class="req">*</span>
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="text" 
+                  id="userName" 
+                  class="form-input" 
+                  placeholder="Enter full name (e.g. Mudassir Shaikh)" 
+                  required
+                  autocomplete="name"
+                >
+              </div>
+              <span class="input-hint">Customer legal name as shown on government ID</span>
+            </div>
+
+            <!-- LOCATION -->
+            <div class="form-group">
+              <label class="form-label" for="userLocation">
+                Branch / Location
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="text" 
+                  id="userLocation" 
+                  class="form-input" 
+                  placeholder="Enter branch or city (e.g. Mumbai)" 
+                  autocomplete="address-level2"
+                >
+              </div>
+              <span class="input-hint">Primary servicing ATM branch or city</span>
+            </div>
+          </div>
+
+          <div class="form-section-title">2. Account & ATM Security</div>
+          <div class="form-grid">
+            <!-- ACCOUNT NUMBER -->
+            <div class="form-group">
+              <label class="form-label" for="userAccountNumber">
+                Account Number <span class="req">*</span>
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="number" 
+                  id="userAccountNumber" 
+                  class="form-input" 
+                  placeholder="Enter account number (e.g. 1029384756)" 
+                  required
+                  min="1"
+                  step="1"
+                >
+                <button type="button" class="input-addon-btn" onclick="generateRandomAccountNumber()" title="Generate unique 10-digit number">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  Generate
+                </button>
+              </div>
+              <span class="input-hint">Unique numerical identifier for ATM card linkage</span>
+            </div>
+
+            <!-- ENCRYPTED UUID -->
+            <div class="form-group">
+              <label class="form-label" for="encryptedIdPreview">
+                Encrypted UUID
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="text" 
+                  id="encryptedIdPreview" 
+                  class="form-input" 
+                  value="Auto-generated by Postgres (gen_random_uuid())" 
+                  disabled
+                >
+              </div>
+              <span class="input-hint">Security key generated automatically upon insert</span>
+            </div>
+          </div>
+
+          <!-- ACTIONS -->
+          <div class="button-group">
+            <button type="button" class="btn btn-secondary" onclick="resetForm()">
+              Clear Form
+            </button>
+            <button type="submit" id="submitBtn" class="btn btn-primary">
+              <span id="btnText">Register ATM Account</span>
+              <div id="btnSpinner" class="spinner" style="display: none;"></div>
+            </button>
+          </div>
+
+        </form>
+      </section>
+
+      <!-- SECTION 2: REGISTERED ACCOUNTS TABLE (RULES 6, 7, 8) -->
+      <section class="card" id="accountsList">
+        <div class="card-header">
+          <div>
+            <h2 class="section-title">Registered ATM Accounts</h2>
+            <p class="section-subtitle">Real-time records queried directly from Supabase table <code style="font-size: 12px; background: #ECFDF5; color: #065F46; padding: 2px 6px; border-radius: 4px;">public."user"</code></p>
+          </div>
+          <div style="font-size: var(--font-small); color: var(--text-secondary);" id="recordCountLabel">
+            Loading accounts...
+          </div>
+        </div>
+
+        <!-- SEARCH TOOLBAR -->
+        <div class="table-toolbar">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input 
+              type="text" 
+              id="searchInput" 
+              class="search-input" 
+              placeholder="Search by name, account #, or location..." 
+              oninput="filterAccounts()"
+            >
+          </div>
+          <div>
+            <button class="action-btn" onclick="exportToCSV()" title="Export list to CSV">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- DESKTOP TABLE -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Customer Name</th>
+                <th>Account Number</th>
+                <th>Branch Location</th>
+                <th>Registered Date</th>
+                <th>Status</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="accountsTableBody">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 32px;">
+                  Loading accounts from Supabase...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- MOBILE CARDS LIST (Rule 7: On mobile tables become cards) -->
+        <div class="mobile-cards-list" id="mobileCardsContainer">
+          <!-- Dynamically populated -->
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL: ACCOUNT DETAILS (RULE 10) -->
+  <div class="modal-overlay" id="accountModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">ATM Account Details</h3>
+        <button class="modal-close-btn" onclick="closeModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- VIRTUAL ATM CARD -->
+        <div class="atm-card-preview">
+          <div class="atm-card-top">
+            <div class="atm-bank-name">Nexus Core ATM</div>
+            <div class="atm-chip"></div>
+          </div>
+          <div class="atm-card-number" id="modalCardNumber">•••• •••• •••• ••••</div>
+          <div class="atm-card-bottom">
+            <div>
+              <div class="atm-card-holder-label">Account Holder</div>
+              <div class="atm-card-holder-name" id="modalCardHolder">-</div>
+            </div>
+            <div class="atm-card-network">DEBIT</div>
+          </div>
+        </div>
+
+        <!-- DETAILS LIST -->
+        <div class="modal-details">
+          <div class="modal-detail-row">
+            <span class="modal-detail-label">Database ID</span>
+            <span class="modal-detail-val" id="modalId">-</span>
+          </div>
+          <div class="modal-detail-row">
+            <span class="modal-detail-label">Account Number</span>
+            <span class="modal-detail-val" id="modalAccountNumber">-</span>
+          </div>
+          <div class="modal-detail-row">
+            <span class="modal-detail-label">Branch / Location</span>
+            <span class="modal-detail-val" id="modalLocation">-</span>
+          </div>
+          <div class="modal-detail-row">
+            <span class="modal-detail-label">Encrypted UUID</span>
+            <span class="modal-detail-val" id="modalUuid" style="font-family: monospace; font-size: 12px;">-</span>
+          </div>
+          <div class="modal-detail-row">
+            <span class="modal-detail-label">Created At</span>
+            <span class="modal-detail-val" id="modalCreatedAt">-</span>
+          </div>
+          <div class="modal-detail-row">
+            <span class="modal-detail-label">Account Status</span>
+            <span class="modal-detail-val"><span class="badge badge-status">Active</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="copyModalAccount()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          Copy Acc No
+        </button>
+        <button class="btn btn-primary" onclick="closeModal()">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // SUPABASE CREDENTIALS PROVIDED
+    const SUPABASE_URL = 'https://xlrxbpaqmzebgnsnogrv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhscnhicGFxbXplYmduc25vZ3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MjMzNzUsImV4cCI6MjEwNzI5OTM3NX0.XvoQuYUTlp6_GgakYOhzcm0uqnfkQJu5vsH1Q6IHo9E';
+
+    // Initialize Supabase Client
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // State
+    let accountsData = [];
+    let currentSelectedAccount = null;
+
+    // Toggle Sidebar for mobile
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      sidebar.classList.toggle('open');
+      backdrop.classList.toggle('open');
+    }
+
+    // Helper: Show toast notification
+    function showToast(message, type = 'default') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        toast.style.transition = 'all 0.2s ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+
+    // Helper: Show Form Alert
+    function setFormAlert(message, type = 'error') {
+      const alertBox = document.getElementById('formAlert');
+      if (!message) {
+        alertBox.style.display = 'none';
+        alertBox.innerHTML = '';
+        return;
+      }
+      alertBox.className = `alert alert-${type}`;
+      alertBox.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          ${type === 'error' 
+            ? '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>' 
+            : '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'}
+        </svg>
+        <div>${message}</div>
+      `;
+      alertBox.style.display = 'flex';
+    }
+
+    // Helper: Generate Random Unique Account Number (10 digits)
+    function generateRandomAccountNumber() {
+      // 10 digit number starting with 10-99
+      const prefix = Math.floor(10 + Math.random() * 90);
+      const remaining = Math.floor(10000000 + Math.random() * 90000000);
+      const generated = Number(`${prefix}${remaining}`);
+      document.getElementById('userAccountNumber').value = generated;
+      showToast('Generated account number: ' + generated, 'default');
+    }
+
+    // Helper: Reset Form
+    function resetForm() {
+      document.getElementById('accountForm').reset();
+      setFormAlert('');
+    }
+
+    // Fetch Accounts from Supabase
+    async function fetchAccounts() {
+      const tableBody = document.getElementById('accountsTableBody');
+      const mobileContainer = document.getElementById('mobileCardsContainer');
+      const countLabel = document.getElementById('recordCountLabel');
+
+      try {
+        countLabel.textContent = 'Fetching records...';
+        
+        const { data, error } = await supabaseClient
+          .from('user')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        accountsData = data || [];
+        renderAccounts(accountsData);
+        updateStatistics(accountsData);
+        countLabel.textContent = `Showing ${accountsData.length} registered accounts`;
+      } catch (err) {
+        console.error('Error fetching accounts:', err);
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--error); padding: 32px;">
+              Failed to load accounts: ${err.message || 'Unknown error'}
+            </td>
+          </tr>
+        `;
+        mobileContainer.innerHTML = `
+          <div class="mobile-card-item" style="color: var(--error); text-align: center;">
+            Failed to load accounts: ${err.message}
+          </div>
+        `;
+        countLabel.textContent = 'Connection error';
+        showToast('Error syncing with Supabase: ' + err.message, 'error');
+      }
+    }
+
+    // Update Top Stat Cards
+    function updateStatistics(data) {
+      document.getElementById('statTotalAccounts').textContent = data.length;
+
+      const locations = new Set(data.map(item => (item.location || '').trim().toLowerCase()).filter(Boolean));
+      document.getElementById('statUniqueLocations').textContent = locations.size || 0;
+    }
+
+    // Format Date
+    function formatDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    // Render Table and Mobile Cards
+    function renderAccounts(data) {
+      const tableBody = document.getElementById('accountsTableBody');
+      const mobileContainer = document.getElementById('mobileCardsContainer');
+
+      if (!data || data.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 36px;">
+              No accounts registered yet. Use the form above to add an account.
+            </td>
+          </tr>
+        `;
+        mobileContainer.innerHTML = `
+          <div class="mobile-card-item" style="text-align: center; color: var(--text-secondary); padding: 36px;">
+            No accounts found.
+          </div>
+        `;
+        return;
+      }
+
+      // Build Desktop Table Rows
+      tableBody.innerHTML = data.map(account => {
+        const initials = (account.name || 'U')
+          .split(' ')
+          .map(n => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
+        
+        const loc = account.location || 'Not Specified';
+        const formattedDate = formatDate(account.created_at);
+
+        return `
+          <tr>
+            <td>
+              <div class="user-cell">
+                <div class="user-avatar">${initials}</div>
+                <div>
+                  <div class="user-meta-name">${escapeHtml(account.name)}</div>
+                  <div class="user-meta-sub" title="${escapeHtml(account.encrypted_id || '')}">
+                    UUID: ${escapeHtml(account.encrypted_id ? account.encrypted_id.substring(0, 8) + '...' : 'Pending')}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge badge-account">#${account.account_number}</span>
+            </td>
+            <td>
+              <span class="badge badge-location">${escapeHtml(loc)}</span>
+            </td>
+            <td style="color: var(--text-secondary); font-size: 13px;">
+              ${formattedDate}
+            </td>
+            <td>
+              <span class="badge badge-status">
+                <span class="badge-dot"></span> Active
+              </span>
+            </td>
+            <td style="text-align: right;">
+              <button class="action-btn" onclick="openModal(${account.id})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                View
+              </button>
+              <button class="action-btn delete" onclick="deleteAccount(${account.id}, '${escapeHtml(account.name)}')" title="Delete Account">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Build Mobile Cards List (Rule 7)
+      mobileContainer.innerHTML = data.map(account => {
+        const initials = (account.name || 'U')
+          .split(' ')
+          .map(n => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
+        const loc = account.location || 'Not Specified';
+
+        return `
+          <div class="mobile-card-item">
+            <div class="user-cell">
+              <div class="user-avatar">${initials}</div>
+              <div>
+                <div class="user-meta-name">${escapeHtml(account.name)}</div>
+                <div class="user-meta-sub">${escapeHtml(loc)}</div>
+              </div>
+            </div>
+            
+            <div class="mobile-card-row">
+              <span class="mobile-card-label">Account No</span>
+              <span class="badge badge-account">#${account.account_number}</span>
+            </div>
+
+            <div class="mobile-card-row">
+              <span class="mobile-card-label">Status</span>
+              <span class="badge badge-status"><span class="badge-dot"></span> Active</span>
+            </div>
+
+            <div class="mobile-card-row">
+              <span class="mobile-card-label">Registered</span>
+              <span style="font-size: 13px; color: var(--text-secondary);">${formatDate(account.created_at)}</span>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <button class="btn btn-secondary" style="flex: 1; height: 36px; font-size: 13px;" onclick="openModal(${account.id})">
+                View Details
+              </button>
+              <button class="action-btn delete" style="padding: 0 12px; height: 36px;" onclick="deleteAccount(${account.id}, '${escapeHtml(account.name)}')">
+                Delete
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Filter Accounts Live Search
+    function filterAccounts() {
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      if (!query) {
+        renderAccounts(accountsData);
+        document.getElementById('recordCountLabel').textContent = `Showing ${accountsData.length} registered accounts`;
+        return;
+      }
+
+      const filtered = accountsData.filter(acc => {
+        const nameMatch = (acc.name || '').toLowerCase().includes(query);
+        const accMatch = String(acc.account_number || '').includes(query);
+        const locMatch = (acc.location || '').toLowerCase().includes(query);
+        const idMatch = (acc.encrypted_id || '').toLowerCase().includes(query);
+        return nameMatch || accMatch || locMatch || idMatch;
+      });
+
+      renderAccounts(filtered);
+      document.getElementById('recordCountLabel').textContent = `Found ${filtered.length} of ${accountsData.length} accounts`;
+    }
+
+    // Handle Form Submission & Insert into Supabase
+    async function handleRegistration(event) {
+      event.preventDefault();
+      setFormAlert('');
+
+      const nameInput = document.getElementById('userName');
+      const locationInput = document.getElementById('userLocation');
+      const accountInput = document.getElementById('userAccountNumber');
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnSpinner = document.getElementById('btnSpinner');
+
+      const name = nameInput.value.trim();
+      const location = locationInput.value.trim() || null;
+      const accountNumber = parseInt(accountInput.value.trim(), 10);
+
+      // Validation
+      if (!name) {
+        setFormAlert('Customer name is required.', 'error');
+        nameInput.focus();
+        return;
+      }
+
+      if (!accountNumber || isNaN(accountNumber) || accountNumber <= 0) {
+        setFormAlert('Please enter a valid numeric account number.', 'error');
+        accountInput.focus();
+        return;
+      }
+
+      // Check client-side for immediate duplicate feedback
+      const exists = accountsData.some(a => Number(a.account_number) === Number(accountNumber));
+      if (exists) {
+        setFormAlert(`Account number #${accountNumber} is already registered. Please enter a unique account number or click "Generate".`, 'error');
+        accountInput.focus();
+        return;
+      }
+
+      // Set Loading State
+      submitBtn.disabled = true;
+      btnText.textContent = 'Registering...';
+      btnSpinner.style.display = 'inline-block';
+
+      try {
+        const payload = {
+          name: name,
+          account_number: accountNumber,
+          location: location
+        };
+
+        const { data, error } = await supabaseClient
+          .from('user')
+          .insert([payload])
+          .select();
+
+        if (error) {
+          // Check for unique violation (PostgreSQL code 23505)
+          if (error.code === '23505' || error.message.includes('unique')) {
+            throw new Error(`Account number #${accountNumber} is already in use by another customer.`);
+          }
+          throw error;
+        }
+
+        // Success!
+        showToast(`Account #${accountNumber} registered successfully!`, 'success');
+        setFormAlert(`Successfully registered ATM Account for "${name}".`, 'success');
+        
+        // Reset form
+        document.getElementById('accountForm').reset();
+
+        // Refresh table
+        await fetchAccounts();
+
+        // Scroll to accounts list
+        const accountsSection = document.getElementById('accountsList');
+        if (accountsSection) {
+          accountsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+      } catch (err) {
+        console.error('Registration error:', err);
+        setFormAlert(err.message || 'Failed to register account. Please check Supabase connection.', 'error');
+        showToast('Registration failed: ' + (err.message || 'Unknown error'), 'error');
+      } finally {
+        submitBtn.disabled = false;
+        btnText.textContent = 'Register ATM Account';
+        btnSpinner.style.display = 'none';
+      }
+    }
+
+    // Delete Account
+    async function deleteAccount(id, name) {
+      if (!confirm(`Are you sure you want to delete ATM account for "${name}" (ID: ${id})?`)) {
+        return;
+      }
+
+      try {
+        const { error } = await supabaseClient
+          .from('user')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        showToast(`Account ID ${id} deleted.`, 'default');
+        await fetchAccounts();
+      } catch (err) {
+        console.error('Delete error:', err);
+        showToast('Failed to delete account: ' + err.message, 'error');
+      }
+    }
+
+    // Open Modal
+    function openModal(id) {
+      const account = accountsData.find(a => a.id === id);
+      if (!account) return;
+
+      currentSelectedAccount = account;
+
+      // Virtual ATM card display
+      const accStr = String(account.account_number);
+      const masked = accStr.padStart(16, '•').replace(/(.{4})/g, '$1 ').trim();
+      document.getElementById('modalCardNumber').textContent = masked;
+      document.getElementById('modalCardHolder').textContent = account.name;
+
+      // Details
+      document.getElementById('modalId').textContent = account.id;
+      document.getElementById('modalAccountNumber').textContent = account.account_number;
+      document.getElementById('modalLocation').textContent = account.location || 'Not Specified';
+      document.getElementById('modalUuid').textContent = account.encrypted_id || 'N/A';
+      document.getElementById('modalCreatedAt').textContent = account.created_at ? new Date(account.created_at).toLocaleString() : 'N/A';
+
+      document.getElementById('accountModal').classList.add('open');
+    }
+
+    // Close Modal
+    function closeModal() {
+      document.getElementById('accountModal').classList.remove('open');
+      currentSelectedAccount = null;
+    }
+
+    // Copy Account Number from Modal
+    function copyModalAccount() {
+      if (!currentSelectedAccount) return;
+      navigator.clipboard.writeText(String(currentSelectedAccount.account_number)).then(() => {
+        showToast(`Copied Account #${currentSelectedAccount.account_number} to clipboard!`, 'default');
+      }).catch(() => {
+        showToast(`Account number: ${currentSelectedAccount.account_number}`, 'default');
+      });
+    }
+
+    // Export Accounts to CSV
+    function exportToCSV() {
+      if (!accountsData || accountsData.length === 0) {
+        showToast('No data to export', 'error');
+        return;
+      }
+
+      const headers = ['ID', 'Name', 'Account Number', 'Location', 'Encrypted ID', 'Created At'];
+      const rows = accountsData.map(a => [
+        a.id,
+        `"${(a.name || '').replace(/"/g, '""')}"`,
+        a.account_number,
+        `"${(a.location || '').replace(/"/g, '""')}"`,
+        `"${a.encrypted_id || ''}"`,
+        `"${a.created_at || ''}"`
+      ]);
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `atm_accounts_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Exported CSV file successfully!', 'default');
+    }
+
+    // Escape HTML string
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = String(text);
+      return div.innerHTML;
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // Close modal on outside click
+    document.getElementById('accountModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('accountModal')) {
+        closeModal();
+      }
+    });
+
+    // Initial Load
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchAccounts();
+    });
+  </script>
+</body>
+</html>

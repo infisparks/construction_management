@@ -152,7 +152,7 @@ export const CONSTRUCTION_MANUAL: ManualEntry[] = [
     siteExample: 'Example: Installing boundary wall fence has 30 days of Float. It doesn\'t matter if it finishes in March or April—the main tower opening in December won\'t be affected.',
     howSoftwareWorks: [
       'Calculated via Critical Path Method (CPM): Total Float = Late Start - Early Start.',
-      'Float = 0 days: Critical activity (Flame icon, purple border).',
+      'Float = 0 days: Critical activity (Flame icon, dark green border).',
       'Float > 0 days: Non-critical activity with flexible scheduling room.'
     ],
     proTip: 'When labor shortages strike, pull workers from high-float tasks (like landscaping) and move them to zero-float critical tasks (like slab shuttering).'
@@ -167,7 +167,7 @@ export const CONSTRUCTION_MANUAL: ManualEntry[] = [
     simpleExplanation: 'The Critical Path is the master backbone of your project. Every single task on this path has 0 days of float. A 1-day delay on ANY critical path activity causes a 1-day delay to the ENTIRE building delivery.',
     siteExample: 'Excavation -> Foundation Raft -> G.F Columns -> 1st Floor Slab -> 2nd Floor Slab... This chain is the Critical Path. Painting or gardening is not.',
     howSoftwareWorks: [
-      'Tasks on the critical path are marked with a purple border and flame icon.',
+      'Tasks on the critical path are marked with a dark green border and flame icon.',
       'The top header Schedule Health card monitors critical path delay directly.',
       'The "Critical Path" view filters out all distraction tasks so project directors see only the bottleneck chain.'
     ],

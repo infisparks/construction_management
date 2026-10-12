@@ -36,7 +36,7 @@ export function generateInventoryStockSummaryPdf(
   let currentY = margin;
 
   // 1. Top Decorative Brand Accent Strip
-  doc.setFillColor(79, 70, 229); // Indigo 600
+  doc.setFillColor(4, 47, 56); // Deep Spruce / Teal #042f38
   doc.rect(0, 0, pageWidth, 5, 'F');
 
   // 2. Main Header Container
@@ -48,7 +48,7 @@ export function generateInventoryStockSummaryPdf(
   // Left Title & Project Info
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.setTextColor(30, 27, 75); // Deep Indigo
+  doc.setTextColor(4, 47, 56);
   doc.text('SITE MATERIAL STOCK BALANCE & INVENTORY STATEMENT', margin + 6, currentY + 9);
 
   doc.setFont('helvetica', 'normal');
@@ -80,14 +80,14 @@ export function generateInventoryStockSummaryPdf(
 
   // Right Reference Badge
   const docRefNo = `STK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  doc.setFillColor(238, 242, 255); // Indigo 50
+  doc.setFillColor(219, 238, 242); // Light Teal 100
   doc.roundedRect(pageWidth - margin - 58, currentY + 5, 52, 18, 2, 2, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('STATEMENT REF #', pageWidth - margin - 54, currentY + 11);
   doc.setFontSize(10);
-  doc.setTextColor(30, 27, 75);
+  doc.setTextColor(4, 47, 56);
   doc.text(docRefNo, pageWidth - margin - 54, currentY + 18);
 
   currentY += 32;

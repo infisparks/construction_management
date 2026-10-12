@@ -65,7 +65,7 @@ export function generateInventoryVoucherPdf(
   if (isCheckIn) {
     doc.setFillColor(16, 185, 129); // Emerald 500
   } else if (isCheckOut) {
-    doc.setFillColor(79, 70, 229); // Indigo 600
+    doc.setFillColor(4, 47, 56); // Deep Spruce / Teal #042f38
   } else if (isReturn) {
     doc.setFillColor(217, 119, 6); // Amber 600
   } else {
@@ -95,7 +95,7 @@ export function generateInventoryVoucherPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   if (isCheckIn) doc.setTextColor(16, 185, 129);
-  else if (isCheckOut) doc.setTextColor(79, 70, 229);
+  else if (isCheckOut) doc.setTextColor(4, 47, 56);
   else if (isReturn) doc.setTextColor(217, 119, 6);
   else doc.setTextColor(225, 29, 72);
 
@@ -245,7 +245,7 @@ export function generateInventoryVoucherPdf(
       valign: 'middle',
     },
     headStyles: {
-      fillColor: isCheckIn ? [16, 185, 129] : isCheckOut ? [79, 70, 229] : isReturn ? [217, 119, 6] : [225, 29, 72],
+      fillColor: isCheckIn ? [16, 185, 129] : isCheckOut ? [4, 47, 56] : isReturn ? [217, 119, 6] : [225, 29, 72],
       textColor: [255, 255, 255],
       fontSize: 8,
       fontStyle: 'bold',
@@ -433,8 +433,8 @@ export function generateMaterialCheckoutHistoryPdf(
   const margin = 14;
   let currentY = margin;
 
-  // 1. Top Indigo Accent Bar
-  doc.setFillColor(79, 70, 229); // Indigo 600
+  // 1. Top Accent Bar
+  doc.setFillColor(4, 47, 56); // Deep Spruce / Teal #042f38
   doc.rect(margin, currentY, pageWidth - margin * 2, 4, 'F');
   currentY += 8;
 
@@ -453,7 +453,7 @@ export function generateMaterialCheckoutHistoryPdf(
   // Document Title on Right
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('MATERIAL CHECKOUT BILL & STATEMENT', pageWidth - margin, currentY, { align: 'right' });
 
   doc.setFont('helvetica', 'bold');
@@ -547,7 +547,7 @@ export function generateMaterialCheckoutHistoryPdf(
       3: { cellWidth: 30 },
       4: { cellWidth: 22 },
       5: { cellWidth: 32 },
-      6: { cellWidth: 17, halign: 'right', fontStyle: 'bold', textColor: [79, 70, 229] },
+      6: { cellWidth: 17, halign: 'right', fontStyle: 'bold', textColor: [4, 47, 56] },
       7: { cellWidth: 14, halign: 'right' },
       8: { cellWidth: 18 },
     },
@@ -558,7 +558,7 @@ export function generateMaterialCheckoutHistoryPdf(
       valign: 'middle',
     },
     headStyles: {
-      fillColor: [79, 70, 229],
+      fillColor: [4, 47, 56],
       textColor: [255, 255, 255],
       fontSize: 7.5,
       fontStyle: 'bold',
@@ -573,13 +573,13 @@ export function generateMaterialCheckoutHistoryPdf(
   currentY += 6;
 
   // Grand Total Summary Line
-  doc.setFillColor(238, 242, 255); // indigo-50
-  doc.setDrawColor(199, 210, 254);
+  doc.setFillColor(240, 247, 248); // light teal tint
+  doc.setDrawColor(184, 223, 229);
   doc.roundedRect(pageWidth - margin - 85, currentY, 85, 14, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(79, 70, 229);
+  doc.setTextColor(4, 47, 56);
   doc.text('Grand Total Issued to Site:', pageWidth - margin - 81, currentY + 5);
 
   doc.setFont('helvetica', 'bold');

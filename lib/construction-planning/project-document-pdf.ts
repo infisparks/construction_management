@@ -21,7 +21,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
   let currentY = margin;
 
   // --- Top Branding Bar ---
-  doc.setFillColor(124, 58, 237); // Purple 600
+  doc.setFillColor(4, 47, 56); // Deep Spruce / Teal #042f38
   doc.rect(margin, currentY, pageWidth - margin * 2, 3, 'F');
   currentY += 8;
 
@@ -153,7 +153,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
     body: contentRows,
     theme: 'striped',
     headStyles: {
-      fillColor: [124, 58, 237],
+      fillColor: [4, 47, 56], // Deep Spruce / Teal #042f38
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 8,
@@ -183,13 +183,13 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
   doc.text(`Digital Verification Hash: SHA256-${file.id.substring(0, 16)} • Tamper-proof archival record`, margin, footerY + 9);
 
   // Digital Signature Box
-  doc.setDrawColor(124, 58, 237);
-  doc.setFillColor(245, 243, 255);
+  doc.setDrawColor(4, 47, 56);
+  doc.setFillColor(240, 247, 248);
   doc.roundedRect(pageWidth - margin - 50, footerY + 2, 50, 15, 1, 1, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.setTextColor(124, 58, 237);
+  doc.setTextColor(4, 47, 56);
   doc.text('VERIFIED & ARCHIVED', pageWidth - margin - 47, footerY + 6);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
