@@ -31,10 +31,14 @@ export const CompleteTaskConfirmModal: React.FC<CompleteTaskConfirmModalProps> =
   onConfirmComplete,
 }) => {
   const [completionMode, setCompletionMode] = useState<'full_100' | 'keep_actual'>('full_100');
-  const [completionDate, setCompletionDate] = useState(() => {
-    return new Date().toISOString().split('T')[0] || '2026-10-12';
-  });
+  const [completionDate, setCompletionDate] = useState('2026-10-12');
   const [remarks, setRemarks] = useState('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setCompletionDate(new Date().toISOString().split('T')[0] || '2026-10-12');
+    }
+  }, [isOpen]);
 
   if (!isOpen || !task) return null;
 
