@@ -779,6 +779,15 @@ export default function ConstructionPlanningPage() {
     });
 
     refreshTasksWithRollups(updated);
+    if (selectedTaskForDrawer?.id === taskId) {
+      setSelectedTaskForDrawer((prev) => prev ? {
+        ...prev,
+        status: 'in_progress',
+        actualStartDate: today,
+        progress: newProgress,
+        notes: updatedNotes,
+      } : null);
+    }
 
     const actionText = isOverride ? 'Task Started (Authorized Override)' : 'Task Started on Site';
     const detailsText = isOverride 
@@ -828,6 +837,15 @@ export default function ConstructionPlanningPage() {
     });
 
     refreshTasksWithRollups(updated);
+    if (selectedTaskForDrawer?.id === taskId) {
+      setSelectedTaskForDrawer((prev) => prev ? {
+        ...prev,
+        status: 'completed',
+        progress: 100,
+        actualEndDate: today,
+        completedQuantity: completedQty,
+      } : null);
+    }
 
     const performedBy = user?.email?.split('@')[0] || 'Quality Inspector';
     const newLog: TaskActivityLog = {
@@ -850,6 +868,88 @@ export default function ConstructionPlanningPage() {
       completedQuantity: completedQty,
     }, activeProjectId);
     await logPlanActivity(taskId, 'Task Marked Completed', `Execution 100% finished. Actual completion date recorded as ${today}.`, performedBy, activeProjectId);
+  };
+
+  // Execution Handlers: Revert Task Status (Mistakenly started or completed)
+  const handleRevertTaskStatus = async (taskId: string, targetStatus: 'not_started' | 'in_progress') => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    let updatedTask: ConstructionTask;
+    let updates: Partial<ConstructionTask>;
+    let actionText = '';
+    let detailsText = '';
+
+    if (targetStatus === 'in_progress') {
+      const prevProgress = task.progress === 100 ? 90 : Math.max(task.progress, 10);
+      const newQty = task.plannedQuantity 
+        ? Math.floor(task.plannedQuantity * (prevProgress / 100)) 
+        : (task.completedQuantity || 0);
+
+      updatedTask = {
+        ...task,
+        status: 'in_progress' as ScheduleStatus,
+        actualEndDate: null,
+        progress: prevProgress,
+        completedQuantity: newQty,
+      };
+
+      updates = {
+        status: 'in_progress',
+        actualEndDate: null,
+        progress: prevProgress,
+        completedQuantity: newQty,
+      };
+
+      actionText = 'Task Completion Reverted';
+      detailsText = `Task completion reverted back to In Progress (${prevProgress}%). Completion end date cleared.`;
+    } else {
+      // 'not_started'
+      updatedTask = {
+        ...task,
+        status: 'not_started' as ScheduleStatus,
+        actualStartDate: null,
+        actualEndDate: null,
+        progress: 0,
+        completedQuantity: 0,
+      };
+
+      updates = {
+        status: 'not_started',
+        actualStartDate: null,
+        actualEndDate: null,
+        progress: 0,
+        completedQuantity: 0,
+      };
+
+      actionText = 'Task Status Reset';
+      detailsText = `Task reset to Not Started. Start/completion dates and progress cleared.`;
+    }
+
+    const updated = tasks.map((t) => (t.id === taskId ? updatedTask : t));
+    refreshTasksWithRollups(updated);
+
+    if (selectedTaskForDrawer?.id === taskId) {
+      setSelectedTaskForDrawer(updatedTask);
+    }
+
+    const today = new Date().toISOString().split('T')[0] || '2026-08-29';
+    const performedBy = user?.email?.split('@')[0] || 'Site Supervisor';
+    const newLog: TaskActivityLog = {
+      id: `act-${Date.now()}`,
+      taskId,
+      action: actionText,
+      details: detailsText,
+      performedBy,
+      timestamp: `${today} ${new Date().toTimeString().slice(0, 5)}`,
+    };
+    setActivityLogs((prev) => [newLog, ...prev]);
+
+    showToast(`Task "${task.name}" reverted to ${targetStatus.replace('_', ' ')}.`);
+
+    // Persist live to Supabase plan_tasks
+    await updatePlanTask(taskId, updates, activeProjectId);
+    await logPlanActivity(taskId, actionText, detailsText, performedBy, activeProjectId);
   };
 
   // Execution Handlers: Daily Progress Submission
@@ -1391,6 +1491,7 @@ export default function ConstructionPlanningPage() {
                     onStartTask={handleInitiateStartTask}
                     onRecordProgress={handleOpenDailyProgress}
                     onCompleteTask={handleCompleteTask}
+                    onRevertTaskStatus={handleRevertTaskStatus}
                     onAddChildTask={handleAddChildTask}
                     onEditTask={handleEditTask}
                     onDeleteTask={handleDeleteTask}
@@ -1495,6 +1596,7 @@ export default function ConstructionPlanningPage() {
         activityLogs={activityLogs}
         onStartTask={handleInitiateStartTask}
         onCompleteTask={handleCompleteTask}
+        onRevertTaskStatus={handleRevertTaskStatus}
         onRecordProgress={handleOpenDailyProgress}
         onSelectTaskById={handleSelectTaskById}
         onAddDependency={handleAddDependency}

@@ -18,7 +18,8 @@ import {
   Trash2,
   ExternalLink,
   ShieldCheck,
-  Package
+  Package,
+  RotateCcw
 } from 'lucide-react';
 import { 
   ConstructionTask, 
@@ -44,6 +45,7 @@ interface TaskDetailsDrawerProps {
   activityLogs: TaskActivityLog[];
   onStartTask: (taskId: string) => void;
   onCompleteTask: (taskId: string) => void;
+  onRevertTaskStatus?: (taskId: string, targetStatus: 'not_started' | 'in_progress') => void;
   onRecordProgress: (task: ConstructionTask) => void;
   onSelectTaskById: (taskId: string) => void;
   onAddDependency: (predecessorId: string, successorId: string, type: DependencyType, lagDays: number) => void;
@@ -62,6 +64,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   activityLogs,
   onStartTask,
   onCompleteTask,
+  onRevertTaskStatus,
   onRecordProgress,
   onSelectTaskById,
   onAddDependency,
@@ -203,6 +206,30 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
               >
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                 <span>Mark Done</span>
+              </button>
+            )}
+
+            {/* Revert Completed Task */}
+            {task.status === 'completed' && onRevertTaskStatus && (
+              <button
+                onClick={() => onRevertTaskStatus(task.id, 'in_progress')}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium border border-amber-200 transition-colors shadow-xs"
+                title="Undo completion and resume task as In Progress"
+              >
+                <RotateCcw className="w-3 h-3 text-amber-600" />
+                <span>Revert to In Progress</span>
+              </button>
+            )}
+
+            {/* Reset accidentally started or completed task back to Not Started */}
+            {(task.actualStartDate || task.status === 'in_progress' || task.status === 'completed') && onRevertTaskStatus && (
+              <button
+                onClick={() => onRevertTaskStatus(task.id, 'not_started')}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 font-medium border border-slate-200 transition-colors shadow-xs"
+                title="Reset actual dates and progress back to Not Started"
+              >
+                <RotateCcw className="w-3 h-3 text-slate-500" />
+                <span>Reset to Not Started</span>
               </button>
             )}
           </div>

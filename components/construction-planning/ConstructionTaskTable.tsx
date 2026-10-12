@@ -15,6 +15,7 @@ interface ConstructionTaskTableProps {
   onStartTask: (taskId: string) => void;
   onRecordProgress: (task: ConstructionTask) => void;
   onCompleteTask: (taskId: string) => void;
+  onRevertTaskStatus?: (taskId: string, targetStatus: 'not_started' | 'in_progress') => void;
   onAddChildTask: (parentTask: ConstructionTask) => void;
   onEditTask: (task: ConstructionTask) => void;
   onDeleteTask: (task: ConstructionTask) => void;
@@ -33,6 +34,7 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
   onStartTask,
   onRecordProgress,
   onCompleteTask,
+  onRevertTaskStatus,
   onAddChildTask,
   onEditTask,
   onDeleteTask,
@@ -134,6 +136,7 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
                   onStartTask={onStartTask}
                   onRecordProgress={onRecordProgress}
                   onCompleteTask={onCompleteTask}
+                  onRevertTaskStatus={onRevertTaskStatus}
                   onAddChildTask={onAddChildTask}
                   onEditTask={onEditTask}
                   onDeleteTask={onDeleteTask}
