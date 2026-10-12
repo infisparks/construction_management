@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ChevronRight, 
   ChevronDown, 
@@ -55,6 +55,36 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
   onToggleRowNotes,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number; openUpwards: boolean } | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleScrollOrResize = () => setShowMenu(false);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [showMenu]);
+
+  const handleToggleMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showMenu && menuButtonRef.current) {
+      const rect = menuButtonRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUpwards = spaceBelow < 230;
+      setMenuCoords({
+        top: openUpwards ? rect.top - 6 : rect.bottom + 6,
+        right: Math.max(16, window.innerWidth - rect.right),
+        openUpwards,
+      });
+      setShowMenu(true);
+    } else {
+      setShowMenu(false);
+    }
+  };
 
   const hasChildren = node.children && node.children.length > 0;
   const isWorkPackage = node.type === 'work_package';
@@ -344,23 +374,33 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
             </>
           )}
 
-          {/* 3-Dots Dropdown with High Z-Index & Dark Text */}
+          {/* 3-Dots Dropdown with Fixed Floating Position */}
           <div className="relative">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              ref={menuButtonRef}
+              onClick={handleToggleMenu}
               className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors border border-transparent hover:border-slate-300"
               title="More actions"
             >
               <MoreVertical className="w-3.5 h-3.5" />
             </button>
 
-            {showMenu && (
+            {showMenu && menuCoords && (
               <>
                 <div 
-                  className="fixed inset-0 z-40" 
+                  className="fixed inset-0 z-[9990]" 
                   onClick={() => setShowMenu(false)} 
                 />
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-left text-xs font-medium whitespace-nowrap">
+                <div 
+                  style={{
+                    position: 'fixed',
+                    ...(menuCoords.openUpwards 
+                      ? { bottom: `${window.innerHeight - menuCoords.top}px` } 
+                      : { top: `${menuCoords.top}px` }),
+                    right: `${menuCoords.right}px`,
+                  }}
+                  className="w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-[9999] text-left text-xs font-medium whitespace-nowrap animate-in fade-in zoom-in-95 duration-100"
+                >
                   <button
                     onClick={() => {
                       setShowMenu(false);
