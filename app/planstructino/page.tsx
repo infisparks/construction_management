@@ -763,7 +763,7 @@ export default function ConstructionPlanningPage() {
     const updatedNotes = isOverride 
       ? `${task?.notes || ''} [AUTHORIZED OVERRIDE: Started despite predecessor constraints: ${overrideReason}]` 
       : task?.notes;
-    const newProgress = Math.max(task?.progress ?? 0, 5);
+    const newProgress = task?.progress ?? 0;
 
     const updated = tasks.map((t) => {
       if (t.id === taskId) {
@@ -881,7 +881,11 @@ export default function ConstructionPlanningPage() {
     let detailsText = '';
 
     if (targetStatus === 'in_progress') {
-      const prevProgress = task.progress === 100 ? 90 : Math.max(task.progress, 10);
+      const prevProgress = task.progress === 100 
+        ? (task.plannedQuantity && task.completedQuantity 
+            ? Math.round((task.completedQuantity / task.plannedQuantity) * 100) 
+            : 0)
+        : task.progress;
       const newQty = task.plannedQuantity 
         ? Math.floor(task.plannedQuantity * (prevProgress / 100)) 
         : (task.completedQuantity || 0);
