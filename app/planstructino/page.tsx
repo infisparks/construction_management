@@ -37,7 +37,6 @@ import {
 import { Sidebar } from '@/components/construction-planning/Sidebar';
 import { PlanningHeader } from '@/components/construction-planning/PlanningHeader';
 import { ProjectSummaryCards, SummaryFilterType } from '@/components/construction-planning/ProjectSummaryCards';
-import { ScheduleHealth } from '@/components/construction-planning/ScheduleHealth';
 import { TaskToolbar } from '@/components/construction-planning/TaskToolbar';
 import { ConstructionTaskTable } from '@/components/construction-planning/ConstructionTaskTable';
 import { TaskDetailsDrawer } from '@/components/construction-planning/TaskDetailsDrawer';
@@ -1425,14 +1424,6 @@ export default function ConstructionPlanningPage() {
                 forecastCompletionDate={project.forecastCompletionDate}
                 activeFilter={summaryFilter}
                 onFilterChange={setSummaryFilter}
-              />
-
-              {/* Schedule Health & Critical Bottleneck Banner */}
-              <ScheduleHealth
-                project={project}
-                tasks={tasks}
-                onViewImpact={handleViewImpact}
-                onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
               />
 
               {/* Toolbar: Views Switcher, Search & Filters */}
