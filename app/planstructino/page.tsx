@@ -66,7 +66,8 @@ import { DbProject } from '@/lib/supabase/types';
 import { 
   resolveActiveSite, 
   setStoredActiveSite, 
-  getStoredActiveSiteId 
+  getStoredActiveSiteId,
+  fetchAllActiveSites 
 } from '@/lib/supabase/site-storage';
 import { CheckCircle2, AlertTriangle, X, Building2, ShieldAlert } from 'lucide-react';
 import { isViewAllowed, isOnlyAllowRole, getFirstAllowedView } from '@/lib/auth/role-access';
@@ -181,6 +182,14 @@ export default function ConstructionPlanningPage() {
   }, [router]);
 
   const handleSelectDbProject = (dbProj: DbProject) => {
+    // Immediately clear previous site's state so tasks never mix or linger
+    setTasks([]);
+    setDependencies([]);
+    setProgressEntries([]);
+    setIssues([]);
+    setActivityLogs([]);
+    setSubcontractorBills([]);
+
     setActiveDbProject(dbProj);
     setStoredActiveSite(dbProj);
     setProject((prev) => ({
@@ -193,7 +202,16 @@ export default function ConstructionPlanningPage() {
         ? `${dbProj.project_person} (${dbProj.person_number || ''})`
         : ''),
     }));
-    showToast(`Switched active site to "${dbProj.name}" (saved in storage)`, 'success');
+
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('site', dbProj.id);
+        window.history.pushState({}, '', url.toString());
+      } catch {}
+    }
+
+    showToast(`Switched active workspace to "${dbProj.name}"`, 'success');
   };
   const [tasks, setTasks] = useState<ConstructionTask[]>([]);
   const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
@@ -207,8 +225,12 @@ export default function ConstructionPlanningPage() {
     setAreAllNotesOpen((prev) => !prev);
   };
 
-  // Active Project ID for Supabase Planning Tables (Uses localStorage active site, then state, then fallback)
-  const activeProjectId = activeDbProject?.id || getStoredActiveSiteId() || 'f0e510da-9530-468f-bb09-59920070d55e';
+  // Active Project ID for Supabase Planning Tables (Checks state, then URL ?site=, then localStorage, then fallback)
+  const activeProjectId =
+    activeDbProject?.id ||
+    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('site') : null) ||
+    getStoredActiveSiteId() ||
+    'f0e510da-9530-468f-bb09-59920070d55e';
   const [isLoadingPlanningDb, setIsLoadingPlanningDb] = useState(false);
 
   // Synchronize planning data live with Supabase plan_* tables
@@ -355,13 +377,22 @@ export default function ConstructionPlanningPage() {
         if (urlCat) {
           setArchiveCategoryFilter(urlCat as any);
         }
+        const urlSite = params.get('site');
+        if (urlSite && activeDbProject && urlSite !== activeDbProject.id) {
+          fetchAllActiveSites(false).then((allSites) => {
+            const found = allSites.find((s) => s.id === urlSite);
+            if (found) {
+              handleSelectDbProject(found);
+            }
+          });
+        }
       } catch {
         // ignore
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [userRole]);
+  }, [userRole, activeDbProject]);
 
   // Guard currentView against restricted role access (onlyallow)
   useEffect(() => {
@@ -389,6 +420,9 @@ export default function ConstructionPlanningPage() {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('view', currentView);
+      if (activeProjectId) {
+        url.searchParams.set('site', activeProjectId);
+      }
 
       if (currentView === 'materials') {
         if (inventorySubTab) {
@@ -1406,7 +1440,7 @@ export default function ConstructionPlanningPage() {
                   <CommercialBillsAndExpensesView
                     initialTab={currentView === 'subcontractor-bills' ? 'subcontractor-bills' : 'expenses'}
                     project={project}
-                    projectId={activeDbProject?.id || 'f0e510da-9530-468f-bb09-59920070d55e'}
+                    projectId={activeProjectId}
                     userEmail={user.email || undefined}
                     userRole={userRole?.role}
                     showToast={showToast}
@@ -1423,7 +1457,7 @@ export default function ConstructionPlanningPage() {
                 {currentView === 'files-archive' && (
                   <FilesArchiveView
                     project={project}
-                    projectId={activeDbProject?.id || 'f0e510da-9530-468f-bb09-59920070d55e'}
+                    projectId={activeProjectId}
                     userEmail={user.email || undefined}
                     onOpenSitesManager={() => setIsSitesManagerOpen(true)}
                     initialCategory={archiveCategoryFilter}

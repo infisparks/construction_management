@@ -113,7 +113,25 @@ export const AddEditTaskDialog: React.FC<AddEditTaskDialogProps> = ({
       }
     } else {
       setName('');
-      setCode(`3.${allTasks.length + 1}`);
+      let nextCode = '1.0';
+      if (defaultParentId) {
+        const parent = allTasks.find((t) => t.id === defaultParentId);
+        const children = allTasks.filter((t) => t.parentTaskId === defaultParentId);
+        if (parent) {
+          nextCode = `${parent.code}.${children.length + 1}`;
+        } else {
+          nextCode = `${allTasks.length + 1}.0`;
+        }
+      } else {
+        const rootTasks = allTasks.filter((t) => !t.parentTaskId);
+        const rootNums = rootTasks.map((t) => {
+          const m = t.code.match(/^(\d+)/);
+          return m ? parseInt(m[1], 10) : 0;
+        });
+        const maxNum = rootNums.length > 0 ? Math.max(...rootNums) : 0;
+        nextCode = `${maxNum + 1}.0`;
+      }
+      setCode(nextCode);
       setType(defaultType);
       setParentTaskId(defaultParentId);
       setFloor('');
@@ -471,7 +489,25 @@ export const AddEditTaskDialog: React.FC<AddEditTaskDialogProps> = ({
                 <select
                   value={parentTaskId || ''}
                   onFocus={() => isInfoGuideEnabled && setHoveredGuideId('parentTaskId')}
-                  onChange={(e) => setParentTaskId(e.target.value || null)}
+                  onChange={(e) => {
+                    const newParentId = e.target.value || null;
+                    setParentTaskId(newParentId);
+                    if (!editingTask) {
+                      if (newParentId) {
+                        const parent = allTasks.find((t) => t.id === newParentId);
+                        const children = allTasks.filter((t) => t.parentTaskId === newParentId);
+                        setCode(parent ? `${parent.code}.${children.length + 1}` : `${allTasks.length + 1}.0`);
+                      } else {
+                        const rootTasks = allTasks.filter((t) => !t.parentTaskId);
+                        const rootNums = rootTasks.map((t) => {
+                          const m = t.code.match(/^(\d+)/);
+                          return m ? parseInt(m[1], 10) : 0;
+                        });
+                        const maxNum = rootNums.length > 0 ? Math.max(...rootNums) : 0;
+                        setCode(`${maxNum + 1}.0`);
+                      }
+                    }
+                  }}
                   className="w-full px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                 >
                   <option value="">None (Top-Level Phase)</option>

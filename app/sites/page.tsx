@@ -149,7 +149,7 @@ function SitesPageContent() {
 
     if (andRedirect) {
       setTimeout(() => {
-        router.push('/planstructino?view=list');
+        router.push(`/planstructino?site=${proj.id}&view=list`);
       }, 400);
     }
   };

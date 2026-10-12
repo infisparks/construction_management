@@ -460,7 +460,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
           ) : (
             <div className="space-y-3">
               {filteredProjects.map((p) => {
-                const isActive = p.id === activeProjectId || p.name === 'Noori Crust Site';
+                const isActive = p.id === activeProjectId;
                 return (
                   <div
                     key={p.id}

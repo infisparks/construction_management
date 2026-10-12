@@ -96,6 +96,24 @@ export async function resolveActiveSite(): Promise<{
     return { activeProject: null, allProjects: [] };
   }
 
+  // 1. Check URL query parameters (highest priority for multi-site tabs)
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlSiteId = params.get('site') || params.get('siteId') || params.get('projectId');
+      if (urlSiteId) {
+        const matchedUrl = allProjects.find((p) => p.id === urlSiteId);
+        if (matchedUrl) {
+          setStoredActiveSite(matchedUrl);
+          return { activeProject: matchedUrl, allProjects };
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Check localStorage
   const storedId = getStoredActiveSiteId();
   if (storedId) {
     const matched = allProjects.find((p) => p.id === storedId);
@@ -105,7 +123,7 @@ export async function resolveActiveSite(): Promise<{
     }
   }
 
-  // Fallback to first available project and persist
+  // 3. Fallback to first available project and persist
   const defaultProject = allProjects[0];
   setStoredActiveSite(defaultProject);
   return { activeProject: defaultProject, allProjects };
