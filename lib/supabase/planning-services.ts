@@ -6,13 +6,6 @@ import {
   TaskIssue, 
   TaskActivityLog 
 } from '@/lib/construction-planning/types';
-import { 
-  initialTasks, 
-  initialDependencies, 
-  initialProgressEntries, 
-  initialIssues, 
-  initialActivityLogs 
-} from '@/lib/construction-planning/mock-data';
 
 // ==========================================
 // 1. MAPPERS: Supabase Database <-> TypeScript
@@ -89,159 +82,22 @@ export function mapConstructionTaskToDb(task: Partial<ConstructionTask>, project
 // 2. SEEDING LOGIC: INITIAL LOAD INTO SUPABASE
 // ==========================================
 
-export async function seedInitialPlanningData(projectId: string, force: boolean = false): Promise<boolean> {
+export async function seedInitialPlanningData(projectId: string, _force: boolean = false): Promise<boolean> {
   try {
-    // 0. Check if tasks already exist for this project
-    const { count, error: countErr } = await supabase
+    // All tasks and planning entities are stored and maintained purely in Supabase
+    const { count, error } = await supabase
       .from('plan_tasks')
       .select('*', { count: 'exact', head: true })
       .eq('project_id', projectId);
 
-    if (!countErr && (count ?? 0) > 0 && !force) {
-      console.log(`[Seed] Project ${projectId} already has ${count} tasks. Skipping seeding.`);
-      return true;
+    if (error) {
+      console.error('[PlanningServices] Error checking tasks:', error);
+      return false;
     }
 
-    if (force) {
-      // Clean up in reverse dependency order
-      await supabase.from('plan_activity_logs').delete().eq('project_id', projectId);
-      await supabase.from('plan_issues').delete().eq('project_id', projectId);
-      await supabase.from('plan_daily_progress').delete().eq('project_id', projectId);
-      await supabase.from('plan_dependencies').delete().eq('project_id', projectId);
-      await supabase.from('plan_tasks').delete().eq('project_id', projectId);
-    }
-
-    // 1. Assign unique UUIDs to all initial tasks upfront
-    const idMap = new Map<string, string>();
-    for (const t of initialTasks) {
-      idMap.set(t.id, crypto.randomUUID());
-    }
-
-    // 2. Insert tasks level-by-level (topological sort) to satisfy foreign key constraints
-    let remaining = [...initialTasks];
-    const insertedOriginalIds = new Set<string>();
-
-    while (remaining.length > 0) {
-      // Find tasks whose parent is either null or has already been inserted
-      const currentBatch = remaining.filter(
-        t => !t.parentTaskId || insertedOriginalIds.has(t.parentTaskId)
-      );
-
-      if (currentBatch.length === 0) {
-        console.warn('[Seed] Circular or unresolvable parent references detected in remaining tasks:', remaining.map(t => t.id));
-        break;
-      }
-
-      for (const task of currentBatch) {
-        const dbPayload = mapConstructionTaskToDb(task, projectId);
-        dbPayload.id = idMap.get(task.id);
-        if (task.parentTaskId && idMap.has(task.parentTaskId)) {
-          dbPayload.parent_task_id = idMap.get(task.parentTaskId);
-        } else {
-          dbPayload.parent_task_id = null;
-        }
-
-        const { error } = await supabase.from('plan_tasks').insert(dbPayload);
-        if (error) {
-          console.error(`[Seed] Failed to insert task ${task.code} (${task.name}):`, error);
-        } else {
-          insertedOriginalIds.add(task.id);
-        }
-      }
-
-      remaining = remaining.filter(t => !insertedOriginalIds.has(t.id));
-    }
-
-    // 3. Insert dependencies
-    const validDeps = initialDependencies.map(dep => {
-      const pred = idMap.get(dep.predecessorId);
-      const succ = idMap.get(dep.successorId);
-      if (!pred || !succ) return null;
-      return {
-        project_id: projectId,
-        predecessor_id: pred,
-        successor_id: succ,
-        dependency_type: dep.type,
-        lag_days: dep.lagDays,
-      };
-    }).filter(Boolean);
-
-    if (validDeps.length > 0) {
-      const { error: depErr } = await supabase.from('plan_dependencies').insert(validDeps as any[]);
-      if (depErr) console.error('[Seed] Dependencies insert error:', depErr);
-    }
-
-    // 4. Insert daily progress logs
-    const validProgress = initialProgressEntries.map(entry => {
-      const taskId = idMap.get(entry.taskId);
-      if (!taskId) return null;
-      return {
-        task_id: taskId,
-        project_id: projectId,
-        report_date: entry.reportDate,
-        work_completed_today: entry.workCompletedToday,
-        previous_progress: entry.previousProgress,
-        new_progress: entry.newProgress,
-        quantity_completed_today: entry.quantityCompletedToday || null,
-        quantity_unit: entry.quantityUnit || null,
-        workers_count: entry.workersCount || null,
-        material_usage: entry.materialUsage || null,
-        supervisor_name: entry.supervisorName,
-        plan_status: entry.status,
-        issues: entry.issues || null,
-        remarks: entry.remarks || null,
-        photos: entry.photos || [],
-      };
-    }).filter(Boolean);
-
-    if (validProgress.length > 0) {
-      const { error: progErr } = await supabase.from('plan_daily_progress').insert(validProgress as any[]);
-      if (progErr) console.error('[Seed] Progress insert error:', progErr);
-    }
-
-    // 5. Insert issues
-    const validIssues = initialIssues.map(issue => {
-      const taskId = idMap.get(issue.taskId);
-      if (!taskId) return null;
-      return {
-        task_id: taskId,
-        project_id: projectId,
-        title: issue.title,
-        description: issue.description,
-        severity: issue.severity,
-        status: issue.status,
-        reported_by: issue.reportedBy,
-        reported_date: issue.reportedDate,
-        resolution_notes: issue.resolutionNotes || null,
-      };
-    }).filter(Boolean);
-
-    if (validIssues.length > 0) {
-      const { error: issErr } = await supabase.from('plan_issues').insert(validIssues as any[]);
-      if (issErr) console.error('[Seed] Issues insert error:', issErr);
-    }
-
-    // 6. Insert activity logs
-    const validLogs = initialActivityLogs.map(log => {
-      const taskId = idMap.get(log.taskId);
-      if (!taskId) return null;
-      return {
-        task_id: taskId,
-        project_id: projectId,
-        action: log.action,
-        details: log.details,
-        performed_by: log.performedBy,
-      };
-    }).filter(Boolean);
-
-    if (validLogs.length > 0) {
-      const { error: logErr } = await supabase.from('plan_activity_logs').insert(validLogs as any[]);
-      if (logErr) console.error('[Seed] Activity logs insert error:', logErr);
-    }
-
-    return true;
+    return (count ?? 0) > 0;
   } catch (err) {
-    console.error('Error seeding initial planning data:', err);
+    console.error('Error checking planning data:', err);
     return false;
   }
 }

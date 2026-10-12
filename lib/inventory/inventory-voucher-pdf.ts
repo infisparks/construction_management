@@ -2,7 +2,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { InventoryTransaction } from './mock-inventory-data';
+import { InventoryTransaction } from './inventory-types';
 
 /**
  * Formats a monetary value safely without using the unicode rupee symbol (₹),

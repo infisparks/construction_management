@@ -15,7 +15,7 @@ import {
   Briefcase,
   CheckCircle2
 } from 'lucide-react';
-import { VendorProfile, VendorPartyType } from '@/lib/inventory/mock-inventory-data';
+import { VendorProfile, VendorPartyType } from '@/lib/inventory/inventory-types';
 
 interface VendorProfileDrawerProps {
   isOpen: boolean;

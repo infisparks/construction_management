@@ -20,6 +20,7 @@ interface CommercialBillsAndExpensesViewProps {
   project?: ProjectInfo;
   projectId?: string;
   userEmail?: string;
+  userRole?: string;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
   externalActionTrigger?: { action: string; timestamp: number } | null;
   // Subcontractor bill props
@@ -36,6 +37,7 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
   project,
   projectId = 'f0e510da-9530-468f-bb09-59920070d55e',
   userEmail,
+  userRole,
   showToast,
   externalActionTrigger,
   subcontractorBills,
@@ -133,6 +135,8 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
           onSaveBill={onSaveSubcontractorBill}
           onDeleteBill={onDeleteSubcontractorBill}
           showToast={showToast}
+          userEmail={userEmail}
+          userRole={userRole}
         />
       )}
     </div>

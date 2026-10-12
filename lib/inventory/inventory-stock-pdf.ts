@@ -2,7 +2,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { ConstructionMaterial } from './mock-inventory-data';
+import { ConstructionMaterial } from './inventory-types';
 import { formatINR, getCleanItemCode } from './inventory-voucher-pdf';
 
 export interface StockSummaryPdfOptions {

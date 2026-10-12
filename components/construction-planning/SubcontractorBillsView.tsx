@@ -19,7 +19,12 @@ import {
   Eye,
   MoreVertical,
   Paperclip,
-  Check
+  Check,
+  ChevronDown,
+  Lock,
+  Loader2,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { 
   SubcontractorBill, 
@@ -42,6 +47,9 @@ import {
   matchesDateFilter, 
   isDateFilterActive 
 } from '@/components/common/DateFilterControl';
+import { useAuth } from '@/lib/supabase/auth-context';
+import { isAdminUser } from '@/lib/auth/role-access';
+import { updateSubcontractorBillStatus } from '@/lib/supabase/subcontractor-bill-services';
 
 interface SubcontractorBillsViewProps {
   bills: SubcontractorBill[];
@@ -51,6 +59,8 @@ interface SubcontractorBillsViewProps {
   onSaveBill: (bill: SubcontractorBill) => void;
   onDeleteBill: (billId: string) => void;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
+  userEmail?: string;
+  userRole?: string;
 }
 
 export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
@@ -61,7 +71,18 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
   onSaveBill,
   onDeleteBill,
   showToast,
+  userEmail,
+  userRole,
 }) => {
+  // Authentication & Admin Check
+  const auth = useAuth();
+  const effectiveRole = userRole || auth?.userRole?.role || '';
+  const effectiveEmail = userEmail || auth?.user?.email || '';
+  const isAdmin = isAdminUser(effectiveRole, effectiveEmail);
+
+  // Status dropdown & updating state
+  const [statusMenuBillId, setStatusMenuBillId] = useState<string | null>(null);
+  const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<string | null>(null);
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'submitted' | 'approved' | 'paid'>('all');
@@ -136,42 +157,189 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
     showToast?.(`Downloading ${bill.billNumber}.pdf`, 'success');
   };
 
-  const getStatusBadge = (status: SubcontractorBill['status']) => {
+  // Status Options configuration
+  const STATUS_OPTIONS: {
+    status: SubcontractorBill['status'];
+    label: string;
+    description: string;
+    badgeClass: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[] = [
+    {
+      status: 'draft',
+      label: 'Draft',
+      description: 'Work in progress, measurements pending certification',
+      badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+      icon: Clock,
+    },
+    {
+      status: 'submitted',
+      label: 'Submitted',
+      description: 'Submitted by contractor, pending review & signoff',
+      badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+      icon: Clock,
+    },
+    {
+      status: 'approved',
+      label: 'Approved',
+      description: 'Verified & certified by Site Admin / Lead PM',
+      badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      icon: Check,
+    },
+    {
+      status: 'paid',
+      label: 'Paid',
+      description: 'Payment released & settled via accounts',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      icon: CheckCircle2,
+    },
+    {
+      status: 'partial',
+      label: 'Partial',
+      description: 'Partially settled milestone / interim payment',
+      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+      icon: Clock,
+    },
+  ];
+
+  // Handle live status modification (Admin restricted)
+  const handleUpdateStatus = async (
+    bill: SubcontractorBill,
+    newStatus: SubcontractorBill['status']
+  ) => {
+    if (!isAdmin) {
+      showToast?.('Access Restricted: Only Admin login can change bill status.', 'error');
+      return;
+    }
+    if (bill.status === newStatus) {
+      setStatusMenuBillId(null);
+      return;
+    }
+
+    setIsUpdatingStatusId(bill.id);
+    setStatusMenuBillId(null);
+
+    // Optimistic UI update
+    const updatedBill: SubcontractorBill = { ...bill, status: newStatus };
+    onSaveBill(updatedBill);
+
+    try {
+      const res = await updateSubcontractorBillStatus(bill.id, newStatus);
+      if (res) {
+        showToast?.(
+          `Bill ${bill.billNumber} status updated to "${newStatus.toUpperCase()}" (Admin)`,
+          'success'
+        );
+      } else {
+        showToast?.('Failed to update status in Supabase. Please retry.', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to update bill status:', err);
+      showToast?.('Error updating bill status', 'error');
+    } finally {
+      setIsUpdatingStatusId(null);
+    }
+  };
+
+  const getStatusBadge = (status: SubcontractorBill['status'], showHoverRing = false) => {
+    const ringClass = showHoverRing ? 'hover:ring-2 hover:ring-purple-300 transition-all' : '';
     switch (status) {
       case 'paid':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs ${ringClass}`}>
             <CheckCircle2 className="w-3 h-3" />
             Paid
           </span>
         );
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs ${ringClass}`}>
             <Check className="w-3 h-3" />
             Approved
           </span>
         );
       case 'submitted':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs ${ringClass}`}>
             <Clock className="w-3 h-3" />
             Submitted
           </span>
         );
       case 'partial':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs ${ringClass}`}>
+            <Clock className="w-3 h-3" />
             Partial
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs ${ringClass}`}>
+            <Clock className="w-3 h-3" />
             Draft
           </span>
         );
     }
+  };
+
+  const renderStatusCell = (bill: SubcontractorBill) => {
+    const isUpdating = isUpdatingStatusId === bill.id;
+
+    if (!isAdmin) {
+      return (
+        <div
+          onClick={() => showToast?.('Access Restricted: Only Admin login can change bill status.', 'error')}
+          className="inline-flex items-center gap-1.5 cursor-not-allowed opacity-90 select-none"
+          title="Only Admin login can change bill status"
+        >
+          {getStatusBadge(bill.status, false)}
+          <Lock className="w-3 h-3 text-slate-400" />
+        </div>
+      );
+    }
+
+    // Color classes matching status for admin select badge
+    const getSelectBg = (status: SubcontractorBill['status']) => {
+      switch (status) {
+        case 'paid':
+          return 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100/80 focus:border-emerald-500';
+        case 'approved':
+          return 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100/80 focus:border-indigo-500';
+        case 'submitted':
+          return 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100/80 focus:border-purple-500';
+        case 'partial':
+          return 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100/80 focus:border-amber-500';
+        default:
+          return 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200/80 focus:border-slate-500';
+      }
+    };
+
+    return (
+      <div className="relative inline-flex items-center group">
+        <select
+          value={bill.status}
+          disabled={isUpdating}
+          onChange={(e) => handleUpdateStatus(bill, e.target.value as SubcontractorBill['status'])}
+          className={`appearance-none cursor-pointer pl-3 pr-7 py-1 rounded-full text-[11px] font-bold border transition-all shadow-2xs focus:outline-none focus:ring-2 focus:ring-purple-400 font-sans tracking-wide ${getSelectBg(
+            bill.status
+          )}`}
+          title="Admin: Click to change bill status"
+        >
+          <option value="draft">● Draft</option>
+          <option value="submitted">● Submitted</option>
+          <option value="approved">● Approved</option>
+          <option value="paid">● Paid</option>
+          <option value="partial">● Partial</option>
+        </select>
+        <div className="pointer-events-none absolute right-2 flex items-center">
+          {isUpdating ? (
+            <Loader2 className="w-3 h-3 animate-spin text-purple-600" />
+          ) : (
+            <ChevronDown className="w-3 h-3 text-slate-500 group-hover:text-purple-700 transition-colors" />
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -188,9 +356,22 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
               Sub-Contractor Bills & RA Invoicing
             </h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Certified contractor measurements, pre-tax deductions (TDS/Royalty), retentions, and professional PDF generation.
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-xs text-slate-500">
+              Certified contractor measurements, pre-tax deductions (TDS/Royalty), retentions, and professional PDF generation.
+            </p>
+            {isAdmin ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
+                <ShieldCheck className="w-3 h-3 text-purple-600" />
+                Admin Session (Status Controls Active)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-semibold">
+                <Lock className="w-3 h-3 text-slate-400" />
+                Status Change Restricted to Admin
+              </span>
+            )}
+          </div>
         </div>
 
         <button
@@ -420,7 +601,7 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
 
                     {/* Status Badge */}
                     <td className="py-3 px-3 text-center">
-                      {getStatusBadge(bill.status)}
+                      {renderStatusCell(bill)}
                     </td>
 
                     {/* Professional PDF Actions: View PDF (blob) & Download PDF */}
@@ -519,7 +700,7 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
                     </div>
                   </div>
                   <div>
-                    {getStatusBadge(bill.status)}
+                    {renderStatusCell(bill)}
                   </div>
                 </div>
 
@@ -575,6 +756,7 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
         billToEdit={billToEdit}
         parties={parties}
         allTasks={tasks}
+        isAdmin={isAdmin}
       />
 
       {/* Bill Success Modal with Download / View PDF options */}

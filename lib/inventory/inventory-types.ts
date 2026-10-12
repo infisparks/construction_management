@@ -21,7 +21,7 @@ export interface ConstructionMaterial {
   minimumAlertStock: number;
   averageUnitRate: number; // In INR ₹
   gstRate: 0 | 5 | 12 | 18 | 28;
-  storageLocation: string; // e.g. "Godown A - Shed 2", "Open Rebar Yard Bay 3"
+  storageLocation: string;
   hsnCode?: string;
   brand?: string;
   lastUpdated: string;
@@ -31,7 +31,7 @@ export type InventoryTransactionType = 'check_in' | 'check_out' | 'return' | 'da
 
 export interface InventoryTransaction {
   id: string;
-  voucherNumber: string; // e.g. "GRN-2026-0142", "MIN-2026-0089", "RET-2026-0012", "DMG-2026-0005"
+  voucherNumber: string;
   type: InventoryTransactionType;
   materialId: string;
   materialCode?: string;
@@ -45,11 +45,11 @@ export interface InventoryTransaction {
   totalAmount?: number;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
-  runningStockBalance: number; // Stock balance right after this transaction
+  runningStockBalance: number;
   
   // Specific Reasons
-  returnReason?: string; // Reason for returning material to vendor
-  damageReason?: string; // Reason for damage / scrap write-off
+  returnReason?: string;
+  damageReason?: string;
 
   // Inward (Check-In) attributes
   supplierId?: string;
@@ -69,13 +69,13 @@ export interface InventoryTransaction {
   wbsTaskId?: string;
   wbsTaskCode?: string;
   wbsTaskName?: string;
-  floorZone?: string; // e.g. "Tower A - 3rd Floor Slab"
+  floorZone?: string;
   purpose?: string;
-  authorizedBy?: string; // Site Engineer / PM
+  authorizedBy?: string;
   isReturnable?: boolean;
 
-  // General audit attributes
-  receivedOrIssuedBy: string; // Storekeeper name
+  // Audit attributes
+  receivedOrIssuedBy: string;
   notes?: string;
 }
 
@@ -83,11 +83,11 @@ export type VendorPartyType = 'vendor' | 'contractor' | 'other';
 
 export interface VendorProfile {
   id: string;
-  name: string; // Only name is compulsory
-  type: VendorPartyType; // 'vendor' | 'contractor' | 'other'
+  name: string;
+  type: VendorPartyType;
   phone?: string;
   address?: string;
-  location?: string; // City / Site location
+  location?: string;
   trade?: string;
   contactPerson?: string;
   email?: string;
@@ -122,10 +122,3 @@ export interface InventorySubcontractor {
   activeWorkers?: number;
   notes?: string;
 }
-
-// All static mock data removed. Data is purely loaded live from Supabase (profile_product, profile_vendor, inventory_transactions).
-export const INITIAL_INVENTORY_SUPPLIERS: InventorySupplier[] = [];
-export const INITIAL_INVENTORY_SUBCONTRACTORS: InventorySubcontractor[] = [];
-export const INITIAL_VENDOR_PROFILES: VendorProfile[] = [];
-export const INITIAL_CONSTRUCTION_MATERIALS: ConstructionMaterial[] = [];
-export const INITIAL_INVENTORY_TRANSACTIONS: InventoryTransaction[] = [];

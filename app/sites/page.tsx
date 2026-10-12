@@ -51,7 +51,10 @@ function SitesPageContent() {
 
   // Form fields
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [address, setAddress] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [principalContractor, setPrincipalContractor] = useState('');
   const [projectPerson, setProjectPerson] = useState('');
   const [personNumber, setPersonNumber] = useState('');
   const [safetyKey, setSafetyKey] = useState('');
@@ -107,8 +110,11 @@ function SitesPageContent() {
   const handleOpenCreateModal = () => {
     setEditingProject(null);
     setName('');
+    setCode(`SITE-${projects.length + 1}`);
     setAddress('');
-    setProjectPerson('Er. Amit Verma');
+    setClientName('');
+    setPrincipalContractor('');
+    setProjectPerson('');
     setPersonNumber('');
     setSafetyKey(`KEY-${Math.floor(1000 + Math.random() * 9000)}`);
     setFormError(null);
@@ -119,7 +125,10 @@ function SitesPageContent() {
   const handleOpenEditModal = (proj: DbProject) => {
     setEditingProject(proj);
     setName(proj.name);
-    setAddress(proj.address || '');
+    setCode(proj.code || `SITE-${proj.serial_no}`);
+    setAddress(proj.location || proj.address || '');
+    setClientName(proj.client_name || '');
+    setPrincipalContractor(proj.principal_contractor || '');
     setProjectPerson(proj.project_person || '');
     setPersonNumber(proj.person_number || '');
     setSafetyKey(proj.safety_key || '');
@@ -163,7 +172,11 @@ function SitesPageContent() {
           .from('projects')
           .update({
             name: name.trim(),
+            code: code.trim() || null,
+            location: address.trim() || null,
             address: address.trim() || null,
+            client_name: clientName.trim() || null,
+            principal_contractor: principalContractor.trim() || null,
             project_person: projectPerson.trim() || null,
             person_number: personNumber.trim() || null,
             safety_key: safetyKey.trim() || null,
@@ -190,7 +203,11 @@ function SitesPageContent() {
           .insert([
             {
               name: name.trim(),
+              code: code.trim() || null,
+              location: address.trim() || null,
               address: address.trim() || null,
+              client_name: clientName.trim() || null,
+              principal_contractor: principalContractor.trim() || null,
               project_person: projectPerson.trim() || null,
               person_number: personNumber.trim() || null,
               safety_key: genKey,
@@ -478,7 +495,7 @@ function SitesPageContent() {
                     {/* Header: Code & Status */}
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                        SITE-#{proj.serial_no}
+                        {proj.code || `SITE-#${proj.serial_no}`}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {proj.is_deleted ? (
@@ -494,15 +511,15 @@ function SitesPageContent() {
                       </div>
                     </div>
 
-                    {/* Site Title */}
+                    {/* Site Title & Location */}
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1" title={proj.name}>
                         {proj.name}
                       </h3>
-                      {proj.address ? (
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1 line-clamp-1" title={proj.address}>
+                      {(proj.location || proj.address) ? (
+                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1 line-clamp-1" title={proj.location || proj.address || ''}>
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{proj.address}</span>
+                          <span>{proj.location || proj.address}</span>
                         </p>
                       ) : (
                         <p className="text-xs text-slate-400 italic mt-1">No address specified</p>
@@ -511,6 +528,24 @@ function SitesPageContent() {
 
                     {/* Key Details */}
                     <div className="p-2.5 rounded-lg bg-[#F5F6F8] space-y-1.5 text-xs text-slate-600">
+                      {proj.client_name && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-slate-500">Client:</span>
+                          <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[170px]" title={proj.client_name}>
+                            {proj.client_name}
+                          </span>
+                        </div>
+                      )}
+
+                      {proj.principal_contractor && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-slate-500">Principal Contractor:</span>
+                          <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[170px]" title={proj.principal_contractor}>
+                            {proj.principal_contractor}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-slate-500 flex items-center gap-1">
                           <User className="w-3 h-3 text-purple-600" /> Site Incharge:
@@ -611,11 +646,11 @@ function SitesPageContent() {
           }}
         >
           <div
-            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
                   <Building2 className="w-4.5 h-4.5" />
@@ -630,7 +665,7 @@ function SitesPageContent() {
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     {activeProjectsCount === 0
-                      ? 'Set up your first project to unlock the WBS planning schedule.'
+                      ? 'Set up your project details to unlock planning, documents & bills.'
                       : 'Add a new building, tower, or infrastructure jobsite.'}
                   </p>
                 </div>
@@ -648,7 +683,7 @@ function SitesPageContent() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmitForm} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleSubmitForm} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
               {formError && (
                 <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -656,83 +691,141 @@ function SitesPageContent() {
                 </div>
               )}
 
-              {/* Site Name */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  Site Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Grand Horizon Towers - Tower B"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium"
-                />
-              </div>
+              {/* Group 1: PROJECT & SITE DETAILS */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1.5 pb-1 border-b border-slate-100">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                    Project & Site Details (Prints on Bills & Vault)
+                  </span>
+                </div>
 
-              {/* Site Address */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  Site Address / Location
-                </label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="e.g. Plot 42, Sector 18, Kharghar, Navi Mumbai"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                />
-              </div>
-
-              {/* 2-column: Incharge & Phone */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Site Name */}
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">
-                    Project Person / Incharge
+                    Site / Project Name *
                   </label>
                   <input
                     type="text"
-                    value={projectPerson}
-                    onChange={(e) => setProjectPerson(e.target.value)}
-                    placeholder="Er. Amit Verma"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Noori Crust Site"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium"
                   />
+                </div>
+
+                {/* 2-column: Project Code & Location */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Project Code (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      placeholder="e.g. SITE-1"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Location / Address (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="e.g. Plot 12, Industrial Area, Phase 2"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 2-column: Client & Principal Contractor */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Client / Owner Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="e.g. Noori Developers & Properties Ltd."
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Principal Contractor (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={principalContractor}
+                      onChange={(e) => setPrincipalContractor(e.target.value)}
+                      placeholder="e.g. Mohammad Tariq (+91 98201 55410)"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 2: Operational Team & Safety Passcode */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Site Operations & Security (Optional)
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Project Incharge / Engineer
+                    </label>
+                    <input
+                      type="text"
+                      value={projectPerson}
+                      onChange={(e) => setProjectPerson(e.target.value)}
+                      placeholder="e.g. Er. Amit Verma"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Contact Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={personNumber}
+                      onChange={(e) => setPersonNumber(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">
-                    Contact Phone Number
+                    Site Safety / Passcode Key (Optional)
                   </label>
                   <input
-                    type="tel"
-                    value={personNumber}
-                    onChange={(e) => setPersonNumber(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    type="text"
+                    value={safetyKey}
+                    onChange={(e) => setSafetyKey(e.target.value)}
+                    placeholder="e.g. KEY-HOR-7821"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
                   />
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Used for engineer verification and subcontractor authorization on site.
+                  </p>
                 </div>
               </div>
 
-              {/* Safety Key */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  Site Safety / Passcode Key (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={safetyKey}
-                  onChange={(e) => setSafetyKey(e.target.value)}
-                  placeholder="e.g. KEY-HOR-7821"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Used for engineer verification and subcontractor authorization on site.
-                </p>
-              </div>
-
               {/* Modal Actions */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
                 {activeProjectsCount > 0 && (
                   <button
                     type="button"

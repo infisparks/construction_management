@@ -51,7 +51,10 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
 
   // Form State for New Site
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [address, setAddress] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [principalContractor, setPrincipalContractor] = useState('');
   const [projectPerson, setProjectPerson] = useState('');
   const [personNumber, setPersonNumber] = useState('');
   const [safetyKey, setSafetyKey] = useState('');
@@ -101,7 +104,11 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
         .insert([
           {
             name: name.trim(),
+            code: code.trim() || null,
+            location: address.trim() || null,
             address: address.trim() || null,
+            client_name: clientName.trim() || null,
+            principal_contractor: principalContractor.trim() || null,
             project_person: projectPerson.trim() || null,
             person_number: personNumber.trim() || null,
             safety_key: genSafetyKey,
@@ -122,7 +129,10 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
         
         // Reset form
         setName('');
+        setCode('');
         setAddress('');
+        setClientName('');
+        setPrincipalContractor('');
         setProjectPerson('');
         setPersonNumber('');
         setSafetyKey('');
@@ -273,7 +283,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                 </button>
               </div>
 
-              {/* Form Inputs (2-column on tablet/desktop, 1-column on mobile) */}
+              {/* Form Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="sm:col-span-2">
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
@@ -285,18 +295,31 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. Noori Crust Site, Apex Heights"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400 font-medium"
                     autoFocus
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                    Site Location / Address
+                    Project Code (Optional)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Plot 12, Industrial Area, Sector 74"
+                    placeholder="e.g. SITE-1"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Site Location / Address (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Plot 12, Industrial Area, Phase 2"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
@@ -305,11 +328,37 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                    Project In-Charge Person
+                    Client / Owner Name (Optional)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Mohammad Tariq, Er. Amit"
+                    placeholder="e.g. Noori Developers & Properties Ltd."
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Principal Contractor (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mohammad Tariq (+91 98201 55410)"
+                    value={principalContractor}
+                    onChange={(e) => setPrincipalContractor(e.target.value)}
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Project In-Charge Person (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Er. Amit Verma"
                     value={projectPerson}
                     onChange={(e) => setProjectPerson(e.target.value)}
                     className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
@@ -318,7 +367,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                    Person Phone Number
+                    Person Phone Number (Optional)
                   </label>
                   <input
                     type="tel"
@@ -338,7 +387,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="Auto-generated if left empty (e.g. NC-SITE-SECURE-88)"
                     value={safetyKey}
                     onChange={(e) => setSafetyKey(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400 font-mono"
                   />
                 </div>
               </div>

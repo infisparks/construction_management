@@ -44,7 +44,7 @@ import {
   InventorySubcontractor,
   VendorProfile,
   VendorPartyType,
-} from '@/lib/inventory/mock-inventory-data';
+} from '@/lib/inventory/inventory-types';
 import { ConstructionTask, ProjectInfo } from '@/lib/construction-planning/types';
 import {
   viewInventoryVoucherPdfInNewTab,

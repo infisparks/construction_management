@@ -12,8 +12,8 @@ import {
   HardHat,
   MapPin
 } from 'lucide-react';
-import { MaterialItem, MaterialTransaction, Party, ConstructionTask } from '@/lib/construction-planning/types';
-import { INITIAL_MATERIALS, INITIAL_PARTIES } from '@/lib/construction-planning/mock-materials-billing';
+import { MaterialTransaction, ConstructionTask } from '@/lib/construction-planning/types';
+import { fetchProfileProducts, fetchProfileVendors, ProfileProduct, ProfileVendor } from '@/lib/supabase/profile-services';
 
 interface LogMaterialModalProps {
   isOpen: boolean;
@@ -28,17 +28,34 @@ export const LogMaterialModal: React.FC<LogMaterialModalProps> = ({
   task,
   onSave,
 }) => {
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>(INITIAL_MATERIALS[0]?.id || '');
-  const [quantity, setQuantity] = useState<number>(50);
+  const [products, setProducts] = useState<ProfileProduct[]>([]);
+  const [vendors, setVendors] = useState<ProfileVendor[]>([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(1);
   const [consumptionDate, setConsumptionDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [contractorName, setContractorName] = useState<string>(INITIAL_PARTIES[0]?.name || 'M/S Sharma RCC Labour Gang');
+  const [contractorName, setContractorName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    fetchProfileProducts().then((prods) => {
+      if (prods && prods.length > 0) {
+        setProducts(prods);
+        setSelectedMaterialId(prods[0].id);
+      }
+    });
+    fetchProfileVendors().then((vends) => {
+      if (vends && vends.length > 0) {
+        setVendors(vends);
+        setContractorName(vends[0].name);
+      }
+    });
+  }, []);
+
   if (!isOpen) return null;
 
-  const selectedMaterial = INITIAL_MATERIALS.find((m) => m.id === selectedMaterialId) || INITIAL_MATERIALS[0];
-  const estimatedCost = selectedMaterial ? quantity * selectedMaterial.averageUnitRate : 0;
+  const selectedMaterial = products.find((m) => m.id === selectedMaterialId) || products[0];
+  const estimatedCost = selectedMaterial ? quantity * 0 : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,14 +77,14 @@ export const LogMaterialModal: React.FC<LogMaterialModalProps> = ({
       materialId: selectedMaterial.id,
       materialName: selectedMaterial.name,
       quantity,
-      unit: selectedMaterial.unit,
+      unit: selectedMaterial.unit || 'units',
       date: consumptionDate,
       taskId: task.id,
       taskCode: task.code,
       taskName: task.name,
       floor: task.floor,
       contractorPartyName: contractorName,
-      unitRate: selectedMaterial.averageUnitRate,
+      unitRate: 0,
       totalAmount: estimatedCost,
       recordedBy: 'Er. Amit Verma',
       notes: notes.trim() || undefined,
@@ -130,9 +147,9 @@ export const LogMaterialModal: React.FC<LogMaterialModalProps> = ({
               onChange={(e) => setSelectedMaterialId(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
-              {INITIAL_MATERIALS.map((m) => (
+              {products.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name} ({m.category}) — {m.currentStock} {m.unit} in store
+                  {m.name} ({m.category || 'Material'}) — {m.unit || 'units'}
                 </option>
               ))}
             </select>
@@ -185,9 +202,9 @@ export const LogMaterialModal: React.FC<LogMaterialModalProps> = ({
               onChange={(e) => setContractorName(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 font-medium text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
-              {INITIAL_PARTIES.map((p) => (
+              {vendors.map((p) => (
                 <option key={p.id} value={p.name}>
-                  {p.name} ({p.trade})
+                  {p.name} {p.trade ? `(${p.trade})` : ''}
                 </option>
               ))}
             </select>
@@ -212,14 +229,14 @@ export const LogMaterialModal: React.FC<LogMaterialModalProps> = ({
             <div className="flex items-center gap-2">
               <Calculator className="w-4 h-4 text-indigo-600" />
               <div>
-                <span className="text-[11px] text-slate-600 block">Estimated Material Cost:</span>
+                <span className="text-[11px] text-slate-600 block">Quantity to consume:</span>
                 <span className="font-mono text-sm font-bold text-indigo-900">
-                  ₹{Math.round(estimatedCost).toLocaleString()}
+                  {quantity} {selectedMaterial?.unit || 'units'}
                 </span>
               </div>
             </div>
             <span className="text-[10px] text-slate-500 font-mono">
-              @ ₹{selectedMaterial?.averageUnitRate.toLocaleString()}/{selectedMaterial?.unit}
+              Material: {selectedMaterial?.name || 'N/A'}
             </span>
           </div>
 

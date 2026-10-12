@@ -20,7 +20,7 @@ import {
   FileSpreadsheet,
   CheckCircle2
 } from 'lucide-react';
-import { ConstructionMaterial, InventoryTransaction } from '@/lib/inventory/mock-inventory-data';
+import { ConstructionMaterial, InventoryTransaction } from '@/lib/inventory/inventory-types';
 import {
   downloadInventoryVoucherPdf,
   viewInventoryVoucherPdfInNewTab,

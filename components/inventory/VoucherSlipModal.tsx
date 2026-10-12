@@ -19,7 +19,7 @@ import {
   ExternalLink,
   FileText
 } from 'lucide-react';
-import { InventoryTransaction } from '@/lib/inventory/mock-inventory-data';
+import { InventoryTransaction } from '@/lib/inventory/inventory-types';
 import {
   getInventoryVoucherPdfBlobUrl,
   downloadInventoryVoucherPdf,

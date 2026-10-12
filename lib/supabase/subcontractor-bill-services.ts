@@ -245,3 +245,34 @@ export async function deleteSubcontractorBill(id: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Update only the status of a Subcontractor Bill in Supabase
+ */
+export async function updateSubcontractorBillStatus(
+  id: string,
+  status: SubcontractorBill['status']
+): Promise<SubcontractorBill | null> {
+  try {
+    const { data, error } = await supabase
+      .from('subcontractor_bills')
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating subcontractor bill status in Supabase:', error);
+      return null;
+    }
+
+    return mapDbBillToUi(data as DbSubcontractorBill);
+  } catch (err) {
+    console.error('Failed to update subcontractor bill status in Supabase:', err);
+    return null;
+  }
+}
+

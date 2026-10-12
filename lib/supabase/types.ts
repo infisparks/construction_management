@@ -2,6 +2,10 @@ export interface DbProject {
   id: string;
   serial_no: number;
   name: string;
+  code?: string | null;
+  location?: string | null;
+  client_name?: string | null;
+  principal_contractor?: string | null;
   address: string | null;
   project_person: string | null;
   person_number: string | null;

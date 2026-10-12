@@ -36,12 +36,6 @@ import {
   Bill, 
   ConstructionTask 
 } from '@/lib/construction-planning/types';
-import { 
-  INITIAL_MATERIALS, 
-  INITIAL_PARTIES, 
-  INITIAL_BILLS, 
-  INITIAL_TRANSACTIONS 
-} from '@/lib/construction-planning/mock-materials-billing';
 
 interface MaterialBillingDrawerProps {
   isOpen: boolean;
@@ -58,13 +52,14 @@ export const MaterialBillingDrawer: React.FC<MaterialBillingDrawerProps> = ({
   initialTab = 'materials',
   onOpenSubcontractorBills,
 }) => {
-  const [activeTab, setActiveTab] = useState<'materials' | 'parties' | 'billing'>(initialTab);
+  const activeTabState = useState<'materials' | 'parties' | 'billing'>(initialTab);
+  const [activeTab, setActiveTab] = activeTabState;
 
   // Live state
-  const [materials, setMaterials] = useState<MaterialItem[]>(INITIAL_MATERIALS);
-  const [transactions, setTransactions] = useState<MaterialTransaction[]>(INITIAL_TRANSACTIONS);
-  const [parties, setParties] = useState<Party[]>(INITIAL_PARTIES);
-  const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS);
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [transactions, setTransactions] = useState<MaterialTransaction[]>([]);
+  const [parties, setParties] = useState<Party[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
 
   // Sub-view forms
   const [showIssueMaterialForm, setShowIssueMaterialForm] = useState(false);

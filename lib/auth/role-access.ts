@@ -236,3 +236,28 @@ export function getFirstAllowedView(
 
   return allowedList.length > 0 ? 'files-archive' : null;
 }
+
+/**
+ * Determines whether the user has administrator privileges.
+ * Only administrators can change bill statuses (draft, submitted, approved, paid), configure project settings, etc.
+ */
+export function isAdminUser(role?: string | null, email?: string | null): boolean {
+  if (!role && !email) return false;
+  const normalizedRole = role?.trim().toLowerCase();
+  const normalizedEmail = email?.trim().toLowerCase();
+
+  // Explicit admin role
+  if (normalizedRole === 'admin') return true;
+
+  // Well-known admin emails
+  if (
+    normalizedEmail === 'admin@gmail.com' ||
+    normalizedEmail === 'mudassir@gmail.com' ||
+    (normalizedEmail && normalizedEmail.startsWith('admin@'))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+

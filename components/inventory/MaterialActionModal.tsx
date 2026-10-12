@@ -24,7 +24,7 @@ import {
   InventoryTransactionType,
   InventorySupplier,
   InventorySubcontractor
-} from '@/lib/inventory/mock-inventory-data';
+} from '@/lib/inventory/inventory-types';
 import { ConstructionTask } from '@/lib/construction-planning/types';
 
 interface MaterialActionModalProps {

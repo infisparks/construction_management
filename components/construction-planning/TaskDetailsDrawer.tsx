@@ -31,7 +31,6 @@ import {
 } from '@/lib/construction-planning/types';
 import { formatDisplayDate, calculateElapsedDuration } from '@/lib/construction-planning/schedule-utils';
 import { checkTaskReadiness, getPredecessorTasks, getSuccessorTasks } from '@/lib/construction-planning/dependency-utils';
-import { INITIAL_MATERIALS, INITIAL_PARTIES, INITIAL_TRANSACTIONS } from '@/lib/construction-planning/mock-materials-billing';
 import { LogMaterialModal } from './LogMaterialModal';
 
 interface TaskDetailsDrawerProps {
@@ -78,7 +77,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   const [newIssueSeverity, setNewIssueSeverity] = useState<TaskIssue['severity']>('medium');
 
   // Material Consumption state
-  const [taskTransactions, setTaskTransactions] = useState<MaterialTransaction[]>(INITIAL_TRANSACTIONS);
+  const [taskTransactions, setTaskTransactions] = useState<MaterialTransaction[]>([]);
   const [isLogMaterialModalOpen, setIsLogMaterialModalOpen] = useState(false);
   const [materialSuccessMsg, setMaterialSuccessMsg] = useState<string | null>(null);
 

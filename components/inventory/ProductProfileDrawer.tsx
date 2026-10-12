@@ -13,7 +13,7 @@ import {
   Sparkles,
   FileText
 } from 'lucide-react';
-import { ConstructionMaterial } from '@/lib/inventory/mock-inventory-data';
+import { ConstructionMaterial } from '@/lib/inventory/inventory-types';
 import {
   fetchDropdownCategory,
   addCustomCategory,

@@ -22,7 +22,8 @@ import {
   Sparkles,
   Package,
   Layers,
-  Search
+  Search,
+  Lock
 } from 'lucide-react';
 import { 
   SubcontractorBill, 
@@ -37,6 +38,8 @@ import { SubcontractorDeductionModal } from './SubcontractorDeductionModal';
 import { VendorProfileDrawer } from './VendorProfileDrawer';
 import { fetchProfileVendors, fetchProfileProducts, ProfileVendor, ProfileProduct } from '@/lib/supabase/profile-services';
 import { fetchBillItemCatalog, saveBillItemToCatalog, BillItemTemplate } from '@/lib/supabase/category-services';
+import { useAuth } from '@/lib/supabase/auth-context';
+import { isAdminUser } from '@/lib/auth/role-access';
 
 interface SubcontractorBillDialogProps {
   isOpen: boolean;
@@ -45,6 +48,7 @@ interface SubcontractorBillDialogProps {
   billToEdit?: SubcontractorBill | null;
   parties?: Party[];
   allTasks?: ConstructionTask[];
+  isAdmin?: boolean;
 }
 
 // Default fallback product profiles for quick selection
@@ -402,7 +406,11 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
   billToEdit,
   parties = [],
   allTasks = [],
+  isAdmin: propIsAdmin,
 }) => {
+  const auth = useAuth();
+  const isUserAdmin = propIsAdmin !== undefined ? propIsAdmin : isAdminUser(auth.userRole?.role, auth.user?.email);
+
   // Remote Database Data States
   const [dbVendors, setDbVendors] = useState<ProfileVendor[]>([]);
   const [dbProducts, setDbProducts] = useState<ProfileProduct[]>([]);
@@ -415,6 +423,7 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
   const [billNumber, setBillNumber] = useState('');
   const [billDate, setBillDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [status, setStatus] = useState<SubcontractorBill['status']>('submitted');
   const [selectedVendorName, setSelectedVendorName] = useState('');
   const [selectedVendorTrade, setSelectedVendorTrade] = useState('');
   const [selectedVendorPhone, setSelectedVendorPhone] = useState('');
@@ -556,6 +565,7 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
       setAdditionalChargesDesc(billToEdit.additionalChargesDesc || '');
       setNotes(billToEdit.notes || '');
       setAttachments(billToEdit.attachments || []);
+      setStatus(billToEdit.status || 'submitted');
       setIsEditingVendor(false);
     } else {
       // EMPTY BY DEFAULT for new bills
@@ -563,6 +573,7 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
       setBillNumber(`SB-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`);
       setBillDate(today);
       setDueDate('');
+      setStatus('submitted');
       setSelectedVendorName('');
       setSelectedVendorTrade('');
       setSelectedVendorPhone('');
@@ -748,7 +759,7 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
       grandTotal,
       notes: notes.trim(),
       attachments,
-      status: billToEdit?.status || 'submitted',
+      status: isUserAdmin ? status : (billToEdit?.status || 'submitted'),
       createdAt: billToEdit?.createdAt || new Date().toISOString(),
     };
 
@@ -861,6 +872,63 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* Status & Approval State Control */}
+              <div className="pt-2.5 mt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Bill Status:
+                  </span>
+                  {isUserAdmin ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
+                      <ShieldCheck className="w-3 h-3 text-purple-600" />
+                      Admin Controlled
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-semibold">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      Admin Only
+                    </span>
+                  )}
+                </div>
+
+                {isUserAdmin ? (
+                  <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200 overflow-x-auto">
+                    {(
+                      [
+                        { key: 'draft', label: 'Draft', activeClass: 'bg-slate-700 text-white shadow-xs' },
+                        { key: 'submitted', label: 'Submitted', activeClass: 'bg-purple-600 text-white shadow-xs' },
+                        { key: 'approved', label: 'Approved', activeClass: 'bg-indigo-600 text-white shadow-xs' },
+                        { key: 'paid', label: 'Paid', activeClass: 'bg-emerald-600 text-white shadow-xs' },
+                        { key: 'partial', label: 'Partial', activeClass: 'bg-amber-600 text-white shadow-xs' },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setStatus(opt.key)}
+                        className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                          status === opt.key
+                            ? `${opt.activeClass}`
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-wide">
+                      <Lock className="w-2.5 h-2.5 text-slate-400" />
+                      {status}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      (Login as Admin to change)
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

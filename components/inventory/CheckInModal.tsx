@@ -20,7 +20,7 @@ import {
   ConstructionMaterial,
   InventoryTransaction,
   InventorySupplier
-} from '@/lib/inventory/mock-inventory-data';
+} from '@/lib/inventory/inventory-types';
 
 interface CheckInModalProps {
   isOpen: boolean;

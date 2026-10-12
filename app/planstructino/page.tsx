@@ -2,15 +2,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  initialProject, 
-  initialTasks, 
-  initialDependencies, 
-  initialProgressEntries, 
-  initialIssues, 
-  initialActivityLogs, 
-  initialRecoveryScenarios 
-} from '@/lib/construction-planning/mock-data';
-import { 
   ProjectInfo, 
   ConstructionTask, 
   TaskDependency, 
@@ -35,7 +26,7 @@ import {
   calculateProjectRollup,
   TaskNode 
 } from '@/lib/construction-planning/task-utils';
-import { INITIAL_PARTIES } from '@/lib/construction-planning/mock-materials-billing';
+import { fetchProfileVendors } from '@/lib/supabase/profile-services';
 import { 
   fetchSubcontractorBills, 
   createSubcontractorBill, 
@@ -138,8 +129,21 @@ export default function ConstructionPlanningPage() {
     });
   };
 
-  // Master State
-  const [project, setProject] = useState<ProjectInfo>(initialProject);
+  // Master State (populated dynamically from active site in Supabase)
+  const [project, setProject] = useState<ProjectInfo>({
+    id: 'active-site',
+    name: 'Loading Site...',
+    code: 'SITE-1',
+    type: 'Construction Site',
+    location: '',
+    durationMonths: 12,
+    plannedStartDate: new Date().toISOString().split('T')[0],
+    plannedCompletionDate: new Date().toISOString().split('T')[0],
+    forecastCompletionDate: new Date().toISOString().split('T')[0],
+    clientName: '',
+    generalContractor: '',
+    overallProgress: 0,
+  });
 
   // Resolve and persist active site from localStorage & Supabase on mount
   useEffect(() => {
@@ -159,11 +163,12 @@ export default function ConstructionPlanningPage() {
         setProject((prev) => ({
           ...prev,
           name: activeProject.name,
-          location: activeProject.address || prev.location,
-          generalContractor: activeProject.project_person
+          code: activeProject.code || `SITE-${activeProject.serial_no}`,
+          location: activeProject.location || activeProject.address || '',
+          clientName: activeProject.client_name || '',
+          generalContractor: activeProject.principal_contractor || (activeProject.project_person
             ? `${activeProject.project_person} (${activeProject.person_number || ''})`
-            : prev.generalContractor,
-          code: `SITE-${activeProject.serial_no}`,
+            : ''),
         }));
       } catch (err) {
         console.error('Error resolving active site:', err);
@@ -181,9 +186,12 @@ export default function ConstructionPlanningPage() {
     setProject((prev) => ({
       ...prev,
       name: dbProj.name,
-      location: dbProj.address || prev.location,
-      generalContractor: dbProj.project_person ? `${dbProj.project_person} (${dbProj.person_number || ''})` : prev.generalContractor,
-      code: `SITE-${dbProj.serial_no}`,
+      code: dbProj.code || `SITE-${dbProj.serial_no}`,
+      location: dbProj.location || dbProj.address || '',
+      clientName: dbProj.client_name || '',
+      generalContractor: dbProj.principal_contractor || (dbProj.project_person
+        ? `${dbProj.project_person} (${dbProj.person_number || ''})`
+        : ''),
     }));
     showToast(`Switched active site to "${dbProj.name}" (saved in storage)`, 'success');
   };
@@ -419,8 +427,34 @@ export default function ConstructionPlanningPage() {
   };
 
   // Subcontractor Bills State & Management (Persisted live to Supabase)
-  const [parties, setParties] = useState<Party[]>(INITIAL_PARTIES);
+  const [parties, setParties] = useState<Party[]>([]);
   const [subcontractorBills, setSubcontractorBills] = useState<SubcontractorBill[]>([]);
+
+  // Load Parties / Vendors dynamically from Supabase
+  useEffect(() => {
+    fetchProfileVendors().then((vendors) => {
+      if (vendors && vendors.length > 0) {
+        setParties(
+          vendors.map((v) => ({
+            id: v.id,
+            name: v.name,
+            category: (v.type === 'contractor' ? 'subcontractor' : v.type === 'vendor' ? 'material_supplier' : 'subcontractor') as any,
+            phone: v.phone || '',
+            email: v.email || undefined,
+            gstin: v.gstin || undefined,
+            pan: v.pan || undefined,
+            trade: v.trade || 'General Works',
+            bankDetails: v.bank_details || undefined,
+            totalBilledAmount: 0,
+            totalPaidAmount: 0,
+            currentBalanceDue: 0,
+            status: 'active' as const,
+            createdAt: v.created_at || new Date().toISOString(),
+          }))
+        );
+      }
+    });
+  }, []);
 
   // Load Subcontractor Bills from Supabase for active project
   useEffect(() => {
@@ -1374,6 +1408,7 @@ export default function ConstructionPlanningPage() {
                     project={project}
                     projectId={activeDbProject?.id || 'f0e510da-9530-468f-bb09-59920070d55e'}
                     userEmail={user.email || undefined}
+                    userRole={userRole?.role}
                     showToast={showToast}
                     externalActionTrigger={triggerExpenseAction}
                     subcontractorBills={subcontractorBills}

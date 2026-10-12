@@ -75,6 +75,23 @@ export function generateSubcontractorBillPdf(
   doc.line(margin, currentY, pageWidth - margin, currentY);
   currentY += 5;
 
+  // --- Dynamic Project Details (Print ONLY details that are present) ---
+  const projectLines: string[] = [];
+  if (project?.code && project.code.trim()) {
+    projectLines.push(`Project Code: ${project.code.trim()}`);
+  }
+  const loc = (project?.location || '').trim();
+  if (loc) {
+    projectLines.push(`Location: ${loc}`);
+  }
+  if (project?.clientName && project.clientName.trim()) {
+    projectLines.push(`Client: ${project.clientName.trim()}`);
+  }
+  const contractor = (project?.generalContractor || '').trim();
+  if (contractor) {
+    projectLines.push(`Principal Contractor: ${contractor}`);
+  }
+
   // --- Dynamic Vendor Details (Print ONLY details that are present) ---
   const vendorLines: string[] = [];
   if (bill.vendorTrade && bill.vendorTrade.trim()) {
@@ -95,9 +112,10 @@ export function generateSubcontractorBillPdf(
 
   // --- Two-Column Meta Box ---
   const boxWidth = (pageWidth - margin * 2 - 6) / 2;
-  const boxHeight = Math.max(32, 14 + vendorLines.length * 4.5);
+  const maxLines = Math.max(projectLines.length, vendorLines.length);
+  const boxHeight = Math.max(28, 14 + maxLines * 4.5);
 
-  // Box 1: Project Information
+  // Box 1: Project Information (Only Present Details Printed)
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(margin, currentY, boxWidth, boxHeight, 2, 2, 'FD');
@@ -115,12 +133,11 @@ export function generateSubcontractorBillPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(75, 85, 99);
-  doc.text(`Project Code: ${project?.code || 'PRJ-SITE-01'}`, margin + 3, currentY + 15);
-  doc.text(`Location: ${project?.location || 'Jobsite Location'}`, margin + 3, currentY + 19);
-  if (project?.clientName) {
-    doc.text(`Client: ${project.clientName}`, margin + 3, currentY + 23);
-  }
-  doc.text(`Principal Contractor: ${project?.generalContractor || 'Armee Enterprises'}`, margin + 3, currentY + (project?.clientName ? 27 : 23));
+  let pLineY = currentY + 15;
+  projectLines.forEach((line) => {
+    doc.text(line, margin + 3, pLineY);
+    pLineY += 4.5;
+  });
 
   // Box 2: Vendor / Subcontractor Information (Only Present Details Printed)
   const box2X = margin + boxWidth + 6;
@@ -196,11 +213,27 @@ export function generateSubcontractorBillPdf(
   const sumBoxWidth = 85;
   const sumBoxX = pageWidth - margin - sumBoxWidth;
 
+  const hasDeductions = (bill.preTaxDeductionTotal || 0) > 0;
+  const hasRetentions = (bill.preTaxRetentionTotal || 0) > 0;
+  const hasSubtotalDivider = hasDeductions || hasRetentions;
+  const hasGst = (bill.gstAmount || 0) > 0;
+  const hasAddCharges = (bill.additionalCharges || 0) > 0;
+
+  // Calculate box height dynamically based on active rows
+  let rowCount = 1; // Item Subtotal
+  if (hasDeductions) rowCount++;
+  if (hasRetentions) rowCount++;
+  if (hasSubtotalDivider) rowCount++; // Net Subtotal
+  if (hasGst) rowCount++;
+  if (hasAddCharges) rowCount++;
+
+  const summaryBoxHeight = Math.max(38, rowCount * 5.2 + 20);
+
   // Left Note & Breakdown Box
   const leftBoxWidth = sumBoxX - margin - 4;
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(229, 231, 235);
-  doc.roundedRect(margin, currentY, leftBoxWidth, 62, 2, 2, 'D');
+  doc.roundedRect(margin, currentY, leftBoxWidth, summaryBoxHeight, 2, 2, 'D');
 
   let leftY = currentY + 4;
   doc.setFont('helvetica', 'bold');
@@ -224,12 +257,6 @@ export function generateSubcontractorBillPdf(
       doc.text(`- ${d.name}: Rs. ${Number(d.amount).toLocaleString('en-IN')}`, margin + 5, leftY);
       leftY += 3.2;
     });
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7);
-    doc.setTextColor(156, 163, 175);
-    doc.text('- No pre-tax deductions applied.', margin + 3, leftY);
-    leftY += 3.5;
   }
 
   // Active retentions list
@@ -251,6 +278,14 @@ export function generateSubcontractorBillPdf(
     });
   }
 
+  if (activeDeductions.length === 0 && activeRetentions.length === 0) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(156, 163, 175);
+    doc.text('- No pre-tax deductions or retentions applied.', margin + 3, leftY);
+    leftY += 3.5;
+  }
+
   // Bill Notes Section
   leftY += 2;
   doc.setFont('helvetica', 'bold');
@@ -267,7 +302,7 @@ export function generateSubcontractorBillPdf(
   // Right Calculations Box
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(229, 231, 235);
-  doc.roundedRect(sumBoxX, currentY, sumBoxWidth, 62, 2, 2, 'FD');
+  doc.roundedRect(sumBoxX, currentY, sumBoxWidth, summaryBoxHeight, 2, 2, 'FD');
 
   let rightY = currentY + 5;
   const labelX = sumBoxX + 4;
@@ -289,18 +324,33 @@ export function generateSubcontractorBillPdf(
   };
 
   printRow('Item Subtotal', `Rs. ${Number(bill.itemSubtotal || 0).toLocaleString('en-IN')}`, false);
-  printRow('(-) Pre-Tax Deduction', `- Rs. ${Number(bill.preTaxDeductionTotal || 0).toLocaleString('en-IN')}`, false, true);
-  printRow('(-) Pre-Tax Retention', `- Rs. ${Number(bill.preTaxRetentionTotal || 0).toLocaleString('en-IN')}`, false, true);
   
-  // Divider
-  doc.setDrawColor(209, 213, 219);
-  doc.line(sumBoxX + 3, rightY - 1.5, sumBoxX + sumBoxWidth - 3, rightY - 1.5);
-  rightY += 1.5;
+  // Print (-) Pre-Tax Deduction ONLY if > 0
+  if (hasDeductions) {
+    printRow('(-) Pre-Tax Deduction', `- Rs. ${Number(bill.preTaxDeductionTotal).toLocaleString('en-IN')}`, false, true);
+  }
 
-  printRow('Net Subtotal', `Rs. ${Number(bill.netSubtotal || 0).toLocaleString('en-IN')}`, true);
-  printRow(`GST (${bill.gstRate || 0}%)`, `+ Rs. ${Number(bill.gstAmount || 0).toLocaleString('en-IN')}`, false);
-  if (bill.additionalCharges > 0) {
-    printRow('(+) Additional Charges', `+ Rs. ${Number(bill.additionalCharges || 0).toLocaleString('en-IN')}`, false);
+  // Print (-) Pre-Tax Retention ONLY if > 0
+  if (hasRetentions) {
+    printRow('(-) Pre-Tax Retention', `- Rs. ${Number(bill.preTaxRetentionTotal).toLocaleString('en-IN')}`, false, true);
+  }
+  
+  // Divider & Net Subtotal ONLY if deductions or retentions are applied
+  if (hasSubtotalDivider) {
+    doc.setDrawColor(209, 213, 219);
+    doc.line(sumBoxX + 3, rightY - 1.5, sumBoxX + sumBoxWidth - 3, rightY - 1.5);
+    rightY += 1.5;
+    printRow('Net Subtotal', `Rs. ${Number(bill.netSubtotal || 0).toLocaleString('en-IN')}`, true);
+  }
+
+  // Print GST ONLY if applied (> 0)
+  if (hasGst) {
+    printRow(`GST (${bill.gstRate || 0}%)`, `+ Rs. ${Number(bill.gstAmount).toLocaleString('en-IN')}`, false);
+  }
+
+  // Print Additional Charges ONLY if applied (> 0)
+  if (hasAddCharges) {
+    printRow('(+) Additional Charges', `+ Rs. ${Number(bill.additionalCharges).toLocaleString('en-IN')}`, false);
   }
 
   // Highlight Box for Grand Total
@@ -314,7 +364,7 @@ export function generateSubcontractorBillPdf(
   doc.text('NET PAYABLE', sumBoxX + 5, rightY + 5.5);
   doc.text(`Rs. ${Number(bill.grandTotal || 0).toLocaleString('en-IN')}`, valX - 2, rightY + 5.5, { align: 'right' });
 
-  currentY += 66;
+  currentY += summaryBoxHeight + 5;
 
   // --- Terms & Signatures Block ---
   const signBoxHeight = 26;
