@@ -18,15 +18,24 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
-  Sparkles
+  Sparkles,
+  Plus,
+  RefreshCw
 } from 'lucide-react';
 import { ProjectFile, FileCategory, FileType, FileStatus } from '@/lib/construction-planning/types';
+import {
+  fetchDropdownCategory,
+  addCustomCategory,
+  DEFAULT_DOCUMENT_CATEGORIES
+} from '@/lib/supabase/category-services';
 import { 
   uploadFileToStorage, 
   createProjectFileRecord, 
   fetchAvailableProjects, 
   ProjectOption 
 } from '@/lib/supabase/project-files';
+import { SitesManagerModal } from '@/components/projects/SitesManagerModal';
+import { DbProject } from '@/lib/supabase/types';
 
 interface UploadDocumentModalProps {
   isOpen: boolean;
@@ -36,6 +45,7 @@ interface UploadDocumentModalProps {
   projectName?: string;
   userEmail?: string;
   onFileUploaded: (file: ProjectFile) => void;
+  onSiteCreated?: (project: DbProject) => void;
 }
 
 const CATEGORIES: FileCategory[] = [
@@ -61,6 +71,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   projectName,
   userEmail,
   onFileUploaded,
+  onSiteCreated,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -70,9 +81,52 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId);
 
+  // Create Site Sidebar Drawer State
+  const [isCreateSiteOpen, setIsCreateSiteOpen] = useState(false);
+  const [siteSuccessToast, setSiteSuccessToast] = useState<string | null>(null);
+
+  // Custom Project Site Dropdown State
+  const [isSiteDropdownOpen, setIsSiteDropdownOpen] = useState(false);
+  const siteDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close site dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (siteDropdownRef.current && !siteDropdownRef.current.contains(event.target as Node)) {
+        setIsSiteDropdownOpen(false);
+      }
+    }
+    if (isSiteDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isSiteDropdownOpen]);
+
+  const handleOpenCreateSite = () => {
+    setIsCreateSiteOpen(true);
+  };
+
+  const handleSelectNewProject = async (newProj: DbProject) => {
+    const projs = await fetchAvailableProjects();
+    setAvailableProjects(projs);
+    setSelectedProjectId(newProj.id);
+    setIsSiteDropdownOpen(false);
+    setIsCreateSiteOpen(false);
+    setSiteSuccessToast(`Site "${newProj.name}" created and selected!`);
+    setTimeout(() => setSiteSuccessToast(null), 4000);
+    onSiteCreated?.(newProj);
+  };
+
   // Required / Primary Fields
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<FileCategory>('Site photographs and reports');
+
+  // Dynamic categories from Supabase category table
+  const [categoriesList, setCategoriesList] = useState<string[]>(DEFAULT_DOCUMENT_CATEGORIES);
+  const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
+  const [newCustomCategoryInput, setNewCustomCategoryInput] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [categorySuccessToast, setCategorySuccessToast] = useState<string | null>(null);
 
   // Toggle for Optional advanced links
   const [showOptionalFields, setShowOptionalFields] = useState(false);
@@ -90,11 +144,17 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Load available projects on mount
+  // Load available projects and categories on mount / open
   useEffect(() => {
-    async function loadProjects() {
-      const projs = await fetchAvailableProjects();
+    async function loadData() {
+      const [projs, cats] = await Promise.all([
+        fetchAvailableProjects(),
+        fetchDropdownCategory('document_category', DEFAULT_DOCUMENT_CATEGORIES)
+      ]);
       setAvailableProjects(projs);
+      if (cats && cats.length > 0) {
+        setCategoriesList(cats);
+      }
       if (projectId) {
         setSelectedProjectId(projectId);
       } else if (projs.length > 0) {
@@ -102,9 +162,35 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       }
     }
     if (isOpen) {
-      loadProjects();
+      loadData();
     }
   }, [isOpen, projectId]);
+
+  // Handle custom category creation into Supabase category table
+  const handleCreateCustomCategory = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newCustomCategoryInput.trim();
+    if (!trimmed) return;
+
+    setIsSavingCategory(true);
+    try {
+      const res = await addCustomCategory('document_category', trimmed, categoriesList);
+      if (res.success) {
+        setCategoriesList(res.categories);
+        setCategory(trimmed);
+        setNewCustomCategoryInput('');
+        setIsAddingCustomCategory(false);
+        setCategorySuccessToast(`Category "${trimmed}" saved to database!`);
+        setTimeout(() => setCategorySuccessToast(null), 3500);
+      } else {
+        setErrorMessage(res.error || 'Failed to save custom category');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Error saving custom category');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -127,12 +213,14 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     const lowerName = file.name.toLowerCase();
     const ext = file.name.split('.').pop()?.toLowerCase();
 
-    if (['jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext || '')) {
+    if (['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'svg'].includes(ext || '')) {
       setCategory('Site photographs and reports');
-    } else if (lowerName.includes('arch') || lowerName.includes('floor') || lowerName.includes('plan')) {
+    } else if (lowerName.includes('arch') || lowerName.includes('floor') || lowerName.includes('elevation')) {
       setCategory('Architectural drawings');
-    } else if (lowerName.includes('rcc') || lowerName.includes('struct') || lowerName.includes('rebar')) {
+    } else if (lowerName.includes('rcc') || lowerName.includes('struct') || lowerName.includes('rebar') || lowerName.includes('beam') || lowerName.includes('column')) {
       setCategory('Structural and RCC drawings');
+    } else if (lowerName.includes('schedule') || lowerName.includes('timeline') || ext === 'mpp' || ext === 'xer') {
+      setCategory('Project information');
     } else if (lowerName.includes('boq') || lowerName.includes('estimate') || ext === 'xlsx' || ext === 'xls') {
       setCategory('BOQs and cost estimates');
     } else if (lowerName.includes('bill') || lowerName.includes('invoice') || lowerName.includes('tax')) {
@@ -141,6 +229,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       setCategory('Contracts and agreements');
     } else if (lowerName.includes('test') || lowerName.includes('cube') || lowerName.includes('cert')) {
       setCategory('Quality, safety and handover documents');
+    } else if (ext === 'dwg' || ext === 'dxf' || ext === 'cad') {
+      setCategory('Architectural drawings');
     }
 
     // 3. Auto-generate optional document code if blank
@@ -235,7 +325,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     }
   };
 
-  const activeProjectName = availableProjects.find(p => p.id === selectedProjectId)?.name || projectName || 'Noori Crust Site';
+  const selectedProject = availableProjects.find(p => p.id === selectedProjectId);
+  const activeProjectName = selectedProject?.name || projectName || 'Noori Crust Site';
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -272,23 +363,123 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             </div>
           )}
 
-          {/* 1. Project Selector (Foreign Key) */}
+          {/* 1. Project Selector (Foreign Key) with Create Site in Dropdown */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-purple-600" />
-              <span>Project Site *</span>
-            </label>
-            <select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
-            >
-              {availableProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  Site #{p.serial_no} — {p.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                <span>Project Site *</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleOpenCreateSite}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors cursor-pointer"
+                title="Create a new construction site in sidebar"
+              >
+                <Plus className="w-3 h-3 stroke-[2.5]" />
+                <span>+ Create Site</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1" ref={siteDropdownRef}>
+                {/* Custom Dropdown Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsSiteDropdownOpen(!isSiteDropdownOpen)}
+                  className={`w-full flex items-center justify-between text-xs px-3 py-2.5 rounded-lg border bg-white font-semibold text-slate-900 transition-colors cursor-pointer text-left ${
+                    isSiteDropdownOpen 
+                      ? 'border-purple-600 ring-2 ring-purple-500/20 shadow-xs' 
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="truncate">
+                      {selectedProject
+                        ? `Site #${selectedProject.serial_no} — ${selectedProject.name}`
+                        : (activeProjectName || 'Select a site')}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isSiteDropdownOpen ? 'rotate-180 text-purple-600' : ''}`} />
+                </button>
+
+                {/* Dropdown Menu Popover */}
+                {isSiteDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-40 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Select Construction Site</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{availableProjects.length} sites</span>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto p-1.5 space-y-0.5">
+                      {availableProjects.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-500">No sites found</div>
+                      ) : (
+                        availableProjects.map((p) => {
+                          const isSelected = p.id === selectedProjectId;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProjectId(p.id);
+                                setIsSiteDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-purple-50 text-purple-900 font-bold'
+                                  : 'text-slate-700 hover:bg-slate-50 font-medium'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-purple-600' : 'bg-slate-300'}`} />
+                                <span className="truncate">Site #{p.serial_no} — {p.name}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-purple-600 shrink-0 ml-2" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Dedicated Create Site Button INSIDE Dropdown */}
+                    <div className="p-2 border-t border-slate-100 bg-slate-50 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSiteDropdownOpen(false);
+                          handleOpenCreateSite();
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>+ Create New Site</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Create Site Button Beside Dropdown */}
+              <button
+                type="button"
+                onClick={handleOpenCreateSite}
+                className="h-[38px] px-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                title="Open Create Site Sidebar"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span className="hidden sm:inline">Create Site</span>
+              </button>
+            </div>
+
+            {siteSuccessToast && (
+              <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 mt-1.5 animate-in fade-in">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{siteSuccessToast}</span>
+              </p>
+            )}
           </div>
 
           {/* 2. Drag & Drop File / Image Zone */}
@@ -347,10 +538,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 <div className="space-y-1">
                   <Upload className="w-7 h-7 mx-auto text-purple-600 mb-1" />
                   <p className="text-xs font-semibold text-slate-700">
-                    Click to browse or drop document / site photo
+                    Click to browse or drop any document, drawing, or site file
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Auto-picks title from file name • PDF, JPG, PNG, Excel, Word (up to 50MB)
+                    All formats supported (MPP, DWG, PDF, Excel, Word, Images, ZIP up to 50MB)
                   </p>
                 </div>
               )}
@@ -380,21 +571,91 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             />
           </div>
 
-          {/* 4. Category Dropdown */}
+          {/* 4. Category Dropdown & Custom Category Creator */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Document Category *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-700">
+                Document Category *
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsAddingCustomCategory(!isAddingCustomCategory)}
+                className="px-2 py-0.5 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-semibold border border-purple-200 transition-colors flex items-center gap-1 cursor-pointer"
+                title="Create a custom category saved to Supabase category table"
+              >
+                <Plus className="w-3 h-3" />
+                <span>{isAddingCustomCategory ? 'Cancel' : '+ Create Category'}</span>
+              </button>
+            </div>
+
+            {categorySuccessToast && (
+              <div className="mb-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-1.5 animate-in fade-in duration-150">
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>{categorySuccessToast}</span>
+              </div>
+            )}
+
+            {isAddingCustomCategory && (
+              <div className="p-3 mb-2 rounded-xl border border-purple-200 bg-purple-50/70 space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-purple-900">
+                    Create Custom Category
+                  </span>
+                  <span className="text-[10px] font-mono text-purple-700 font-semibold px-1.5 py-0.5 rounded bg-purple-100">
+                    category table (JSONB)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newCustomCategoryInput}
+                    onChange={(e) => setNewCustomCategoryInput(e.target.value)}
+                    placeholder="e.g. Safety Audit Reports, Elevation Photos"
+                    autoFocus
+                    className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-purple-300 bg-white focus:outline-hidden focus:border-purple-600 font-medium text-slate-900"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateCustomCategory();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={isSavingCategory || !newCustomCategoryInput.trim()}
+                    onClick={() => handleCreateCustomCategory()}
+                    className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                  >
+                    {isSavingCategory ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="w-3.5 h-3.5" />
+                    )}
+                    <span>Save</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value as FileCategory)}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+              onChange={(e) => {
+                if (e.target.value === '__add_new__') {
+                  setIsAddingCustomCategory(true);
+                } else {
+                  setCategory(e.target.value as FileCategory);
+                }
+              }}
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
             >
-              {CATEGORIES.map((cat) => (
+              {categoriesList.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
+              <option value="__add_new__" className="font-bold text-purple-700 bg-purple-50">
+                + Add Custom Category...
+              </option>
             </select>
           </div>
 
@@ -546,6 +807,16 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Slide-over Create Site Sidebar Drawer (Nested on top with higher z-index) */}
+      <SitesManagerModal
+        isOpen={isCreateSiteOpen}
+        onClose={() => setIsCreateSiteOpen(false)}
+        activeProjectId={selectedProjectId}
+        onSelectProject={handleSelectNewProject}
+        initialShowCreateForm={true}
+        zIndexClassName="z-[70]"
+      />
     </div>
   );
 };

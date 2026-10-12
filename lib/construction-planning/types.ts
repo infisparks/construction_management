@@ -136,7 +136,8 @@ export type ViewMode =
   | 'materials' 
   | 'billing' 
   | 'subcontractor-bills' 
-  | 'files-archive';
+  | 'files-archive'
+  | 'expenses';
 
 // Module 3 — Files Archive (Project Documents & Media Repository)
 export type FileCategory =
@@ -151,7 +152,8 @@ export type FileCategory =
   | 'Bills, invoices and payment records'
   | 'Site photographs and reports'
   | 'Meeting minutes and correspondence'
-  | 'Quality, safety and handover documents';
+  | 'Quality, safety and handover documents'
+  | (string & {});
 
 export type FileType = 'pdf' | 'image' | 'spreadsheet' | 'document' | 'dwg' | 'other';
 export type FileStatus = 'approved' | 'under_review' | 'draft' | 'superseded';
@@ -302,6 +304,7 @@ export interface SubcontractorRetentionItem {
 
 export interface SubcontractorBill {
   id: string;
+  projectId?: string;
   billNumber: string;
   billDate: string; // YYYY-MM-DD
   dueDate?: string;
@@ -329,4 +332,5 @@ export interface SubcontractorBill {
   attachments?: { name: string; size?: string; type: 'image' | 'doc'; url?: string }[];
   status: 'draft' | 'submitted' | 'approved' | 'paid' | 'partial';
   createdAt: string;
+  updatedAt?: string;
 }

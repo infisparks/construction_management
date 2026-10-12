@@ -29,6 +29,8 @@ interface SitesManagerModalProps {
   activeProjectId?: string;
   onSelectProject: (project: DbProject) => void;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
+  initialShowCreateForm?: boolean;
+  zIndexClassName?: string;
 }
 
 export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
@@ -37,13 +39,15 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
   activeProjectId,
   onSelectProject,
   showToast,
+  initialShowCreateForm = false,
+  zIndexClassName = 'z-50',
 }) => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<DbProject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleted, setShowDeleted] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(initialShowCreateForm);
 
   // Form State for New Site
   const [name, setName] = useState('');
@@ -77,8 +81,11 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchProjects();
+      if (initialShowCreateForm) {
+        setShowCreateForm(true);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialShowCreateForm]);
 
   // Handle Create New Site
   const handleCreateSite = async (e: React.FormEvent) => {
@@ -190,7 +197,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
   return (
     /* Slide-over Right Sidebar Drawer Container */
     <div 
-      className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+      className={`fixed inset-0 ${zIndexClassName || 'z-50'} overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-200`}
       onClick={onClose}
     >
       <div

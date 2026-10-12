@@ -1,5 +1,5 @@
 import { ConstructionTask, ScheduleStatus, ProjectInfo } from './types';
-import { calculateDaysBetween } from './schedule-utils';
+import { calculateDaysBetween, calculateDurationDetails } from './schedule-utils';
 
 export interface TaskNode extends ConstructionTask {
   children: TaskNode[];
@@ -7,13 +7,33 @@ export interface TaskNode extends ConstructionTask {
 }
 
 /**
+ * Deduplicates tasks by ID and by code to guarantee no activity ever appears twice
+ */
+export function deduplicateTaskList(tasks: ConstructionTask[]): ConstructionTask[] {
+  const seenIds = new Set<string>();
+  const seenCodes = new Set<string>();
+  const unique: ConstructionTask[] = [];
+
+  for (const t of tasks) {
+    if (!t || !t.id) continue;
+    if (seenIds.has(t.id)) continue;
+    seenIds.add(t.id);
+    if (t.code && seenCodes.has(t.code)) continue;
+    if (t.code) seenCodes.add(t.code);
+    unique.push(t);
+  }
+  return unique;
+}
+
+/**
  * Builds a hierarchical tree from a flat list of tasks
  */
 export function buildTaskTree(tasks: ConstructionTask[]): TaskNode[] {
+  const uniqueTasks = deduplicateTaskList(tasks);
   const taskMap = new Map<string, TaskNode>();
   
   // Sort tasks by sortOrder first
-  const sortedTasks = [...tasks].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sortedTasks = [...uniqueTasks].sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Initialize all nodes with empty children array
   sortedTasks.forEach((task) => {
@@ -63,8 +83,9 @@ export function flattenTaskTree(
  * Parent planned start is min(child start), planned end is max(child end).
  */
 export function recalculateParentRollups(tasks: ConstructionTask[]): ConstructionTask[] {
+  const uniqueTasks = deduplicateTaskList(tasks);
   const tasksById = new Map<string, ConstructionTask>();
-  tasks.forEach((t) => tasksById.set(t.id, { ...t }));
+  uniqueTasks.forEach((t) => tasksById.set(t.id, { ...t }));
 
   // Find all tasks that are parents
   const parentIds = new Set<string>();
@@ -210,7 +231,8 @@ export function calculateProjectRollup(
 
   // Calculate duration dynamically from minPlannedStart to maxPlannedEnd
   const diffDays = Math.max(1, calculateDaysBetween(minPlannedStart, maxPlannedEnd));
-  const dynamicMonths = Math.max(1, Math.round(diffDays / 30.4));
+  const durDetails = calculateDurationDetails(minPlannedStart, maxPlannedEnd);
+  const dynamicMonths = durDetails.months > 0 ? durDetails.months : Math.max(1, Math.round(diffDays / 30.4375));
 
   // Overall progress is weighted average of leaf tasks
   const avgProgress = Math.round(leafTasks.reduce((acc, t) => acc + t.progress, 0) / leafTasks.length);

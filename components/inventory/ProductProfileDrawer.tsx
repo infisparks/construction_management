@@ -14,6 +14,10 @@ import {
   FileText
 } from 'lucide-react';
 import { ConstructionMaterial } from '@/lib/inventory/mock-inventory-data';
+import {
+  fetchDropdownCategory,
+  addCustomCategory,
+} from '@/lib/supabase/category-services';
 
 interface ProductProfileDrawerProps {
   isOpen: boolean;
@@ -84,9 +88,20 @@ export const ProductProfileDrawer: React.FC<ProductProfileDrawerProps> = ({
   const [brand, setBrand] = useState('');
   const [gstRate, setGstRate] = useState<0 | 5 | 12 | 18 | 28>(0); // Default GST is 0%
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dbCategories, setDbCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchDropdownCategory('material_category', DEFAULT_CATEGORIES).then((cats) => {
+        if (cats && cats.length > 0) {
+          setDbCategories(cats);
+        }
+      });
+    }
+  }, [isOpen]);
 
   // All categories combined
-  const categoryOptions = Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories]));
+  const categoryOptions = Array.from(new Set([...DEFAULT_CATEGORIES, ...dbCategories, ...existingCategories]));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +112,10 @@ export const ProductProfileDrawer: React.FC<ProductProfileDrawerProps> = ({
     const finalCategory = category === '__custom__' && customCategory.trim() 
       ? customCategory.trim() 
       : category;
+
+    if (category === '__custom__' && customCategory.trim()) {
+      addCustomCategory('material_category', customCategory.trim(), categoryOptions);
+    }
 
     const finalUnit = unit === '__custom__' && customUnit.trim()
       ? customUnit.trim()

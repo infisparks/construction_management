@@ -1161,7 +1161,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                     <FileText className="w-12 h-12 text-purple-600 mx-auto" />
                     <h3 className="text-sm font-bold text-slate-900">{file.file_name}</h3>
                     <p className="text-xs text-slate-500">
-                      Technical Drawing Format: {file.file_type.toUpperCase()} &bull; {formatFileSize(file.file_size)}
+                      {file.file_type === 'dwg' ? 'Technical CAD Drawing' : file.file_type === 'document' ? 'Document' : `${(file.file_name.split('.').pop() || 'FILE').toUpperCase()} Format`} &bull; {formatFileSize(file.file_size)}
                     </p>
                     <div className="flex items-center gap-2 pt-2">
                       <button
@@ -1170,7 +1170,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                         className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-xs cursor-pointer"
                       >
                         <Download className="w-4 h-4" />
-                        <span>Download Drawing</span>
+                        <span>Download {file.file_name.split('.').pop()?.toUpperCase() || 'File'}</span>
                       </button>
                       <button
                         type="button"

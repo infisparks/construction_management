@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Building2, 
   ListTree, 
@@ -32,9 +33,15 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   History,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Printer,
+  Download,
+  Clock,
+  ExternalLink
 } from 'lucide-react';
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
+import { isModuleAllowed, isViewAllowed, isOnlyAllowRole } from '@/lib/auth/role-access';
 
 export type NavModuleId = 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'controls' | 'sites';
 
@@ -53,12 +60,16 @@ interface SidebarProps {
   onOpenSitesManager?: () => void;
   userEmail?: string;
   userRole?: string;
+  userPage?: string | null;
   onSignOut?: () => void;
   activeArchiveCategory?: FileCategory | 'all';
   onSelectArchiveCategory?: (category: FileCategory | 'all') => void;
   activeInventoryTab?: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'vendors';
   onSelectInventoryTab?: (tab: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'vendors') => void;
   onOpenMaterialAction?: (action: 'check_in' | 'check_out' | 'return' | 'damage') => void;
+  onOpenExpenseAction?: (action: string) => void;
+  onAddTask?: () => void;
+  onAddWorkPackage?: () => void;
 }
 
 interface NavModuleDef {
@@ -80,20 +91,13 @@ const MODULES: NavModuleDef[] = [
     description: 'WBS, Gantt timelines & CPM float',
   },
   {
-    id: 'execution',
-    label: 'Site Execution',
-    shortLabel: 'Site',
-    icon: HardHat,
-    description: 'Daily logs & progress reporting',
-  },
-  {
     id: 'commercial',
     label: 'Commercial & Bills',
     shortLabel: 'Bills',
-    icon: FileSpreadsheet,
-    badge: 'RA Bills',
+    icon: Receipt,
+    badge: 'Live',
     badgeColor: 'bg-purple-100 text-purple-700',
-    description: 'Sub-contractor bills & Khata',
+    description: 'Site expenses, subcontractor bills & Khata',
   },
   {
     id: 'materials',
@@ -122,15 +126,6 @@ const MODULES: NavModuleDef[] = [
     badgeColor: 'bg-amber-100 text-amber-800',
     description: 'Recovery plans & baseline configs',
   },
-  {
-    id: 'sites',
-    label: 'Sites & Multi-Project',
-    shortLabel: 'Sites',
-    icon: Building2,
-    badge: 'Cloud',
-    badgeColor: 'bg-purple-100 text-purple-700',
-    description: 'Switch sites & Supabase workspaces',
-  },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -148,19 +143,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSitesManager,
   userEmail,
   userRole,
+  userPage,
   onSignOut,
   activeArchiveCategory,
   onSelectArchiveCategory,
   activeInventoryTab = 'catalog',
   onSelectInventoryTab,
   onOpenMaterialAction,
+  onOpenExpenseAction,
+  onAddTask,
+  onAddWorkPackage,
 }) => {
+  const router = useRouter();
+
+  // Filter modules based on userRole and userPage (restricted for 'onlyallow' role)
+  const visibleModules = React.useMemo(() => {
+    return MODULES.filter((mod) => isModuleAllowed(mod.id, userRole, userPage));
+  }, [userRole, userPage]);
+
   // Determine active module based on current view or user selection
   const [activeModule, setActiveModule] = useState<NavModuleId>(() => {
     if (currentView === 'files-archive') return 'archive';
-    if (currentView === 'subcontractor-bills' || currentView === 'billing') return 'commercial';
+    if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing') return 'commercial';
     if (currentView === 'materials') return 'materials';
-    if (currentView === 'progress') return 'execution';
+    if (currentView === 'progress') return 'planning';
     return 'planning';
   });
 
@@ -169,18 +175,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Sync active module if currentView changes externally
   useEffect(() => {
-    if (currentView === 'files-archive') {
+    if (currentView === 'files-archive' && isModuleAllowed('archive', userRole, userPage)) {
       setActiveModule('archive');
-    } else if (currentView === 'subcontractor-bills' || currentView === 'billing') {
+    } else if ((currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing') && isModuleAllowed('commercial', userRole, userPage)) {
       setActiveModule('commercial');
-    } else if (currentView === 'materials') {
+    } else if (currentView === 'materials' && isModuleAllowed('materials', userRole, userPage)) {
       setActiveModule('materials');
-    } else if (currentView === 'progress') {
-      setActiveModule('execution');
-    } else if (currentView === 'list' || currentView === 'gantt' || currentView === 'critical' || currentView === 'milestones') {
+    } else if ((currentView === 'list' || currentView === 'gantt' || currentView === 'critical' || currentView === 'milestones' || currentView === 'progress') && isModuleAllowed('planning', userRole, userPage)) {
       setActiveModule('planning');
     }
-  }, [currentView]);
+  }, [currentView, userRole, userPage]);
+
+  // Ensure activeModule is one of the visible allowed modules
+  useEffect(() => {
+    if (visibleModules.length > 0 && !visibleModules.some((m) => m.id === activeModule)) {
+      setActiveModule(visibleModules[0].id);
+    }
+  }, [visibleModules, activeModule]);
 
   const closeAllPanels = () => {
     onCloseMobile();
@@ -188,6 +199,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleModuleClick = (modId: NavModuleId) => {
+    if (!isModuleAllowed(modId, userRole, userPage)) return;
+
     if (isCollapsed) {
       if (activeModule === modId && flyoutOpen) {
         setFlyoutOpen(false);
@@ -198,17 +211,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } else {
       setActiveModule(modId);
     }
-    // Auto switch to default view for certain single-view modules
-    if (modId === 'archive') {
+    // Auto switch to default view for modules
+    if (modId === 'planning') {
+      onViewChange('list');
+    } else if (modId === 'archive') {
       if (onSelectArchiveCategory) {
         onSelectArchiveCategory('all');
       }
       onViewChange('files-archive');
+    } else if (modId === 'commercial') {
+      onViewChange('expenses');
     } else if (modId === 'materials') {
-      if (onSelectInventoryTab) {
-        onSelectInventoryTab('catalog');
-      }
       onViewChange('materials');
+    } else if (modId === 'execution') {
+      onViewChange('progress');
     }
   };
 
@@ -238,142 +254,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
     switch (activeModule) {
       case 'archive':
         return (
-          <div className="space-y-5">
-            {/* Group 1: All Files & Drawings */}
+          <div className="space-y-4">
             <div>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Drawings & Engineering (Vault)
+                Documents & Drawings
               </div>
               <div className="space-y-1">
                 <button
                   type="button"
-                  onClick={() => handleArchiveCategoryClick('all')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isCatActive('all')
+                  onClick={() => {
+                    if (onSelectArchiveCategory) onSelectArchiveCategory('all');
+                    onViewChange('files-archive');
+                    closeAllPanels();
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    currentView === 'files-archive'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <FolderKanban className={`w-4 h-4 shrink-0 ${isCatActive('all') ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">All Project Documents</span>
+                    <FolderKanban className={`w-4 h-4 shrink-0 ${currentView === 'files-archive' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className="truncate">Files & Documents Archive</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
                     Vault
                   </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('Architectural drawings')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('Architectural drawings')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <FileText className={`w-4 h-4 shrink-0 ${isCatActive('Architectural drawings') ? 'text-purple-600' : 'text-rose-500'}`} />
-                    <span className="truncate">Architectural Drawings</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('Structural and RCC drawings')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('Structural and RCC drawings')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <FileText className={`w-4 h-4 shrink-0 ${isCatActive('Structural and RCC drawings') ? 'text-purple-600' : 'text-purple-500'}`} />
-                    <span className="truncate">Structural & RCC Plans</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('MEP drawings')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('MEP drawings')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Layers className={`w-4 h-4 shrink-0 ${isCatActive('MEP drawings') ? 'text-purple-600' : 'text-amber-500'}`} />
-                    <span className="truncate">MEP Drawings</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 2: Contracts, BOQs & Reports */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Commercial & Site Reports
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('BOQs and cost estimates')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('BOQs and cost estimates')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <FileSpreadsheet className={`w-4 h-4 shrink-0 ${isCatActive('BOQs and cost estimates') ? 'text-purple-600' : 'text-emerald-600'}`} />
-                    <span className="truncate">BOQs & Cost Estimates</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('Contracts and agreements')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('Contracts and agreements')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Receipt className={`w-4 h-4 shrink-0 ${isCatActive('Contracts and agreements') ? 'text-purple-600' : 'text-indigo-500'}`} />
-                    <span className="truncate">Contracts & Legal</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('Site photographs and reports')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('Site photographs and reports')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <ImageIcon className={`w-4 h-4 shrink-0 ${isCatActive('Site photographs and reports') ? 'text-purple-600' : 'text-purple-500'}`} />
-                    <span className="truncate">Site Photos Gallery</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleArchiveCategoryClick('Quality, safety and handover documents')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    isCatActive('Quality, safety and handover documents')
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <ShieldCheck className={`w-4 h-4 shrink-0 ${isCatActive('Quality, safety and handover documents') ? 'text-purple-600' : 'text-emerald-600'}`} />
-                    <span className="truncate">Quality & Safety Reports</span>
-                  </div>
                 </button>
               </div>
             </div>
@@ -382,11 +288,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'planning':
         return (
-          <div className="space-y-5">
-            {/* Group 1 */}
+          <div className="space-y-4">
             <div>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                WBS & Schedule Timeline
+                WBS & Schedule Views
               </div>
               <div className="space-y-1">
                 <button
@@ -395,10 +300,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onViewChange('list');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     currentView === 'list'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
@@ -413,10 +318,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onViewChange('gantt');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     currentView === 'gantt'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
@@ -434,10 +339,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onViewChange('critical');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     currentView === 'critical'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
@@ -455,10 +360,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onViewChange('milestones');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     currentView === 'milestones'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
@@ -466,131 +371,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="truncate">Project Milestones</span>
                   </div>
                 </button>
-              </div>
-            </div>
 
-            {/* Group 2 */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Baseline Controls
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenRecoveryPlan();
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <RotateCcw className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span className="truncate">Recovery & Resequence</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                    +3d
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenSettings();
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Settings className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="truncate">Baseline Settings</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'execution':
-        return (
-          <div className="space-y-5">
-            {/* Group 1 */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Site Operations & Logs
-              </div>
-              <div className="space-y-1">
                 <button
                   type="button"
                   onClick={() => {
                     onViewChange('progress');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     currentView === 'progress'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <ClipboardList className={`w-4 h-4 shrink-0 ${currentView === 'progress' ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">Daily Progress Log</span>
+                    <HardHat className={`w-4 h-4 shrink-0 ${currentView === 'progress' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className="truncate">Daily Site Progress Log</span>
                   </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenRecordProgress();
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-purple-700 bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200 transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <HardHat className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span className="truncate">Record Site Progress</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-800 shrink-0">
-                    + Log
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
+                    Daily
                   </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 2 */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Execution Intelligence
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onViewChange('critical');
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Route className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span className="truncate">Critical Activities</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                    Focus
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenRecoveryPlan();
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <RotateCcw className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span className="truncate">Delay Impact & Catch-Up</span>
-                  </div>
                 </button>
               </div>
             </div>
@@ -599,71 +399,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'commercial':
         return (
-          <div className="space-y-5">
-            {/* Group 1 */}
+          <div className="space-y-4">
             <div>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Sub-Contractor Bills (RA)
+                Commercial & Bills
               </div>
               <div className="space-y-1">
                 <button
                   type="button"
                   onClick={() => {
-                    onViewChange('subcontractor-bills');
+                    onViewChange('expenses');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    currentView === 'subcontractor-bills'
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    currentView === 'expenses' || currentView === 'subcontractor-bills'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <FileSpreadsheet className={`w-4 h-4 shrink-0 ${currentView === 'subcontractor-bills' ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">Sub-Contractor Bills</span>
+                    <Receipt className={`w-4 h-4 shrink-0 ${currentView === 'expenses' || currentView === 'subcontractor-bills' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className="truncate">Commercial Bills & Expenses</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
-                    RA Bills
+                    Bills
                   </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 2 */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Financial Khata & Parties
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenMaterialBilling?.('billing');
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Receipt className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="truncate">Parties & Billing Khata</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
-                    GST
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenMaterialBilling?.('parties');
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="truncate">Parties & Contractor List</span>
-                  </div>
                 </button>
               </div>
             </div>
@@ -673,131 +433,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'materials':
         return (
           <div className="space-y-4">
-            {/* Quick Movement & Action Popup in Sidebar */}
-            <div className="p-2.5 rounded-xl bg-purple-50/70 border border-purple-200/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider">
-                  Quick Action Popup
-                </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-200 text-purple-800 font-bold">
-                  Live Stock
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenMaterialAction?.('check_in');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer"
-                  title="Open Check-In Goods Modal"
-                >
-                  <ArrowDownLeft className="w-3 h-3 stroke-[2.5]" />
-                  <span>+ In</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenMaterialAction?.('check_out');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer"
-                  title="Open Check-Out & View Full History"
-                >
-                  <ArrowUpRight className="w-3 h-3 stroke-[2.5]" />
-                  <span>- Out</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenMaterialAction?.('return');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer"
-                  title="Open Vendor Return Modal"
-                >
-                  <RotateCcw className="w-3 h-3 stroke-[2.5]" />
-                  <span>- Return</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenMaterialAction?.('damage');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className="px-2 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer"
-                  title="Open Damage / Scrap Modal"
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>- Damaged</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 0: Master Profiles (Database Tables) */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-purple-700 flex items-center justify-between">
-                <span>Master Profiles (Supabase)</span>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 font-bold">
-                  2 Tables
-                </span>
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('products');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'products'
-                      ? 'bg-purple-100 text-purple-900 border border-purple-300 font-bold shadow-2xs'
-                      : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Package className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'products' ? 'text-purple-700' : 'text-purple-600'}`} />
-                    <span className="truncate">Product Profiles</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                    profile_product
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('vendors');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'vendors'
-                      ? 'bg-purple-100 text-purple-900 border border-purple-300 font-bold shadow-2xs'
-                      : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Building2 className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'vendors' ? 'text-purple-700' : 'text-purple-600'}`} />
-                    <span className="truncate">Vendor & Parties Profiles</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                    profile_vendor
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 1: Store & Receipts */}
             <div>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Site Inventory & Stock
@@ -806,159 +441,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    onSelectInventoryTab?.('catalog');
                     onViewChange('materials');
                     closeAllPanels();
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'catalog'
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    currentView === 'materials'
                       ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <Package className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'catalog' ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">Material Store & Stock</span>
+                    <Package className={`w-4 h-4 shrink-0 ${currentView === 'materials' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className="truncate">Material Store & Inventory</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
-                    Stock
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('inward');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'inward'
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <ArrowDownLeft className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'inward' ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">Inward Goods Register (GRN)</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                    + In
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 2: Issues, Dispatches & Returns */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Site Requisition & Usage
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('outward');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'outward'
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <ArrowUpRight className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'outward' ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">Material Issue & Dispatch (MIN)</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                    - Out
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('returns_damages');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'returns_damages'
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <RotateCcw className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'returns_damages' ? 'text-purple-600' : 'text-amber-600'}`} />
-                    <span className="truncate">Returns & Damaged Register</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                    Ret/Dmg
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('ledger');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'ledger'
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <History className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'ledger' ? 'text-purple-600' : 'text-slate-400'}`} />
-                    <span className="truncate">Stock History & Ledger</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('low_stock');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'low_stock'
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <AlertTriangle className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'low_stock' ? 'text-amber-600' : 'text-amber-500'}`} />
-                    <span className="truncate">Low Stock Alerts</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                    Alert
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectInventoryTab?.('vendors');
-                    onViewChange('materials');
-                    closeAllPanels();
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left cursor-pointer ${
-                    currentView === 'materials' && activeInventoryTab === 'vendors'
-                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Building2 className={`w-4 h-4 shrink-0 ${currentView === 'materials' && activeInventoryTab === 'vendors' ? 'text-purple-600' : 'text-purple-500'}`} />
-                    <span className="truncate">Vendors & Contractors</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                    Profiles
+                    Store
                   </span>
                 </button>
               </div>
@@ -966,13 +463,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         );
 
+
+
       case 'controls':
         return (
-          <div className="space-y-5">
-            {/* Group 1 */}
+          <div className="space-y-4">
             <div>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Fast-Tracking & Recovery
+                Controls & Governance
               </div>
               <div className="space-y-1">
                 <button
@@ -981,13 +479,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onOpenRecoveryPlan();
                     closeAllPanels();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer border border-transparent"
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <RotateCcw className="w-4 h-4 text-amber-600 shrink-0" />
+                    <RotateCcw className="w-4 h-4 text-purple-600 shrink-0" />
                     <span className="truncate">Recovery & Resequence</span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
                     +3d
                   </span>
                 </button>
@@ -995,54 +493,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    onViewChange('critical');
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Route className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span className="truncate">Critical Float Analysis</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Group 2 */}
-            <div>
-              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Workspace Configuration
-              </div>
-              <div className="space-y-1">
-                <button
-                  type="button"
-                  onClick={() => {
                     onOpenSettings();
                     closeAllPanels();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer border border-transparent"
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Settings className="w-4 h-4 text-slate-400 shrink-0" />
                     <span className="truncate">Baseline Settings</span>
                   </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenSitesManager?.();
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Building2 className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span className="truncate">Sites Multi-Project</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
-                    Supabase
-                  </span>
                 </button>
               </div>
             </div>
@@ -1051,8 +510,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'sites':
         return (
-          <div className="space-y-5">
-            {/* Group 1 */}
+          <div className="space-y-4">
             <div>
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Construction Workspaces
@@ -1064,29 +522,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onOpenSitesManager?.();
                     closeAllPanels();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-purple-700 bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200 transition-all text-left cursor-pointer"
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-all text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Building2 className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span className="truncate">Sites Manager (Supabase)</span>
+                    <span className="truncate">Sites Multi-Project Manager</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-800 shrink-0">
                     Active
                   </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenSitesManager?.();
-                    closeAllPanels();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <CheckSquare className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="truncate">Switch Active Site</span>
-                  </div>
                 </button>
               </div>
             </div>
@@ -1113,7 +557,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const currentModuleDef = MODULES.find(m => m.id === activeModule) || MODULES[0];
+  const currentModuleDef = visibleModules.find(m => m.id === activeModule) || visibleModules[0] || MODULES[0];
 
   return (
     <>
@@ -1142,14 +586,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex flex-col items-center gap-3">
             <button
               type="button"
-              onClick={() => handleModuleClick('planning')}
+              onClick={() => handleModuleClick(visibleModules[0]?.id || 'planning')}
               className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-xs font-bold hover:shadow-md transition-all group relative cursor-pointer"
-              title="InfiBuild PMS"
+              title="Armee Enterprises PMS"
             >
               <Building2 className="w-4 h-4 group-hover:scale-105 transition-transform" />
               {/* Tooltip */}
               <div className="absolute left-14 ml-1 px-2.5 py-1 bg-slate-900 text-white text-xs font-semibold rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                InfiBuild PMS
+                Armee Enterprises PMS
               </div>
             </button>
 
@@ -1157,7 +601,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Modules Navigation Rail */}
             <div className="flex flex-col items-center gap-1 w-full px-1.5">
-              {MODULES.map((mod) => {
+              {visibleModules.map((mod) => {
                 const Icon = mod.icon;
                 const isCurrent = activeModule === mod.id;
 
@@ -1199,11 +643,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 );
               })}
             </div>
+
           </div>
 
-          {/* Bottom Rail: Toggle, Avatar & Sign Out */}
+          {/* Bottom Rail: Sites, Toggle, Avatar & Sign Out */}
           <div className="flex flex-col items-center gap-2 w-full px-1.5">
             
+            {/* Sites Multi-Project Switcher Button (Opens separate /sites page) */}
+            <button
+              type="button"
+              onClick={() => {
+                router.push('/sites');
+                closeAllPanels();
+              }}
+              className="w-11 h-11 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition-all relative group cursor-pointer border border-transparent hover:border-purple-200"
+              title="Switch Construction Site"
+            >
+              <Building2 className="w-4 h-4 text-purple-600" />
+              <span className="text-[9px] font-semibold tracking-tight leading-none text-slate-600 group-hover:text-purple-700">
+                Sites
+              </span>
+              {/* Flyout Tooltip */}
+              <div className="absolute left-14 ml-1 px-2.5 py-1.5 bg-slate-900 text-white text-xs rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-left">
+                <div className="font-semibold text-xs flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Switch Construction Site</span>
+                </div>
+                <div className="text-[10px] text-purple-300 font-normal truncate max-w-[170px] mt-0.5">
+                  Current: {project.name}
+                </div>
+              </div>
+            </button>
+
             {/* Desktop Collapse / Expand Toggle Button */}
             <button
               type="button"
@@ -1310,7 +781,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  onOpenSitesManager?.();
+                  router.push('/sites');
                   closeAllPanels();
                 }}
                 className="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold border border-purple-200 transition-colors shrink-0 cursor-pointer"
@@ -1420,7 +891,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    onOpenSitesManager?.();
+                    router.push('/sites');
                     closeAllPanels();
                   }}
                   className="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-bold border border-purple-200 cursor-pointer"

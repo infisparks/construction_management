@@ -35,6 +35,13 @@ import {
 import { SubcontractorBillDialog } from './SubcontractorBillDialog';
 import { BillSuccessPdfModal } from './BillSuccessPdfModal';
 import { PdfViewerDialog } from './PdfViewerDialog';
+import { 
+  DateFilterControl, 
+  DateFilterState, 
+  DEFAULT_DATE_FILTER, 
+  matchesDateFilter, 
+  isDateFilterActive 
+} from '@/components/common/DateFilterControl';
 
 interface SubcontractorBillsViewProps {
   bills: SubcontractorBill[];
@@ -58,6 +65,7 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'submitted' | 'approved' | 'paid'>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
 
   // Modals & Dialogs
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -82,10 +90,11 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
         b.items.some((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+      const matchesDate = matchesDateFilter(b.billDate, dateFilter);
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [bills, searchQuery, statusFilter]);
+  }, [bills, searchQuery, statusFilter, dateFilter]);
 
   // Aggregate Metrics
   const metrics = useMemo(() => {
@@ -255,7 +264,7 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
       </div>
 
       {/* Toolbar: Search & Filters */}
-      <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -268,21 +277,45 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
           />
         </div>
 
-        {/* Status Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          {(['all', 'submitted', 'approved', 'paid', 'draft'] as const).map((st) => (
+        {/* Filters Group: Date Filter + Status Filters */}
+        <div className="flex items-center flex-wrap gap-2">
+          {/* Universal Date Filter: Range + Particular Date */}
+          <DateFilterControl
+            value={dateFilter}
+            onChange={setDateFilter}
+            label="Bill Date"
+          />
+
+          {/* Status Filters */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {(['all', 'submitted', 'approved', 'paid', 'draft'] as const).map((st) => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize whitespace-nowrap transition-colors cursor-pointer ${
+                  statusFilter === st
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {(searchQuery || isDateFilterActive(dateFilter) || statusFilter !== 'all') && (
             <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize whitespace-nowrap transition-colors ${
-                statusFilter === st
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDateFilter(DEFAULT_DATE_FILTER);
+                setStatusFilter('all');
+              }}
+              className="text-xs text-purple-700 hover:underline px-1.5 py-1 font-semibold cursor-pointer"
             >
-              {st}
+              Reset
             </button>
-          ))}
+          )}
         </div>
       </div>
 

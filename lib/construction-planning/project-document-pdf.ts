@@ -29,7 +29,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(17, 24, 39);
-  doc.text('InfiBuild Construction PMS • Project Vault', margin, currentY);
+  doc.text('Armee Enterprises PMS • Project Vault', margin, currentY);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -65,7 +65,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
   const metaRows = [
     ['Document Code', file.document_no, 'Revision / Version', file.version],
     ['Category', file.category, 'Status', file.status.toUpperCase()],
-    ['Building / Floor', file.building_floor || 'General / All Floors', 'Contractor / Vendor', file.contractor_name || 'InfiBuild Project Team'],
+    ['Building / Floor', file.building_floor || 'General / All Floors', 'Contractor / Vendor', file.contractor_name || 'Armee Enterprises Project Team'],
     ['WBS Task Code', file.task_code || 'wp-1 (Civil & Substructure)', 'Document Size', `${(file.file_size / (1024 * 1024)).toFixed(2)} MB`],
     ['Created Date', new Date(file.created_at).toLocaleDateString(), 'Archived By', file.uploaded_by || 'admin@gmail.com'],
   ];
@@ -179,7 +179,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text('Electronically verified and archived in InfiBuild PMS Document Vault.', margin, footerY + 5);
+  doc.text('Electronically verified and archived in Armee Enterprises PMS Document Vault.', margin, footerY + 5);
   doc.text(`Digital Verification Hash: SHA256-${file.id.substring(0, 16)} • Tamper-proof archival record`, margin, footerY + 9);
 
   // Digital Signature Box

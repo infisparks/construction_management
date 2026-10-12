@@ -23,7 +23,8 @@ import { InventoryTransaction } from '@/lib/inventory/mock-inventory-data';
 import {
   getInventoryVoucherPdfBlobUrl,
   downloadInventoryVoucherPdf,
-  viewInventoryVoucherPdfInNewTab
+  viewInventoryVoucherPdfInNewTab,
+  getCleanItemCode
 } from '@/lib/inventory/inventory-voucher-pdf';
 
 interface VoucherSlipModalProps {
@@ -269,14 +270,16 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                     <th className="px-4 py-2.5">Item Description & Code</th>
                     <th className="px-4 py-2.5 text-right">Movement Quantity</th>
                     <th className="px-4 py-2.5 text-right">Remaining Stock</th>
-                    <th className="px-4 py-2.5 text-right">Total (₹)</th>
+                    <th className="px-4 py-2.5 text-right">Total (Rs.)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr>
                     <td className="px-4 py-3">
                       <div className="font-bold text-slate-900">{transaction.materialName}</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">{transaction.materialId}</div>
+                      <div className="text-[11px] text-purple-700 font-semibold font-mono mt-0.5">
+                        Code: {getCleanItemCode(transaction.materialCode, transaction.materialId, 1)}
+                      </div>
                     </td>
                     <td className={`px-4 py-3 text-right font-bold text-sm ${
                       isCheckIn 
@@ -293,7 +296,7 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                       {transaction.runningStockBalance} {transaction.unit}
                     </td>
                     <td className="px-4 py-3 text-right font-bold font-mono text-slate-900">
-                      {transaction.totalAmount ? `₹${transaction.totalAmount.toLocaleString('en-IN')}` : '—'}
+                      {transaction.totalAmount ? `Rs. ${transaction.totalAmount.toLocaleString('en-IN')}` : '—'}
                     </td>
                   </tr>
                 </tbody>

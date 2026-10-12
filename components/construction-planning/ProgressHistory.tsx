@@ -14,6 +14,13 @@ import {
 } from 'lucide-react';
 import { DailyProgressEntry, ConstructionTask } from '@/lib/construction-planning/types';
 import { formatDisplayDate } from '@/lib/construction-planning/schedule-utils';
+import { 
+  DateFilterControl, 
+  DateFilterState, 
+  DEFAULT_DATE_FILTER, 
+  matchesDateFilter, 
+  isDateFilterActive 
+} from '@/components/common/DateFilterControl';
 
 interface ProgressHistoryProps {
   entries: DailyProgressEntry[];
@@ -31,6 +38,7 @@ export const ProgressHistory: React.FC<ProgressHistoryProps> = ({
   const [supervisorFilter, setSupervisorFilter] = useState('all');
   const [taskFilter, setTaskFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
 
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
 
@@ -41,6 +49,7 @@ export const ProgressHistory: React.FC<ProgressHistoryProps> = ({
   const filteredEntries = entries.filter((entry) => {
     if (supervisorFilter !== 'all' && entry.supervisorName !== supervisorFilter) return false;
     if (taskFilter !== 'all' && entry.taskId !== taskFilter) return false;
+    if (!matchesDateFilter(entry.reportDate, dateFilter)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const task = taskMap.get(entry.taskId);
@@ -94,6 +103,28 @@ export const ProgressHistory: React.FC<ProgressHistoryProps> = ({
               </option>
             ))}
           </select>
+
+          {/* Universal Date Filter: Start & End Date (Range) + Particular Date */}
+          <DateFilterControl
+            value={dateFilter}
+            onChange={setDateFilter}
+            label="Log Date"
+          />
+
+          {(searchQuery || isDateFilterActive(dateFilter) || supervisorFilter !== 'all' || taskFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDateFilter(DEFAULT_DATE_FILTER);
+                setSupervisorFilter('all');
+                setTaskFilter('all');
+              }}
+              className="text-xs text-purple-700 hover:underline px-1.5 py-1 font-semibold cursor-pointer"
+            >
+              Reset
+            </button>
+          )}
         </div>
 
         <button

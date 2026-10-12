@@ -13,9 +13,16 @@ import {
   Flame, 
   X,
   SlidersHorizontal,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 import { ViewMode, ScheduleStatus } from '@/lib/construction-planning/types';
+import { 
+  DateFilterControl, 
+  DateFilterState, 
+  DEFAULT_DATE_FILTER, 
+  isDateFilterActive 
+} from '@/components/common/DateFilterControl';
 
 interface TaskToolbarProps {
   currentView: ViewMode;
@@ -32,6 +39,10 @@ interface TaskToolbarProps {
   onExpandAll: () => void;
   onCollapseAll: () => void;
   isAllExpanded: boolean;
+  dateFilter?: DateFilterState;
+  onDateFilterChange?: (filter: DateFilterState) => void;
+  areAllNotesOpen?: boolean;
+  onToggleAllNotes?: () => void;
 }
 
 export const TaskToolbar: React.FC<TaskToolbarProps> = ({
@@ -49,6 +60,10 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
   onExpandAll,
   onCollapseAll,
   isAllExpanded,
+  dateFilter,
+  onDateFilterChange,
+  areAllNotesOpen,
+  onToggleAllNotes,
 }) => {
   const views: { id: ViewMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'list', label: 'Task List', icon: ListTree },
@@ -59,13 +74,19 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
     { id: 'subcontractor-bills', label: 'Sub-Contractor Bills', icon: FileSpreadsheet },
   ];
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || criticalOnly || floorFilter !== 'all';
+  const hasActiveFilters = 
+    searchQuery !== '' || 
+    statusFilter !== 'all' || 
+    criticalOnly || 
+    floorFilter !== 'all' ||
+    (dateFilter ? isDateFilterActive(dateFilter) : false);
 
   const clearAllFilters = () => {
     onSearchChange('');
     onStatusFilterChange('all');
     if (criticalOnly) onCriticalOnlyToggle();
     onFloorFilterChange('all');
+    if (onDateFilterChange) onDateFilterChange(DEFAULT_DATE_FILTER);
   };
 
   return (
@@ -94,12 +115,29 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
           })}
         </div>
 
-        {/* Tree Expand / Collapse controls for List & Gantt views */}
+        {/* Tree Expand / Collapse & Open / Close All Notes controls for List & Gantt views */}
         {(currentView === 'list' || currentView === 'gantt') && (
-          <div className="flex items-center gap-2 self-end md:self-auto">
+          <div className="flex items-center gap-2 self-end md:self-auto flex-wrap">
+            {onToggleAllNotes && currentView === 'list' && (
+              <button
+                type="button"
+                onClick={onToggleAllNotes}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                  areAllNotesOpen
+                    ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold shadow-xs'
+                    : 'text-slate-700 bg-slate-50 hover:bg-slate-100 border-slate-200'
+                }`}
+                title={areAllNotesOpen ? 'Close all activity notes across table' : 'Open and view all activity notes'}
+              >
+                <FileText className={`w-3.5 h-3.5 ${areAllNotesOpen ? 'text-amber-600' : 'text-slate-500'}`} />
+                <span>{areAllNotesOpen ? 'Close All Notes' : 'Open All Notes'}</span>
+              </button>
+            )}
+
             <button
+              type="button"
               onClick={isAllExpanded ? onCollapseAll : onExpandAll}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
             >
               <ChevronsUpDown className="w-3.5 h-3.5 text-slate-500" />
               <span>{isAllExpanded ? 'Collapse All' : 'Expand All'}</span>
@@ -162,6 +200,15 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
               ))}
             </select>
           </div>
+        )}
+
+        {/* Date Filter: Range + Particular Date */}
+        {dateFilter && onDateFilterChange && (
+          <DateFilterControl
+            value={dateFilter}
+            onChange={onDateFilterChange}
+            label="Schedule Date"
+          />
         )}
 
         {/* Critical Path Toggle */}

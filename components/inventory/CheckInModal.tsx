@@ -45,20 +45,39 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   const initialMat = materials.find((m) => m.id === selectedMaterialId) || materials[0];
 
   const [materialId, setMaterialId] = useState<string>(initialMat ? initialMat.id : '');
-  const [quantity, setQuantity] = useState<number | ''>(100);
-  const [unitRate, setUnitRate] = useState<number | ''>(initialMat && initialMat.averageUnitRate > 0 ? initialMat.averageUnitRate : '');
-  const [supplierId, setSupplierId] = useState<string>(suppliers[0]?.id || '');
-  const [challanNumber, setChallanNumber] = useState<string>('DC-' + Math.floor(1000 + Math.random() * 9000));
-  const [poNumber, setPoNumber] = useState<string>('PO-2026-' + Math.floor(100 + Math.random() * 900));
-  const [vehicleNumber, setVehicleNumber] = useState<string>('MH-04-AZ-8821');
-  const [driverName, setDriverName] = useState<string>('Ramesh Kumar');
-  const [driverPhone, setDriverPhone] = useState<string>('+91 98200 12345');
-  const [storageLocation, setStorageLocation] = useState<string>(initialMat ? initialMat.storageLocation : 'Cement Godown Shed #1');
+  const [quantity, setQuantity] = useState<number | ''>('');
+  const [unitRate, setUnitRate] = useState<number | ''>('');
+  const [supplierId, setSupplierId] = useState<string>('');
+  const [challanNumber, setChallanNumber] = useState<string>('');
+  const [poNumber, setPoNumber] = useState<string>('');
+  const [vehicleNumber, setVehicleNumber] = useState<string>('');
+  const [driverName, setDriverName] = useState<string>('');
+  const [driverPhone, setDriverPhone] = useState<string>('');
+  const [storageLocation, setStorageLocation] = useState<string>('');
   const [qcStatus, setQcStatus] = useState<'Passed' | 'Conditional' | 'Rejected'>('Passed');
-  const [receivedBy, setReceivedBy] = useState<string>('Ravi Kumar (Storekeeper)');
-  const [notes, setNotes] = useState<string>('Goods received in good order. Material physically inspected.');
+  const [receivedBy, setReceivedBy] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState<string>('10:30 AM');
+
+  // Reset all fields to empty defaults when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      const initM = materials.find((m) => m.id === selectedMaterialId) || materials[0];
+      if (initM) setMaterialId(initM.id);
+      setQuantity('');
+      setUnitRate('');
+      setSupplierId('');
+      setChallanNumber('');
+      setPoNumber('');
+      setVehicleNumber('');
+      setDriverName('');
+      setDriverPhone('');
+      setStorageLocation('');
+      setReceivedBy('');
+      setNotes('');
+    }
+  }, [isOpen, selectedMaterialId, materials]);
 
   if (!isOpen) return null;
 
@@ -207,25 +226,24 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               {/* Unit Rate */}
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Purchase Unit Rate (₹ per {currentMat?.unit || 'unit'}) <span className="text-purple-600 font-bold">*</span>
+                  Purchase Unit Rate (Rs. per {currentMat?.unit || 'unit'}) (Optional)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-medium">₹</span>
+                  <span className="absolute left-3 top-2.5 text-[11px] text-slate-400 font-medium">Rs.</span>
                   <input
                     type="number"
                     min="0"
                     step="any"
-                    required
                     value={unitRate}
                     onChange={(e) => setUnitRate(e.target.value === '' ? '' : Number(e.target.value))}
                     onWheel={(e) => e.currentTarget.blur()}
-                    placeholder={currentMat?.averageUnitRate && currentMat.averageUnitRate > 0 ? String(currentMat.averageUnitRate) : "Enter purchase rate"}
-                    className="w-full h-10 pl-7 pr-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                    placeholder={currentMat?.averageUnitRate && currentMat.averageUnitRate > 0 ? String(currentMat.averageUnitRate) : "e.g. 100"}
+                    className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                   />
                 </div>
                 <span className="text-[10px] text-slate-400 mt-1 block">
                   {currentMat?.averageUnitRate && currentMat.averageUnitRate > 0
-                    ? `Current rate: ₹${currentMat.averageUnitRate.toLocaleString('en-IN')}`
+                    ? `Current rate: Rs. ${currentMat.averageUnitRate.toLocaleString('en-IN')}`
                     : 'Enter rate per unit for this arrival'}
                 </span>
               </div>
@@ -234,10 +252,10 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
             {/* Quick Valuation Banner */}
             <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-100 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-slate-600">
-                Subtotal: <strong className="text-slate-800">₹{subtotal.toLocaleString('en-IN')}</strong> + GST ({gstRate}%): <strong className="text-slate-800">₹{gstAmount.toLocaleString('en-IN')}</strong>
+                Subtotal: <strong className="text-slate-800">Rs. {subtotal.toLocaleString('en-IN')}</strong> + GST ({gstRate}%): <strong className="text-slate-800">Rs. {gstAmount.toLocaleString('en-IN')}</strong>
               </span>
               <span className="font-semibold text-purple-800">
-                Total Value: ₹{totalValuation.toLocaleString('en-IN')}
+                Total Value: Rs. {totalValuation.toLocaleString('en-IN')}
               </span>
             </div>
           </div>
@@ -254,13 +272,14 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Supplier / Vendor *
+                  Supplier / Vendor (Optional)
                 </label>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
                 >
+                  <option value="">Select Supplier / Vendor (Optional)</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -271,15 +290,14 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Delivery Challan / Invoice # *
+                  Delivery Challan / Invoice # (Optional)
                 </label>
                 <input
                   type="text"
                   value={challanNumber}
                   onChange={(e) => setChallanNumber(e.target.value)}
-                  placeholder="e.g. DC-9941"
+                  placeholder="e.g. DC-9941 / INV-104"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  required
                 />
               </div>
 
@@ -310,7 +328,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Vehicle / Truck # *
+                  Vehicle / Truck # (Optional)
                 </label>
                 <input
                   type="text"
@@ -318,7 +336,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                   onChange={(e) => setVehicleNumber(e.target.value)}
                   placeholder="e.g. MH-04-CP-8812"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 uppercase"
-                  required
                 />
               </div>
 
@@ -383,7 +400,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Unloading Yard / Shed *
+                  Unloading Yard / Shed (Optional)
                 </label>
                 <input
                   type="text"
@@ -391,19 +408,18 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                   onChange={(e) => setStorageLocation(e.target.value)}
                   placeholder="e.g. Cement Shed #1"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  required
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Received By (Storekeeper) *
+                  Received By / Person Name *
                 </label>
                 <input
                   type="text"
                   value={receivedBy}
                   onChange={(e) => setReceivedBy(e.target.value)}
-                  placeholder="e.g. Ravi Kumar"
+                  placeholder="Enter receiving person name (e.g. Ravi Kumar)"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
                   required
                 />

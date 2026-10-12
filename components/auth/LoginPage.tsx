@@ -84,7 +84,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           </div>
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold text-[#111827] tracking-tight">
-              InfiBuild PMS
+              Armee Enterprises PMS
             </h1>
             <p className="text-xs sm:text-sm text-[#6B7280]">
               Enterprise Construction & Site Planning Software

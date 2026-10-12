@@ -232,7 +232,7 @@ export const PdfViewerDialog: React.FC<PdfViewerDialogProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 truncate">
-                Net Payable: ₹{Number(bill.grandTotal || 0).toLocaleString('en-IN')} &bull; Date: {bill.billDate}
+                Net Payable: Rs. {Number(bill.grandTotal || 0).toLocaleString('en-IN')} &bull; Date: {bill.billDate}
               </p>
             </div>
           </div>

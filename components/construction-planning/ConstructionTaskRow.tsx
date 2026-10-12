@@ -34,6 +34,8 @@ interface ConstructionTaskRowProps {
   onDeleteTask: (task: ConstructionTask) => void;
   dependencies: TaskDependency[];
   onOpenDependencyManager: (task: ConstructionTask) => void;
+  isNotesOpen?: boolean;
+  onToggleRowNotes?: () => void;
 }
 
 export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
@@ -49,6 +51,8 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
   onDeleteTask,
   dependencies,
   onOpenDependencyManager,
+  isNotesOpen = false,
+  onToggleRowNotes,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -117,8 +121,9 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
   const indentPadding = Math.min(node.level * 20, 80);
 
   return (
-    <tr 
-      className={`group border-b border-slate-200/80 hover:bg-slate-50/90 transition-colors ${
+    <React.Fragment>
+      <tr 
+        className={`group border-b border-slate-200/80 hover:bg-slate-50/90 transition-colors ${
         isWorkPackage ? 'bg-slate-50/70 font-medium' : 'bg-white'
       } ${node.isCritical ? 'border-l-4 border-l-purple-600' : 'border-l-4 border-l-transparent'}`}
     >
@@ -177,6 +182,26 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
               {node.floor}
             </span>
           )}
+
+          {/* Activity Note Indicator & Toggle Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleRowNotes?.();
+            }}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors shrink-0 cursor-pointer ${
+              isNotesOpen
+                ? 'bg-amber-100 text-amber-900 border border-amber-300 font-semibold'
+                : node.notes || node.description
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                  : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600 border border-slate-200'
+            }`}
+            title={node.notes || node.description ? (isNotesOpen ? 'Close note' : 'View note') : 'Add note'}
+          >
+            <FileText className="w-2.5 h-2.5 text-amber-600" />
+            <span className="hidden sm:inline">{node.notes || node.description ? (isNotesOpen ? 'Hide' : 'Note') : '+Note'}</span>
+          </button>
         </div>
       </td>
 
@@ -257,15 +282,23 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
         </div>
       </td>
 
-      {/* 7. Dependencies (Predecessors & Successors - "Sub / Pub") ALWAYS VISIBLE */}
+      {/* 7. Dependencies (Predecessors & Successors) - Highlight in RED if linked in this project */}
       <td className="py-2 px-2 text-xs text-center whitespace-nowrap">
         <button
           onClick={() => onOpenDependencyManager(node)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-semibold text-slate-700 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-300 transition-colors shadow-2xs"
-          title={`${taskPredecessors.length} Predecessors, ${taskSuccessors.length} Successors. Click to inspect & edit.`}
+          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono font-semibold transition-all shadow-2xs cursor-pointer ${
+            taskPredecessors.length > 0
+              ? 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-300 font-bold'
+              : 'text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300'
+          }`}
+          title={
+            taskPredecessors.length > 0
+              ? `Linked in this project: ${taskPredecessors.length} Predecessor(s), ${taskSuccessors.length} Successor(s). Click to inspect & edit.`
+              : 'No predecessor dependencies. Independent parallel task.'
+          }
         >
-          <Link2 className="w-3 h-3 text-indigo-600" />
-          <span>{taskPredecessors.length} / {taskSuccessors.length}</span>
+          <Link2 className={`w-3 h-3 ${taskPredecessors.length > 0 ? 'text-rose-600' : 'text-slate-400'}`} />
+          <span>{taskPredecessors.length > 0 ? `Linked (${taskPredecessors.length})` : 'Independent'}</span>
         </button>
       </td>
 
@@ -391,5 +424,38 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
         </div>
       </td>
     </tr>
+
+      {/* Expandable Activity Notes Sub-Row */}
+      {isNotesOpen && (
+        <tr className="bg-amber-50/40 border-b border-amber-200/80 transition-colors">
+          <td colSpan={8} className="py-2.5 px-4 sm:px-6">
+            <div className="flex items-start gap-2.5 max-w-4xl">
+              <div className="w-5 h-5 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200 shadow-2xs">
+                <FileText className="w-3 h-3 text-amber-600" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
+                    Activity Notes & Field Remarks ({node.code} - {node.name})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onEditTask(node)}
+                    className="text-[11px] font-medium text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                  >
+                    Edit Note
+                  </button>
+                </div>
+                <p className="text-xs text-slate-800 leading-relaxed font-normal whitespace-pre-wrap">
+                  {node.notes || node.description || (
+                    <span className="text-slate-400 italic">No notes recorded yet for this activity. Click &quot;Edit Note&quot; to add notes, technical specs, or site instructions.</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
   );
 };

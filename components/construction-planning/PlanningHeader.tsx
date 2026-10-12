@@ -21,8 +21,10 @@ import {
   Sliders
 } from 'lucide-react';
 import { ProjectInfo } from '@/lib/construction-planning/types';
-import { formatDisplayDate } from '@/lib/construction-planning/schedule-utils';
+import { formatDisplayDate, calculateDurationDetails } from '@/lib/construction-planning/schedule-utils';
 import { SoftwareManualSearch } from './SoftwareManualSearch';
+
+import { isViewAllowed, isModuleAllowed, isOnlyAllowRole } from '@/lib/auth/role-access';
 
 interface PlanningHeaderProps {
   project: ProjectInfo;
@@ -39,6 +41,7 @@ interface PlanningHeaderProps {
   onOpenSitesManager?: () => void;
   userEmail?: string;
   userRole?: string;
+  userPage?: string | null;
   onSignOut?: () => void;
 }
 
@@ -57,6 +60,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
   onOpenSitesManager,
   userEmail,
   userRole,
+  userPage,
   onSignOut,
 }) => {
   const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -71,6 +75,16 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const canLogProgress = isViewAllowed('progress', userRole, userPage);
+  const canAddTask = isViewAllowed('list', userRole, userPage);
+  const canViewCritical = isViewAllowed('critical', userRole, userPage);
+  const canViewRecovery = isModuleAllowed('controls', userRole, userPage);
+  const canViewSubBills = isViewAllowed('subcontractor-bills', userRole, userPage);
+  const canViewStore = isViewAllowed('materials', userRole, userPage);
+  const canViewBilling = isViewAllowed('billing', userRole, userPage);
+  const canViewSettings = isModuleAllowed('controls', userRole, userPage);
+  const hasAnyTools = canViewCritical || canViewRecovery || canViewSubBills || canViewStore || canViewBilling || canAddTask;
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs w-full">
@@ -126,143 +140,164 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               
               {/* Secondary Action: Log Daily Progress */}
-              <button
-                type="button"
-                onClick={onRecordProgress}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-colors shadow-2xs cursor-pointer"
-                title="Record daily site execution progress"
-              >
-                <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
-                <span className="hidden sm:inline">Log Progress</span>
-                <span className="sm:hidden">Log</span>
-              </button>
-
-              {/* Primary Action: Add Task */}
-              <button
-                type="button"
-                onClick={onAddTask}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors cursor-pointer"
-                title="Add new construction WBS task"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Add Task</span>
-              </button>
-
-              {/* Quick Tools & Modules Dropdown */}
-              <div className="relative" ref={toolsRef}>
+              {canLogProgress && (
                 <button
                   type="button"
-                  onClick={() => setIsToolsOpen(!isToolsOpen)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                    isToolsOpen 
-                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                  }`}
-                  title="Quick Tools & Special Views"
+                  onClick={onRecordProgress}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+                  title="Record daily site execution progress"
                 >
-                  <Sliders className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="hidden sm:inline">Tools</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                  <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">Log Progress</span>
+                  <span className="sm:hidden">Log</span>
                 </button>
+              )}
 
-                {isToolsOpen && (
-                  <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 text-xs">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Quick Tools & Modules
+              {/* Primary Action: Add Task */}
+              {canAddTask && (
+                <button
+                  type="button"
+                  onClick={onAddTask}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors cursor-pointer"
+                  title="Add new construction WBS task"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Add Task</span>
+                </button>
+              )}
+
+              {/* Quick Tools & Modules Dropdown */}
+              {hasAnyTools && (
+                <div className="relative" ref={toolsRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsToolsOpen(!isToolsOpen)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                      isToolsOpen 
+                        ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                    }`}
+                    title="Quick Tools & Special Views"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="hidden sm:inline">Tools</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+
+                  {isToolsOpen && (
+                    <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 text-xs">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Quick Tools & Modules
+                      </div>
+                      
+                      {canViewCritical && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onViewCriticalPath();
+                            setIsToolsOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Route className="w-4 h-4 text-purple-600" />
+                            <span className="font-medium">Critical Path (CPM)</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-400">0d float</span>
+                        </button>
+                      )}
+
+                      {canViewRecovery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenRecoveryPlan();
+                            setIsToolsOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RotateCcw className="w-4 h-4 text-amber-600" />
+                            <span className="font-medium">Recovery & Resequence</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1 rounded">+3d</span>
+                        </button>
+                      )}
+
+                      {canViewSubBills && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenSubcontractorBills?.();
+                            setIsToolsOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+                          <span className="font-medium">Sub-Contractor RA Bills</span>
+                        </button>
+                      )}
+
+                      {canViewStore && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenMaterialStore?.();
+                            setIsToolsOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
+                        >
+                          <Package className="w-4 h-4 text-indigo-600" />
+                          <span className="font-medium">Material Store & Inventory</span>
+                        </button>
+                      )}
+
+                      {canViewBilling && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onOpenBilling?.();
+                            setIsToolsOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
+                        >
+                          <Receipt className="w-4 h-4 text-emerald-600" />
+                          <span className="font-medium">Billing Khata & Parties</span>
+                        </button>
+                      )}
+
+                      {canAddTask && (
+                        <>
+                          <div className="my-1 border-t border-slate-100" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onAddWorkPackage();
+                              setIsToolsOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
+                          >
+                            <Layers className="w-4 h-4 text-slate-500" />
+                            <span className="font-medium">+ Add Work Package</span>
+                          </button>
+                        </>
+                      )}
                     </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onViewCriticalPath();
-                        setIsToolsOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Route className="w-4 h-4 text-purple-600" />
-                        <span className="font-medium">Critical Path (CPM)</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-400">0d float</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenRecoveryPlan();
-                        setIsToolsOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <RotateCcw className="w-4 h-4 text-amber-600" />
-                        <span className="font-medium">Recovery & Resequence</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1 rounded">+3d</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenSubcontractorBills?.();
-                        setIsToolsOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-4 h-4 text-purple-600" />
-                      <span className="font-medium">Sub-Contractor RA Bills</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenMaterialStore?.();
-                        setIsToolsOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
-                    >
-                      <Package className="w-4 h-4 text-indigo-600" />
-                      <span className="font-medium">Material Store & Inventory</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenBilling?.();
-                        setIsToolsOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
-                    >
-                      <Receipt className="w-4 h-4 text-emerald-600" />
-                      <span className="font-medium">Billing Khata & Parties</span>
-                    </button>
-
-                    <div className="my-1 border-t border-slate-100" />
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onAddWorkPackage();
-                        setIsToolsOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors text-left cursor-pointer"
-                    >
-                      <Layers className="w-4 h-4 text-slate-500" />
-                      <span className="font-medium">+ Add Work Package</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Baseline Settings Icon */}
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
-                title="Project Baseline Settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
+              {canViewSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                  title="Project Baseline Settings"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              )}
 
               {/* User Avatar / Sign Out */}
               {userEmail && (
@@ -294,11 +329,21 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
         {/* Row 2: Clean KPI Ribbon */}
         <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-y-2 gap-x-4 text-xs">
           
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="text-slate-500 text-[11px]">Duration:</span>
-            <span className="font-semibold text-slate-800">{project.durationMonths} Mo</span>
-          </div>
+          {(() => {
+            const dur = calculateDurationDetails(project.plannedStartDate, project.plannedCompletionDate);
+            return (
+              <div 
+                className="flex items-center gap-1.5" 
+                title={`Timeline: ${project.plannedStartDate} to ${project.plannedCompletionDate} (${dur.days} calendar days / ${dur.decimalMonths} months)`}
+              >
+                <Clock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <span className="text-slate-500 text-[11px]">Duration:</span>
+                <span className="font-semibold text-slate-800">
+                  {dur.formatted}
+                </span>
+              </div>
+            );
+          })()}
 
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />

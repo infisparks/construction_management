@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Settings, Building2, Calendar, Clock, Check } from 'lucide-react';
 import { ProjectInfo } from '@/lib/construction-planning/types';
+import { calculateDurationDetails } from '@/lib/construction-planning/schedule-utils';
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -113,10 +114,13 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                 min={1}
                 required
                 value={durationMonths}
-                onChange={(e) => setDurationMonths(parseInt(e.target.value) || 18)}
+                onChange={(e) => setDurationMonths(parseInt(e.target.value) || 1)}
                 onWheel={(e) => e.currentTarget.blur()}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white font-mono"
               />
+              <p className="text-[10px] text-purple-600 font-semibold mt-1">
+                Calculated: {calculateDurationDetails(plannedStartDate, plannedCompletionDate).formatted}
+              </p>
             </div>
           </div>
 
@@ -127,7 +131,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                 type="date"
                 required
                 value={plannedStartDate}
-                onChange={(e) => setPlannedStartDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPlannedStartDate(val);
+                  const d = calculateDurationDetails(val, plannedCompletionDate);
+                  setDurationMonths(d.months > 0 ? d.months : 1);
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white font-mono"
               />
             </div>
@@ -137,7 +146,12 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                 type="date"
                 required
                 value={plannedCompletionDate}
-                onChange={(e) => setPlannedCompletionDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPlannedCompletionDate(val);
+                  const d = calculateDurationDetails(plannedStartDate, val);
+                  setDurationMonths(d.months > 0 ? d.months : 1);
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white font-mono"
               />
             </div>

@@ -27,6 +27,11 @@ export interface ProfileVendor {
   contact_person?: string;
   trade?: string;
   gstin?: string;
+  pan?: string;
+  bank_name?: string;
+  bank_account?: string;
+  bank_ifsc?: string;
+  bank_details?: string;
   address?: string;
   city?: string;
   location?: string;
@@ -166,6 +171,15 @@ export async function createProfileVendor(
           contact_person: vendor.contact_person || null,
           trade: vendor.trade || null,
           gstin: vendor.gstin || null,
+          pan: vendor.pan || null,
+          bank_name: vendor.bank_name || null,
+          bank_account: vendor.bank_account || null,
+          bank_ifsc: vendor.bank_ifsc || null,
+          bank_details: vendor.bank_details || (
+            vendor.bank_name || vendor.bank_account || vendor.bank_ifsc
+              ? `${vendor.bank_name || 'Bank'} A/C: ${vendor.bank_account || '—'} / IFSC: ${vendor.bank_ifsc || '—'}`
+              : null
+          ),
           address: vendor.address || null,
           city: vendor.city || null,
           location: vendor.location || null,

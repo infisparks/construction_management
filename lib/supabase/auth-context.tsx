@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_id: userId,
           role: 'admin',
           email: user?.email || null,
+          page: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -67,8 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserRole({
           id: 'role-demo',
           user_id: 'demo-admin-id',
-          role: 'admin',
+          role: 'onlyallow',
           email: 'admin@gmail.com',
+          page: 'files-archive, materials',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -126,8 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserRole({
       id: 'role-demo',
       user_id: 'demo-admin-id',
-      role: 'admin',
+      role: 'onlyallow',
       email: 'admin@gmail.com',
+      page: 'files-archive, materials',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });

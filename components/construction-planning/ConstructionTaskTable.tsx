@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ConstructionTask, TaskDependency } from '@/lib/construction-planning/types';
 import { TaskNode } from '@/lib/construction-planning/task-utils';
 import { ConstructionTaskRow } from './ConstructionTaskRow';
-import { Layers, AlertCircle } from 'lucide-react';
+import { Layers, AlertCircle, FileText } from 'lucide-react';
 
 interface ConstructionTaskTableProps {
   tasks: TaskNode[];
@@ -20,6 +20,8 @@ interface ConstructionTaskTableProps {
   onDeleteTask: (task: ConstructionTask) => void;
   dependencies: TaskDependency[];
   onOpenDependencyManager: (task: ConstructionTask) => void;
+  areAllNotesOpen?: boolean;
+  onToggleAllNotes?: () => void;
 }
 
 export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
@@ -36,11 +38,36 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
   onDeleteTask,
   dependencies,
   onOpenDependencyManager,
+  areAllNotesOpen = false,
+  onToggleAllNotes,
 }) => {
+  const [openNotesTaskIds, setOpenNotesTaskIds] = useState<Set<string>>(new Set());
+
+  // Synchronize with global areAllNotesOpen toggle
+  useEffect(() => {
+    if (areAllNotesOpen) {
+      setOpenNotesTaskIds(new Set(tasks.map((t) => t.id)));
+    } else {
+      setOpenNotesTaskIds(new Set());
+    }
+  }, [areAllNotesOpen, tasks]);
+
+  const handleToggleRowNotes = (taskId: string) => {
+    setOpenNotesTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col w-full">
       {/* Table Subheader Bar */}
-      <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
+      <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Layers className="w-3.5 h-3.5 text-slate-400" />
           <span>
@@ -48,7 +75,22 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
             <strong className="text-slate-800">{allTasksCount}</strong> WBS nodes
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex items-center gap-3 text-[11px] flex-wrap">
+          {onToggleAllNotes && (
+            <button
+              type="button"
+              onClick={onToggleAllNotes}
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                areAllNotesOpen
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold shadow-2xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
+              }`}
+              title={areAllNotesOpen ? 'Close all activity notes across table' : 'Open all activity notes across table'}
+            >
+              <FileText className={`w-3 h-3 ${areAllNotesOpen ? 'text-amber-600' : 'text-slate-500'}`} />
+              <span>{areAllNotesOpen ? 'Close All Notes' : 'Open All Notes'}</span>
+            </button>
+          )}
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-purple-500" />
             Critical Path Border
@@ -97,15 +139,21 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
                   onDeleteTask={onDeleteTask}
                   dependencies={dependencies}
                   onOpenDependencyManager={onOpenDependencyManager}
+                  isNotesOpen={openNotesTaskIds.has(node.id)}
+                  onToggleRowNotes={() => handleToggleRowNotes(node.id)}
                 />
               ))
             ) : (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <AlertCircle className="w-8 h-8 text-slate-300" />
-                    <p className="text-sm font-medium text-slate-600">No activities match your current search or filter</p>
-                    <p className="text-xs text-slate-400">Try clearing active filters or reset your search query.</p>
+                <td colSpan={8} className="py-14 text-center text-slate-500">
+                  <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 shadow-2xs">
+                      <Layers className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">No Construction Activities Yet</h4>
+                      <p className="text-xs text-slate-500 mt-1">Start by adding your first work package or activity to build your project schedule live in Supabase.</p>
+                    </div>
                   </div>
                 </td>
               </tr>

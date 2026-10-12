@@ -83,9 +83,9 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
   const [actionType, setActionType] = useState<InventoryTransactionType>(initialAction);
   const [materialId, setMaterialId] = useState<string>('');
-  const [quantity, setQuantity] = useState<number | ''>(50);
+  const [quantity, setQuantity] = useState<number | ''>('');
 
-  // Check-In fields
+  // Check-In fields (default empty / null)
   const [unitRate, setUnitRate] = useState<number | ''>('');
   const [checkInGstRate, setCheckInGstRate] = useState<0 | 5 | 12 | 18 | 28>(0);
   const [storageLocation, setStorageLocation] = useState<string>(allLocations[0] || 'Central Site Store #1');
@@ -93,30 +93,30 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
   const [isCustomStorage, setIsCustomStorage] = useState<boolean>(false);
   const [supplierId, setSupplierId] = useState<string>('');
   const [challanNumber, setChallanNumber] = useState<string>('');
-  const [vehicleNumber, setVehicleNumber] = useState<string>('MH-04-CP-8812');
+  const [vehicleNumber, setVehicleNumber] = useState<string>('');
 
-  // Check-Out fields
+  // Check-Out fields (default empty / null)
   const [subcontractorId, setSubcontractorId] = useState<string>('');
   const [foremanName, setForemanName] = useState<string>('');
-  const [floorZone, setFloorZone] = useState<string>('Tower A - 3rd Floor Slab');
-  const [purpose, setPurpose] = useState<string>('Site construction work');
-  const [authorizedBy, setAuthorizedBy] = useState<string>('Er. Amit Verma');
+  const [floorZone, setFloorZone] = useState<string>('');
+  const [purpose, setPurpose] = useState<string>('');
+  const [authorizedBy, setAuthorizedBy] = useState<string>('');
 
-  // Return fields
+  // Return fields (default empty / null)
   const [returnReason, setReturnReason] = useState<string>('Defective / sub-standard material (QC Rejected)');
-  const [returnCustomNote, setReturnCustomNote] = useState<string>('Returned to supplier for credit adjustment');
-  const [returnSlipNo, setReturnSlipNo] = useState<string>('RET-DC-901');
+  const [returnCustomNote, setReturnCustomNote] = useState<string>('');
+  const [returnSlipNo, setReturnSlipNo] = useState<string>('');
 
-  // Damaged fields
+  // Damaged fields (default empty / null)
   const [damageReason, setDamageReason] = useState<string>('Corner cracking / transit fracture during unloading');
-  const [damageCustomNote, setDamageCustomNote] = useState<string>('Unloading fracture beyond allowable tolerance');
-  const [damageLocation, setDamageLocation] = useState<string>('Ground Stacking Yard');
+  const [damageCustomNote, setDamageCustomNote] = useState<string>('');
+  const [damageLocation, setDamageLocation] = useState<string>('');
 
-  // General fields
-  const [recordedBy, setRecordedBy] = useState<string>('Ravi Kumar (Storekeeper)');
+  // General fields (default empty / null)
+  const [recordedBy, setRecordedBy] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
-  // Sync state when opened
+  // Sync state when opened - reset all inputs to clean empty state (hints shown in placeholders)
   useEffect(() => {
     if (isOpen) {
       setActionType(initialAction);
@@ -129,16 +129,22 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
         setIsCustomStorage(false);
         setCustomStorage('');
       }
-      if (suppliers.length > 0 && !supplierId) {
-        setSupplierId(suppliers[0].id);
-      }
-      if (subcontractors.length > 0 && !subcontractorId) {
-        setSubcontractorId(subcontractors[0].id);
-        setForemanName(subcontractors[0].foremanName || '');
-      }
-      setChallanNumber('DC-' + Math.floor(1000 + Math.random() * 9000));
+      setQuantity('');
+      setSupplierId('');
+      setSubcontractorId('');
+      setForemanName('');
+      setFloorZone('');
+      setPurpose('');
+      setChallanNumber('');
+      setVehicleNumber('');
+      setRecordedBy('');
+      setAuthorizedBy('');
+      setReturnSlipNo('');
+      setReturnCustomNote('');
+      setDamageLocation('');
+      setDamageCustomNote('');
     }
-  }, [isOpen, selectedMaterialId, initialAction, materials, suppliers, subcontractors]);
+  }, [isOpen, selectedMaterialId, initialAction, materials]);
 
   // Current material and recent checkouts - must execute before any conditional returns
   const currentMat = materials.find((m) => m.id === materialId) || materials[0] || null;
@@ -180,10 +186,6 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
   const handleSubChange = (newSubId: string) => {
     setSubcontractorId(newSubId);
-    const sub = subcontractors.find((s) => s.id === newSubId);
-    if (sub) {
-      setForemanName(sub.foremanName || '');
-    }
   };
 
   const qtyNum = typeof quantity === 'number' ? quantity : 0;
@@ -479,7 +481,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
                     onWheel={(e) => e.currentTarget.blur()}
-                    placeholder="50"
+                    placeholder="e.g. 10"
                     className="w-full h-10 pl-7 pr-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-900 focus:outline-hidden focus:border-purple-600"
                     required
                   />
@@ -512,7 +514,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="font-medium text-slate-700">
-                      Supplier / Vendor *
+                      Supplier / Vendor (Optional)
                     </label>
                     {onOpenVendorDrawer && (
                       <button
@@ -530,6 +532,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                     onChange={(e) => setSupplierId(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
                   >
+                    <option value="">Select Supplier / Vendor (Optional)</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -540,52 +543,50 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Challan / Invoice # *
+                    Challan / Invoice # (Optional)
                   </label>
                   <input
                     type="text"
                     value={challanNumber}
                     onChange={(e) => setChallanNumber(e.target.value)}
-                    placeholder="DC-9921"
+                    placeholder="e.g. DC-9921 / INV-104"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                    required
                   />
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Purchase Unit Rate (₹ per {currentMat?.unit || 'unit'}) <span className="text-purple-600 font-bold">*</span>
+                    Purchase Unit Rate (Rs. per {currentMat?.unit || 'unit'}) (Optional)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-slate-400 font-semibold">₹</span>
+                    <span className="absolute left-3 top-2.5 text-[11px] text-slate-400 font-semibold">Rs.</span>
                     <input
                       type="number"
                       min="0"
                       step="any"
-                      required
                       value={unitRate}
                       onChange={(e) => setUnitRate(e.target.value === '' ? '' : Number(e.target.value))}
                       onWheel={(e) => e.currentTarget.blur()}
-                      placeholder={currentMat?.averageUnitRate && currentMat.averageUnitRate > 0 ? String(currentMat.averageUnitRate) : "Enter unit purchase rate"}
-                      className="w-full h-10 pl-7 pr-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
+                      placeholder="e.g. 100"
+                      className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
                     />
                   </div>
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
                     {currentMat?.averageUnitRate && currentMat.averageUnitRate > 0
-                      ? `Current avg rate: ₹${currentMat.averageUnitRate.toLocaleString('en-IN')}`
-                      : 'Enter unit purchase rate for incoming delivery'}
+                      ? `Current avg rate: Rs. ${currentMat.averageUnitRate.toLocaleString('en-IN')}`
+                      : 'Enter unit purchase rate for incoming delivery (optional)'}
                   </span>
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Vehicle / Truck #
+                    Vehicle / Truck # (Optional)
                   </label>
                   <input
                     type="text"
                     value={vehicleNumber}
                     onChange={(e) => setVehicleNumber(e.target.value)}
-                    placeholder="MH-04-CP-8812"
+                    placeholder="e.g. MH-04-CP-8812"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 uppercase"
                   />
                 </div>
@@ -600,7 +601,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="font-medium text-slate-700">
-                      Subcontractor Agency *
+                      Subcontractor Agency (Optional)
                     </label>
                     {onOpenVendorDrawer && (
                       <button
@@ -618,6 +619,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                     onChange={(e) => handleSubChange(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
                   >
+                    <option value="">Select Subcontractor / Agency (Optional)</option>
                     {subcontractors.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({s.trade})
@@ -634,7 +636,11 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                     type="text"
                     value={foremanName}
                     onChange={(e) => setForemanName(e.target.value)}
-                    placeholder="Ramprasad Sharma"
+                    placeholder={
+                      selectedSub?.foremanName
+                        ? `Enter receiving person name (e.g. ${selectedSub.foremanName})`
+                        : "Enter receiving person name (e.g. Ramprasad Sharma)"
+                    }
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
                     required
                   />
@@ -642,27 +648,26 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Floor / Zone / Work Area *
+                    Floor / Zone / Work Area (Optional)
                   </label>
                   <input
                     type="text"
                     value={floorZone}
                     onChange={(e) => setFloorZone(e.target.value)}
-                    placeholder="Tower A - 3rd Floor Slab"
+                    placeholder="e.g. Tower A - 3rd Floor Slab"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
-                    required
                   />
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Work Purpose / Description
+                    Work Purpose / Description (Optional)
                   </label>
                   <input
                     type="text"
                     value={purpose}
                     onChange={(e) => setPurpose(e.target.value)}
-                    placeholder="Beam and slab concrete casting"
+                    placeholder="e.g. Site construction work"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
                   />
                 </div>
@@ -758,6 +763,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                     onChange={(e) => setSupplierId(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
                   >
+                    <option value="">Select Vendor (Optional)</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -768,26 +774,26 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Return Gate Pass / Slip #
+                    Return Gate Pass / Slip # (Optional)
                   </label>
                   <input
                     type="text"
                     value={returnSlipNo}
                     onChange={(e) => setReturnSlipNo(e.target.value)}
-                    placeholder="RET-DC-901"
+                    placeholder="e.g. RET-DC-901"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden uppercase"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="block font-medium text-slate-700 mb-1">
-                    Explanation / Return Notes
+                    Explanation / Return Notes (Optional)
                   </label>
                   <input
                     type="text"
                     value={returnCustomNote}
                     onChange={(e) => setReturnCustomNote(e.target.value)}
-                    placeholder="Loaded back onto supplier lorry for credit note..."
+                    placeholder="e.g. Loaded back onto supplier lorry for credit note..."
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
                   />
                 </div>
@@ -832,27 +838,26 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Location Where Damaged *
+                    Location Where Damaged (Optional)
                   </label>
                   <input
                     type="text"
                     value={damageLocation}
                     onChange={(e) => setDamageLocation(e.target.value)}
-                    placeholder="Ground Stacking Yard Bay #2"
+                    placeholder="e.g. Ground Stacking Yard Bay #2"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
-                    required
                   />
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Inspected By (Engineer / Incharge) *
+                    Inspected By / Person Name *
                   </label>
                   <input
                     type="text"
                     value={authorizedBy}
                     onChange={(e) => setAuthorizedBy(e.target.value)}
-                    placeholder="Er. Amit Verma"
+                    placeholder="Enter person name (e.g. Er. Amit Verma)"
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
                     required
                   />
@@ -860,13 +865,13 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
                 <div className="sm:col-span-2">
                   <label className="block font-medium text-slate-700 mb-1">
-                    Damage Assessment Notes
+                    Damage Assessment Notes (Optional)
                   </label>
                   <input
                     type="text"
                     value={damageCustomNote}
                     onChange={(e) => setDamageCustomNote(e.target.value)}
-                    placeholder="Fractured blocks removed from usable stack and written off..."
+                    placeholder="e.g. Fractured blocks removed from usable stack..."
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
                   />
                 </div>
@@ -880,14 +885,14 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-medium text-slate-700 mb-1">
-                Storekeeper / Logged By *
+                Storekeeper / Logged By (Optional)
               </label>
               <input
                 type="text"
                 value={recordedBy}
                 onChange={(e) => setRecordedBy(e.target.value)}
+                placeholder="e.g. Ravi Kumar (Storekeeper)"
                 className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
-                required
               />
             </div>
             <div>

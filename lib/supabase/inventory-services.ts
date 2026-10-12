@@ -335,11 +335,14 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
       ? 'damage'
       : 'return';
 
+  const isCheckOut = normType === 'check_out';
+
   return {
     id: row.id,
     voucherNumber: row.voucher_no,
     type: normType as 'check_in' | 'check_out' | 'return' | 'damage',
     materialId: row.product_id || '',
+    materialCode: row.product_code || undefined,
     materialName: row.product_name,
     category: row.category || 'General',
     quantity: Number(row.quantity),
@@ -351,11 +354,21 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
     runningStockBalance: Number(row.stock_after ?? 0),
     returnReason: normType === 'return' ? row.reason : undefined,
     damageReason: normType === 'damage' ? row.reason : undefined,
-    supplierName: row.vendor_name,
-    supplierId: row.vendor_id,
+    supplierName: !isCheckOut ? row.vendor_name : undefined,
+    supplierId: !isCheckOut ? row.vendor_id : undefined,
+    subcontractorName: isCheckOut ? row.vendor_name : undefined,
+    subcontractorId: isCheckOut ? row.vendor_id : undefined,
     challanNumber: row.reference_no,
+    vehicleNumber: row.reference_no,
     storageLocation: row.location,
+    unloadingLocation: row.location,
+    floorZone: isCheckOut ? row.location : undefined,
+    purpose: isCheckOut ? row.reason : undefined,
+    foremanName: isCheckOut ? row.person_name : undefined,
+    authorizedBy: isCheckOut ? row.person_name : undefined,
     receivedOrIssuedBy: row.person_name || 'Storekeeper',
+    notes: row.notes,
     remarks: row.notes,
   };
 }
+

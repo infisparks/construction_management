@@ -46,18 +46,34 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
   const initialMat = materials.find((m) => m.id === selectedMaterialId) || materials[0];
 
   const [materialId, setMaterialId] = useState<string>(initialMat ? initialMat.id : '');
-  const [quantity, setQuantity] = useState<number | ''>(10);
-  const [subcontractorId, setSubcontractorId] = useState<string>(subcontractors[0]?.id || '');
-  const [foremanName, setForemanName] = useState<string>(subcontractors[0]?.foremanName || 'Ramprasad Sharma');
+  const [quantity, setQuantity] = useState<number | ''>('');
+  const [subcontractorId, setSubcontractorId] = useState<string>('');
+  const [foremanName, setForemanName] = useState<string>('');
   const [selectedTaskCode, setSelectedTaskCode] = useState<string>(tasks[0]?.code || '3.4.3');
-  const [floorZone, setFloorZone] = useState<string>('Tower A - 3rd Floor Slab');
-  const [purpose, setPurpose] = useState<string>('Material requisition for site construction activity');
-  const [authorizedBy, setAuthorizedBy] = useState<string>('Er. Amit Verma (Project Engineer)');
-  const [issuedBy, setIssuedBy] = useState<string>('Ravi Kumar (Storekeeper)');
+  const [floorZone, setFloorZone] = useState<string>('');
+  const [purpose, setPurpose] = useState<string>('');
+  const [authorizedBy, setAuthorizedBy] = useState<string>('');
+  const [issuedBy, setIssuedBy] = useState<string>('');
   const [isReturnable, setIsReturnable] = useState<boolean>(false);
-  const [notes, setNotes] = useState<string>('Dispatched via site material hoist. Inspected by site supervisor.');
+  const [notes, setNotes] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState<string>('11:45 AM');
+
+  // Reset fields to clean empty defaults when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      const initM = materials.find((m) => m.id === selectedMaterialId) || materials[0];
+      if (initM) setMaterialId(initM.id);
+      setQuantity('');
+      setSubcontractorId('');
+      setForemanName('');
+      setFloorZone('');
+      setPurpose('');
+      setAuthorizedBy('');
+      setIssuedBy('');
+      setNotes('');
+    }
+  }, [isOpen, selectedMaterialId, materials]);
 
   if (!isOpen) return null;
 
@@ -67,10 +83,6 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
 
   const handleSubcontractorChange = (subId: string) => {
     setSubcontractorId(subId);
-    const sub = subcontractors.find((s) => s.id === subId);
-    if (sub) {
-      setForemanName(sub.foremanName || '');
-    }
   };
 
   const handleMaterialChange = (newId: string) => {
@@ -229,7 +241,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                   Material Classification
                 </label>
                 <div className="h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
-                  <span className="text-slate-600">Avg Cost: ₹{currentMat?.averageUnitRate || 0}/{currentMat?.unit}</span>
+                  <span className="text-slate-600">Avg Cost: Rs. {currentMat?.averageUnitRate || 0}/{currentMat?.unit}</span>
                   <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 font-medium">
                     <input
                       type="checkbox"
@@ -256,13 +268,14 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Subcontractor Agency *
+                  Subcontractor Agency (Optional)
                 </label>
                 <select
                   value={subcontractorId}
                   onChange={(e) => handleSubcontractorChange(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
                 >
+                  <option value="">Select Subcontractor / Agency (Optional)</option>
                   {subcontractors.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.trade})
@@ -273,13 +286,17 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Foreman / Gang Leader Receiving *
+                  Receiving Foreman / Person *
                 </label>
                 <input
                   type="text"
                   value={foremanName}
                   onChange={(e) => setForemanName(e.target.value)}
-                  placeholder="e.g. Ramprasad Sharma"
+                  placeholder={
+                    selectedSub?.foremanName
+                      ? `Enter receiving person name (e.g. ${selectedSub.foremanName})`
+                      : "Enter receiving person name (e.g. Ramprasad Sharma)"
+                  }
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
                   required
                 />
@@ -327,7 +344,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Tower / Floor / Zone *
+                  Tower / Floor / Zone (Optional)
                 </label>
                 <input
                   type="text"
@@ -335,7 +352,6 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                   onChange={(e) => setFloorZone(e.target.value)}
                   placeholder="e.g. Tower A - 3rd Floor Slab"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
-                  required
                 />
               </div>
 
@@ -366,29 +382,27 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Authorized By (Engineer / Incharge) *
+                  Authorized By (Optional)
                 </label>
                 <input
                   type="text"
                   value={authorizedBy}
                   onChange={(e) => setAuthorizedBy(e.target.value)}
-                  placeholder="Er. Amit Verma"
+                  placeholder="e.g. Er. Amit Verma"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
-                  required
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Issued By (Storekeeper) *
+                  Issued By (Storekeeper) (Optional)
                 </label>
                 <input
                   type="text"
                   value={issuedBy}
                   onChange={(e) => setIssuedBy(e.target.value)}
-                  placeholder="Ravi Kumar"
+                  placeholder="e.g. Ravi Kumar"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
-                  required
                 />
               </div>
 

@@ -30,12 +30,18 @@ import {
   buildTaskTree, 
   flattenTaskTree, 
   recalculateParentRollups, 
+  deduplicateTaskList,
   getTaskMetrics, 
   calculateProjectRollup,
   TaskNode 
 } from '@/lib/construction-planning/task-utils';
 import { INITIAL_PARTIES } from '@/lib/construction-planning/mock-materials-billing';
-import { INITIAL_SUBCONTRACTOR_BILLS } from '@/lib/construction-planning/mock-subcontractor-bills';
+import { 
+  fetchSubcontractorBills, 
+  createSubcontractorBill, 
+  updateSubcontractorBill, 
+  deleteSubcontractorBill 
+} from '@/lib/supabase/subcontractor-bill-services';
 
 import { Sidebar } from '@/components/construction-planning/Sidebar';
 import { PlanningHeader } from '@/components/construction-planning/PlanningHeader';
@@ -59,13 +65,45 @@ import { MaterialBillingDrawer } from '@/components/construction-planning/Materi
 import { SubcontractorBillsView } from '@/components/construction-planning/SubcontractorBillsView';
 import { FilesArchiveView } from '@/components/documents/FilesArchiveView';
 import { SiteInventoryManagement } from '@/components/inventory/SiteInventoryManagement';
+import { SiteExpensesView } from '@/components/expenses/SiteExpensesView';
+import { CommercialBillsAndExpensesView } from '@/components/expenses/CommercialBillsAndExpensesView';
 import { useAuth } from '@/lib/supabase/auth-context';
+import { useRouter } from 'next/navigation';
 import { LoginPage } from '@/components/auth/LoginPage';
 import { SitesManagerModal } from '@/components/projects/SitesManagerModal';
 import { DbProject } from '@/lib/supabase/types';
-import { CheckCircle2, AlertTriangle, X, Building2 } from 'lucide-react';
+import { 
+  resolveActiveSite, 
+  setStoredActiveSite, 
+  getStoredActiveSiteId 
+} from '@/lib/supabase/site-storage';
+import { CheckCircle2, AlertTriangle, X, Building2, ShieldAlert } from 'lucide-react';
+import { isViewAllowed, isOnlyAllowRole, getFirstAllowedView } from '@/lib/auth/role-access';
+import { 
+  DateFilterState, 
+  DEFAULT_DATE_FILTER, 
+  matchesDateFilter, 
+  isDateFilterActive 
+} from '@/components/common/DateFilterControl';
+import {
+  fetchPlanTasks,
+  createPlanTask,
+  updatePlanTask,
+  deletePlanTask,
+  fetchPlanDependencies,
+  createPlanDependency,
+  deletePlanDependency,
+  fetchPlanDailyProgress,
+  createPlanDailyProgress,
+  fetchPlanIssues,
+  createPlanIssue,
+  fetchPlanActivityLogs,
+  logPlanActivity,
+} from '@/lib/supabase/planning-services';
 
 export default function ConstructionPlanningPage() {
+  const router = useRouter();
+
   // Supabase Auth Session & User Role
   const { user, userRole, isLoading: isAuthLoading, signOut } = useAuth();
 
@@ -103,8 +141,43 @@ export default function ConstructionPlanningPage() {
   // Master State
   const [project, setProject] = useState<ProjectInfo>(initialProject);
 
+  // Resolve and persist active site from localStorage & Supabase on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function initSite() {
+      try {
+        const { activeProject, allProjects } = await resolveActiveSite();
+        if (!isMounted) return;
+
+        if (!activeProject || allProjects.length === 0) {
+          // If no site exists, redirect to /sites and prompt user to create first site!
+          router.replace('/sites?first=true');
+          return;
+        }
+
+        setActiveDbProject(activeProject);
+        setProject((prev) => ({
+          ...prev,
+          name: activeProject.name,
+          location: activeProject.address || prev.location,
+          generalContractor: activeProject.project_person
+            ? `${activeProject.project_person} (${activeProject.person_number || ''})`
+            : prev.generalContractor,
+          code: `SITE-${activeProject.serial_no}`,
+        }));
+      } catch (err) {
+        console.error('Error resolving active site:', err);
+      }
+    }
+    initSite();
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
   const handleSelectDbProject = (dbProj: DbProject) => {
     setActiveDbProject(dbProj);
+    setStoredActiveSite(dbProj);
     setProject((prev) => ({
       ...prev,
       name: dbProj.name,
@@ -112,14 +185,63 @@ export default function ConstructionPlanningPage() {
       generalContractor: dbProj.project_person ? `${dbProj.project_person} (${dbProj.person_number || ''})` : prev.generalContractor,
       code: `SITE-${dbProj.serial_no}`,
     }));
-    showToast(`Switched active site to "${dbProj.name}"`, 'success');
+    showToast(`Switched active site to "${dbProj.name}" (saved in storage)`, 'success');
   };
-  const [tasks, setTasks] = useState<ConstructionTask[]>(() => recalculateParentRollups(initialTasks));
-  const [dependencies, setDependencies] = useState<TaskDependency[]>(initialDependencies);
-  const [progressEntries, setProgressEntries] = useState<DailyProgressEntry[]>(initialProgressEntries);
-  const [issues, setIssues] = useState<TaskIssue[]>(initialIssues);
-  const [activityLogs, setActivityLogs] = useState<TaskActivityLog[]>(initialActivityLogs);
-  const [recoveryScenarios, setRecoveryScenarios] = useState<RecoveryScenario[]>(initialRecoveryScenarios);
+  const [tasks, setTasks] = useState<ConstructionTask[]>([]);
+  const [dependencies, setDependencies] = useState<TaskDependency[]>([]);
+  const [progressEntries, setProgressEntries] = useState<DailyProgressEntry[]>([]);
+  const [issues, setIssues] = useState<TaskIssue[]>([]);
+  const [activityLogs, setActivityLogs] = useState<TaskActivityLog[]>([]);
+  const [recoveryScenarios, setRecoveryScenarios] = useState<RecoveryScenario[]>([]);
+  const [areAllNotesOpen, setAreAllNotesOpen] = useState(false);
+
+  const handleToggleAllNotes = () => {
+    setAreAllNotesOpen((prev) => !prev);
+  };
+
+  // Active Project ID for Supabase Planning Tables (Uses localStorage active site, then state, then fallback)
+  const activeProjectId = activeDbProject?.id || getStoredActiveSiteId() || 'f0e510da-9530-468f-bb09-59920070d55e';
+  const [isLoadingPlanningDb, setIsLoadingPlanningDb] = useState(false);
+
+  // Synchronize planning data live with Supabase plan_* tables
+  useEffect(() => {
+    let isMounted = true;
+    async function loadPlanningData() {
+      setIsLoadingPlanningDb(true);
+      try {
+        const [dbTasks, dbDeps, dbProgress, dbIssues, dbLogs] = await Promise.all([
+          fetchPlanTasks(activeProjectId),
+          fetchPlanDependencies(activeProjectId),
+          fetchPlanDailyProgress(activeProjectId),
+          fetchPlanIssues(activeProjectId),
+          fetchPlanActivityLogs(activeProjectId),
+        ]);
+
+        if (isMounted) {
+          const loadedTasks = recalculateParentRollups(deduplicateTaskList(dbTasks || []));
+          setTasks(loadedTasks);
+          if (loadedTasks.length > 0) {
+            setProject((prev) => calculateProjectRollup(loadedTasks, prev));
+          }
+          setDependencies(dbDeps || []);
+          setProgressEntries(dbProgress || []);
+          setIssues(dbIssues || []);
+          setActivityLogs(dbLogs || []);
+        }
+      } catch (err) {
+        console.error('Failed to synchronize Supabase planning data:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingPlanningDb(false);
+        }
+      }
+    }
+
+    loadPlanningData();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeProjectId]);
 
   // Active View & Filter State (initialized SSR-safely, synced from URL on client mount)
   const [currentView, setCurrentView] = useState<ViewMode>('list');
@@ -130,6 +252,7 @@ export default function ConstructionPlanningPage() {
   const [floorFilter, setFloorFilter] = useState('all');
   const [summaryFilter, setSummaryFilter] = useState<SummaryFilterType>('all');
   const [archiveCategoryFilter, setArchiveCategoryFilter] = useState<FileCategory | 'all'>('all');
+  const [taskDateFilter, setTaskDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
 
   // Tree Expansion State
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
@@ -167,6 +290,7 @@ export default function ConstructionPlanningPage() {
   const [materialBillingTab, setMaterialBillingTab] = useState<'materials' | 'parties' | 'billing'>('materials');
   const [inventorySubTab, setInventorySubTab] = useState<'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'vendors'>('catalog');
   const [triggerMaterialAction, setTriggerMaterialAction] = useState<{ action: 'check_in' | 'check_out' | 'return' | 'damage'; timestamp: number } | null>(null);
+  const [triggerExpenseAction, setTriggerExpenseAction] = useState<{ action: string; timestamp: number } | null>(null);
 
   // Initialize view and tab from URL once on client mount (SSR safe)
   useEffect(() => {
@@ -184,6 +308,7 @@ export default function ConstructionPlanningPage() {
         'billing',
         'subcontractor-bills',
         'files-archive',
+        'expenses',
       ];
       if (urlView && validViews.includes(urlView as ViewMode)) {
         setCurrentView(urlView as ViewMode);
@@ -228,7 +353,27 @@ export default function ConstructionPlanningPage() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [userRole]);
+
+  // Guard currentView against restricted role access (onlyallow)
+  useEffect(() => {
+    if (userRole && isOnlyAllowRole(userRole.role)) {
+      if (!isViewAllowed(currentView, userRole.role, userRole.page)) {
+        const first = getFirstAllowedView(userRole.role, userRole.page);
+        if (first) {
+          setCurrentView(first);
+        }
+      }
+    }
+  }, [userRole, currentView]);
+
+  const handleViewChange = (newView: ViewMode) => {
+    if (userRole && !isViewAllowed(newView, userRole.role, userRole.page)) {
+      showToast(`Access Restricted: Your role (${userRole.role}) does not have permission to access "${newView}".`);
+      return;
+    }
+    setCurrentView(newView);
+  };
 
   // Sync current view & subtabs to top URL address bar only AFTER initial URL is read
   useEffect(() => {
@@ -273,11 +418,19 @@ export default function ConstructionPlanningPage() {
     setIsMaterialBillingDrawerOpen(true);
   };
 
-  // Subcontractor Bills State & Management
+  // Subcontractor Bills State & Management (Persisted live to Supabase)
   const [parties, setParties] = useState<Party[]>(INITIAL_PARTIES);
-  const [subcontractorBills, setSubcontractorBills] = useState<SubcontractorBill[]>(INITIAL_SUBCONTRACTOR_BILLS);
+  const [subcontractorBills, setSubcontractorBills] = useState<SubcontractorBill[]>([]);
 
-  const handleSaveSubcontractorBill = (savedBill: SubcontractorBill) => {
+  // Load Subcontractor Bills from Supabase for active project
+  useEffect(() => {
+    if (!activeProjectId) return;
+    fetchSubcontractorBills(activeProjectId).then((dbBills) => {
+      setSubcontractorBills(dbBills || []);
+    });
+  }, [activeProjectId]);
+
+  const handleSaveSubcontractorBill = async (savedBill: SubcontractorBill) => {
     setSubcontractorBills((prev) => {
       const exists = prev.some((b) => b.id === savedBill.id);
       if (exists) {
@@ -285,10 +438,24 @@ export default function ConstructionPlanningPage() {
       }
       return [savedBill, ...prev];
     });
+
+    const isExisting = subcontractorBills.some((b) => b.id === savedBill.id);
+    if (isExisting) {
+      await updateSubcontractorBill(savedBill.id, savedBill, activeProjectId);
+    } else {
+      const created = await createSubcontractorBill(savedBill, activeProjectId);
+      if (created) {
+        setSubcontractorBills((prev) =>
+          prev.map((b) => (b.id === savedBill.id ? created : b))
+        );
+      }
+    }
   };
 
-  const handleDeleteSubcontractorBill = (billId: string) => {
+  const handleDeleteSubcontractorBill = async (billId: string) => {
     setSubcontractorBills((prev) => prev.filter((b) => b.id !== billId));
+    await deleteSubcontractorBill(billId);
+    showToast('Subcontractor Bill deleted from database.', 'info');
   };
 
   // Toast Notification State
@@ -430,8 +597,42 @@ export default function ConstructionPlanningPage() {
       result = filterNodes(result);
     }
 
+    // Filter by task schedule date (Range or Exact Particular Date)
+    if (isDateFilterActive(taskDateFilter)) {
+      const filterNodes = (nodes: TaskNode[]): TaskNode[] => {
+        return nodes
+          .map((node) => {
+            const filteredChildren = filterNodes(node.children);
+            const taskStart = node.actualStartDate || node.plannedStartDate;
+            const taskEnd = node.forecastEndDate || node.plannedEndDate;
+            const matchesStart = matchesDateFilter(taskStart, taskDateFilter);
+            const matchesEnd = matchesDateFilter(taskEnd, taskDateFilter);
+            let matchesRange = matchesStart || matchesEnd;
+            if (taskDateFilter.mode === 'exact' && taskDateFilter.exactDate) {
+              if (taskStart && taskEnd && taskStart <= taskDateFilter.exactDate && taskEnd >= taskDateFilter.exactDate) {
+                matchesRange = true;
+              }
+            } else if (taskDateFilter.mode === 'range') {
+              const rStart = taskDateFilter.startDate;
+              const rEnd = taskDateFilter.endDate;
+              if (rStart && rEnd && taskStart && taskEnd) {
+                if (taskStart <= rEnd && taskEnd >= rStart) {
+                  matchesRange = true;
+                }
+              }
+            }
+            if (matchesRange || filteredChildren.length > 0) {
+              return { ...node, children: filteredChildren };
+            }
+            return null;
+          })
+          .filter(Boolean) as TaskNode[];
+      };
+      result = filterNodes(result);
+    }
+
     return result;
-  }, [fullTree, summaryFilter, statusFilter, criticalOnly, floorFilter, searchQuery]);
+  }, [fullTree, summaryFilter, statusFilter, criticalOnly, floorFilter, searchQuery, taskDateFilter]);
 
   // Flattened tasks
   const displayedFlattenedTasks = useMemo(() => {
@@ -488,18 +689,22 @@ export default function ConstructionPlanningPage() {
     setIsStartConfirmModalOpen(true);
   };
 
-  const handleConfirmStartTask = (taskId: string, isOverride: boolean, overrideReason?: string) => {
+  const handleConfirmStartTask = async (taskId: string, isOverride: boolean, overrideReason?: string) => {
     const today = new Date().toISOString().split('T')[0] || '2026-08-29';
+    const task = tasks.find((t) => t.id === taskId);
+    const updatedNotes = isOverride 
+      ? `${task?.notes || ''} [AUTHORIZED OVERRIDE: Started despite predecessor constraints: ${overrideReason}]` 
+      : task?.notes;
+    const newProgress = Math.max(task?.progress ?? 0, 5);
+
     const updated = tasks.map((t) => {
       if (t.id === taskId) {
         return {
           ...t,
           status: 'in_progress' as ScheduleStatus,
           actualStartDate: today,
-          progress: Math.max(t.progress, 5),
-          notes: isOverride 
-            ? `${t.notes || ''} [AUTHORIZED OVERRIDE: Started despite predecessor constraints: ${overrideReason}]` 
-            : t.notes,
+          progress: newProgress,
+          notes: updatedNotes,
         };
       }
       return t;
@@ -507,26 +712,39 @@ export default function ConstructionPlanningPage() {
 
     refreshTasksWithRollups(updated);
 
-    const task = tasks.find((t) => t.id === taskId);
+    const actionText = isOverride ? 'Task Started (Authorized Override)' : 'Task Started on Site';
+    const detailsText = isOverride 
+      ? `Actual start stamped as ${today}. Overrode dependencies: ${overrideReason}` 
+      : `Actual start stamped as ${today}. Dependencies satisfied.`;
+    const performedBy = user?.email?.split('@')[0] || 'Site Engineer';
+
     const newLog: TaskActivityLog = {
       id: `act-${Date.now()}`,
       taskId,
-      action: isOverride ? 'Task Started (Authorized Override)' : 'Task Started on Site',
-      details: isOverride 
-        ? `Actual start stamped as ${today}. Overrode dependencies: ${overrideReason}` 
-        : `Actual start stamped as ${today}. Dependencies satisfied.`,
-      performedBy: 'Site Engineer',
+      action: actionText,
+      details: detailsText,
+      performedBy,
       timestamp: `${today} 08:30`,
     };
     setActivityLogs((prev) => [newLog, ...prev]);
 
     showToast(`Activity "${task?.name}" marked as started on site.`);
+
+    // Persist live to Supabase plan_* tables
+    await updatePlanTask(taskId, {
+      status: 'in_progress',
+      actualStartDate: today,
+      progress: newProgress,
+      notes: updatedNotes,
+    }, activeProjectId);
+    await logPlanActivity(taskId, actionText, detailsText, performedBy, activeProjectId);
   };
 
   // Execution Handlers: Complete Task
-  const handleCompleteTask = (taskId: string) => {
+  const handleCompleteTask = async (taskId: string) => {
     const today = new Date().toISOString().split('T')[0] || '2026-08-29';
     const task = tasks.find((t) => t.id === taskId);
+    const completedQty = task?.plannedQuantity || task?.completedQuantity;
 
     const updated = tasks.map((t) => {
       if (t.id === taskId) {
@@ -535,7 +753,7 @@ export default function ConstructionPlanningPage() {
           status: 'completed' as ScheduleStatus,
           progress: 100,
           actualEndDate: today,
-          completedQuantity: t.plannedQuantity || t.completedQuantity,
+          completedQuantity: completedQty,
         };
       }
       return t;
@@ -543,17 +761,27 @@ export default function ConstructionPlanningPage() {
 
     refreshTasksWithRollups(updated);
 
+    const performedBy = user?.email?.split('@')[0] || 'Quality Inspector';
     const newLog: TaskActivityLog = {
       id: `act-${Date.now()}`,
       taskId,
       action: 'Task Marked Completed',
       details: `Execution 100% finished. Actual completion date recorded as ${today}.`,
-      performedBy: 'Quality Inspector',
+      performedBy,
       timestamp: `${today} 17:00`,
     };
     setActivityLogs((prev) => [newLog, ...prev]);
 
     showToast(`Activity "${task?.name}" marked as 100% completed.`);
+
+    // Persist live to Supabase plan_* tables
+    await updatePlanTask(taskId, {
+      status: 'completed',
+      progress: 100,
+      actualEndDate: today,
+      completedQuantity: completedQty,
+    }, activeProjectId);
+    await logPlanActivity(taskId, 'Task Marked Completed', `Execution 100% finished. Actual completion date recorded as ${today}.`, performedBy, activeProjectId);
   };
 
   // Execution Handlers: Daily Progress Submission
@@ -562,7 +790,7 @@ export default function ConstructionPlanningPage() {
     setIsDailyProgressDialogOpen(true);
   };
 
-  const handleSubmitDailyProgress = (entry: Omit<DailyProgressEntry, 'id' | 'createdAt'>) => {
+  const handleSubmitDailyProgress = async (entry: Omit<DailyProgressEntry, 'id' | 'createdAt'>) => {
     const newEntry: DailyProgressEntry = {
       ...entry,
       id: `dp-${Date.now()}`,
@@ -571,16 +799,22 @@ export default function ConstructionPlanningPage() {
 
     setProgressEntries((prev) => [newEntry, ...prev]);
 
+    const isFinished = entry.newProgress >= 100;
+    const task = tasks.find((t) => t.id === entry.taskId);
+    const newCompletedQty = (task?.completedQuantity || 0) + (entry.quantityCompletedToday || 0);
+    const newStartDate = task?.actualStartDate || entry.reportDate;
+    const newEndDate: string | null = isFinished ? entry.reportDate : (task?.actualEndDate ?? null);
+    const newStatus: ScheduleStatus = isFinished ? ('completed' as ScheduleStatus) : ('in_progress' as ScheduleStatus);
+
     const updated = tasks.map((t) => {
       if (t.id === entry.taskId) {
-        const isFinished = entry.newProgress >= 100;
         return {
           ...t,
           progress: entry.newProgress,
-          status: isFinished ? ('completed' as ScheduleStatus) : ('in_progress' as ScheduleStatus),
-          actualStartDate: t.actualStartDate || entry.reportDate,
-          actualEndDate: isFinished ? entry.reportDate : t.actualEndDate,
-          completedQuantity: (t.completedQuantity || 0) + (entry.quantityCompletedToday || 0),
+          status: newStatus,
+          actualStartDate: newStartDate,
+          actualEndDate: newEndDate,
+          completedQuantity: newCompletedQty,
         };
       }
       return t;
@@ -588,7 +822,6 @@ export default function ConstructionPlanningPage() {
 
     refreshTasksWithRollups(updated);
 
-    const task = tasks.find((t) => t.id === entry.taskId);
     const newLog: TaskActivityLog = {
       id: `act-${Date.now()}`,
       taskId: entry.taskId,
@@ -600,6 +833,26 @@ export default function ConstructionPlanningPage() {
     setActivityLogs((prev) => [newLog, ...prev]);
 
     showToast(`Daily progress recorded: ${task?.name} updated to ${entry.newProgress}%.`);
+
+    // Persist live to Supabase plan_* tables
+    const createdProgress = await createPlanDailyProgress(entry, activeProjectId);
+    if (createdProgress) {
+      setProgressEntries((prev) => prev.map((p) => p.id === newEntry.id ? createdProgress : p));
+    }
+    await updatePlanTask(entry.taskId, {
+      progress: entry.newProgress,
+      status: newStatus,
+      actualStartDate: newStartDate,
+      actualEndDate: newEndDate,
+      completedQuantity: newCompletedQty,
+    }, activeProjectId);
+    await logPlanActivity(
+      entry.taskId, 
+      'Daily Progress Logged', 
+      `Progress increased from ${entry.previousProgress}% to ${entry.newProgress}%. Reported by ${entry.supervisorName}.`, 
+      entry.supervisorName, 
+      activeProjectId
+    );
   };
 
   // Task Add / Edit
@@ -629,7 +882,7 @@ export default function ConstructionPlanningPage() {
     setIsAddTaskDialogOpen(true);
   };
 
-  const handleSaveTask = (
+  const handleSaveTask = async (
     taskData: Partial<ConstructionTask>,
     initialDependency?: { predecessorId: string; type: DependencyType; lagDays: number }
   ) => {
@@ -642,10 +895,20 @@ export default function ConstructionPlanningPage() {
       });
       refreshTasksWithRollups(updated);
       showToast(`Updated activity "${taskData.name}".`);
+
+      // Persist to Supabase
+      await updatePlanTask(taskToEdit.id, taskData, activeProjectId);
+      await logPlanActivity(
+        taskToEdit.id,
+        'Task Updated',
+        `Details updated for task ${taskData.name || taskToEdit.name}`,
+        user?.email?.split('@')[0] || 'Site Engineer',
+        activeProjectId
+      );
     } else {
-      const newId = `t-user-${Date.now()}`;
+      const tempId = `t-user-${Date.now()}`;
       const newTask: ConstructionTask = {
-        id: newId,
+        id: tempId,
         code: taskData.code || `${tasks.length + 1}`,
         name: taskData.name || 'New Activity',
         description: taskData.description,
@@ -675,22 +938,42 @@ export default function ConstructionPlanningPage() {
       const updated = [...tasks, newTask];
       refreshTasksWithRollups(updated);
 
-      if (initialDependency && initialDependency.predecessorId) {
-        const newDep: TaskDependency = {
-          id: `dep-${Date.now()}`,
-          predecessorId: initialDependency.predecessorId,
-          successorId: newId,
-          type: initialDependency.type,
-          lagDays: initialDependency.lagDays,
-        };
-        setDependencies((prev) => [...prev, newDep]);
-      }
-
       if (taskData.parentTaskId) {
         setExpandedIds((prev) => new Set(prev).add(taskData.parentTaskId!));
       }
 
       showToast(`Added new activity "${newTask.name}" to WBS.`);
+
+      // Persist to Supabase
+      const dbTask = await createPlanTask(newTask, activeProjectId);
+      const finalTaskId = dbTask ? dbTask.id : tempId;
+      if (dbTask) {
+        setTasks((prev) => prev.map((t) => (t.id === tempId ? dbTask : t)));
+      }
+
+      if (initialDependency && initialDependency.predecessorId) {
+        const newDep: TaskDependency = {
+          id: `dep-${Date.now()}`,
+          predecessorId: initialDependency.predecessorId,
+          successorId: finalTaskId,
+          type: initialDependency.type,
+          lagDays: initialDependency.lagDays,
+        };
+        setDependencies((prev) => [...prev, newDep]);
+
+        const dbDep = await createPlanDependency(newDep, activeProjectId);
+        if (dbDep) {
+          setDependencies((prev) => prev.map((d) => (d.id === newDep.id ? dbDep : d)));
+        }
+      }
+
+      await logPlanActivity(
+        finalTaskId,
+        'Task Created',
+        `Created new ${newTask.type} "${newTask.name}" in WBS`,
+        user?.email?.split('@')[0] || 'Site Engineer',
+        activeProjectId
+      );
     }
   };
 
@@ -704,7 +987,7 @@ export default function ConstructionPlanningPage() {
     }
   };
 
-  const executeDeleteTask = (taskId: string) => {
+  const executeDeleteTask = async (taskId: string) => {
     const idsToDelete = new Set<string>([taskId]);
     let added = true;
     while (added) {
@@ -729,6 +1012,10 @@ export default function ConstructionPlanningPage() {
     }
 
     showToast(`Removed activity and subtasks from WBS.`);
+
+    // Persist delete to Supabase plan_*
+    const deletePromises = Array.from(idsToDelete).map((id) => deletePlanTask(id));
+    await Promise.all(deletePromises);
   };
 
   // Dependencies Management
@@ -737,14 +1024,15 @@ export default function ConstructionPlanningPage() {
     setIsDependencyEditorOpen(true);
   };
 
-  const handleAddDependency = (
+  const handleAddDependency = async (
     predecessorId: string, 
     successorId: string, 
     type: DependencyType, 
     lagDays: number
   ) => {
+    const tempId = `dep-${Date.now()}`;
     const newDep: TaskDependency = {
-      id: `dep-${Date.now()}`,
+      id: tempId,
       predecessorId,
       successorId,
       type,
@@ -752,11 +1040,20 @@ export default function ConstructionPlanningPage() {
     };
     setDependencies((prev) => [...prev, newDep]);
     showToast(`Linked new dependency (${type}).`);
+
+    // Persist to Supabase
+    const dbDep = await createPlanDependency(newDep, activeProjectId);
+    if (dbDep) {
+      setDependencies((prev) => prev.map((d) => (d.id === tempId ? dbDep : d)));
+    }
   };
 
-  const handleRemoveDependency = (dependencyId: string) => {
+  const handleRemoveDependency = async (dependencyId: string) => {
     setDependencies((prev) => prev.filter((d) => d.id !== dependencyId));
     showToast(`Removed task dependency.`);
+
+    // Persist to Supabase
+    await deletePlanDependency(dependencyId);
   };
 
   // Delay Impact Trace
@@ -791,20 +1088,21 @@ export default function ConstructionPlanningPage() {
   };
 
   // Issue Add Handler
-  const handleAddIssue = (
+  const handleAddIssue = async (
     taskId: string, 
     title: string, 
     description: string, 
     severity: TaskIssue['severity']
   ) => {
+    const tempId = `iss-${Date.now()}`;
     const newIssue: TaskIssue = {
-      id: `iss-${Date.now()}`,
+      id: tempId,
       taskId,
       title,
       description,
       severity,
       status: 'open',
-      reportedBy: 'Site Supervisor',
+      reportedBy: user?.email?.split('@')[0] || 'Site Supervisor',
       reportedDate: new Date().toISOString().split('T')[0] || '2026-08-29',
     };
     setIssues((prev) => [newIssue, ...prev]);
@@ -812,9 +1110,23 @@ export default function ConstructionPlanningPage() {
     if (severity === 'critical') {
       const updated = tasks.map((t) => (t.id === taskId ? { ...t, status: 'blocked' as ScheduleStatus } : t));
       refreshTasksWithRollups(updated);
+      await updatePlanTask(taskId, { status: 'blocked' }, activeProjectId);
     }
 
     showToast(`Logged site issue: "${title}".`, 'info');
+
+    // Persist to Supabase
+    const dbIssue = await createPlanIssue(newIssue, activeProjectId);
+    if (dbIssue) {
+      setIssues((prev) => prev.map((i) => (i.id === tempId ? dbIssue : i)));
+    }
+    await logPlanActivity(
+      taskId,
+      'Issue Reported',
+      `Logged issue: ${title} (${severity} severity)`,
+      newIssue.reportedBy,
+      activeProjectId
+    );
   };
 
   // Project Settings Save
@@ -831,7 +1143,7 @@ export default function ConstructionPlanningPage() {
           <Building2 className="w-6 h-6" />
         </div>
         <div className="text-center">
-          <h2 className="text-sm font-bold text-slate-800">InfiBuild PMS</h2>
+          <h2 className="text-sm font-bold text-slate-800">Armee Enterprises PMS</h2>
           <p className="text-xs text-slate-500 mt-0.5">Verifying security session...</p>
         </div>
       </div>
@@ -849,12 +1161,14 @@ export default function ConstructionPlanningPage() {
       {/* 1. Left Fixed & Collapsible Sidebar */}
       <Sidebar
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={handleViewChange}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         project={project}
+        onAddTask={handleAddTask}
+        onAddWorkPackage={handleAddWorkPackage}
         onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
         onOpenSettings={() => setIsProjectSettingsOpen(true)}
         onOpenRecordProgress={() => handleOpenDailyProgress()}
@@ -862,14 +1176,27 @@ export default function ConstructionPlanningPage() {
         onOpenSitesManager={() => setIsSitesManagerOpen(true)}
         userEmail={user.email || undefined}
         userRole={userRole?.role}
+        userPage={userRole?.page}
         onSignOut={signOut}
         activeArchiveCategory={archiveCategoryFilter}
         onSelectArchiveCategory={setArchiveCategoryFilter}
         activeInventoryTab={inventorySubTab}
         onSelectInventoryTab={setInventorySubTab}
         onOpenMaterialAction={(act) => {
+          if (!isViewAllowed('materials', userRole?.role, userRole?.page)) {
+            showToast('Access Restricted: You do not have permission to access Materials.');
+            return;
+          }
           setCurrentView('materials');
           setTriggerMaterialAction({ action: act, timestamp: Date.now() });
+        }}
+        onOpenExpenseAction={(act) => {
+          if (!isViewAllowed('expenses', userRole?.role, userRole?.page)) {
+            showToast('Access Restricted: You do not have permission to access Expenses.');
+            return;
+          }
+          setCurrentView('expenses');
+          setTriggerExpenseAction({ action: act, timestamp: Date.now() });
         }}
       />
 
@@ -885,16 +1212,17 @@ export default function ConstructionPlanningPage() {
           onAddTask={handleAddTask}
           onAddWorkPackage={handleAddWorkPackage}
           onRecordProgress={() => handleOpenDailyProgress()}
-          onViewCriticalPath={() => setCurrentView('critical')}
+          onViewCriticalPath={() => handleViewChange('critical')}
           onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
           onOpenSettings={() => setIsProjectSettingsOpen(true)}
           onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           onOpenMaterialStore={() => handleOpenMaterialDrawer('materials')}
           onOpenBilling={() => handleOpenMaterialDrawer('billing')}
-          onOpenSubcontractorBills={() => setCurrentView('subcontractor-bills')}
+          onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
           onOpenSitesManager={() => setIsSitesManagerOpen(true)}
           userEmail={user.email || undefined}
           userRole={userRole?.role}
+          userPage={userRole?.page}
           onSignOut={signOut}
         />
 
@@ -917,7 +1245,7 @@ export default function ConstructionPlanningPage() {
           )}
 
           {/* Project Summary Cards (KPIs) - Full Width Grid (Only on schedule planning views) */}
-          {currentView !== 'files-archive' && currentView !== 'subcontractor-bills' && currentView !== 'materials' && (
+          {currentView !== 'files-archive' && currentView !== 'subcontractor-bills' && currentView !== 'materials' && currentView !== 'expenses' && (
             <>
               <ProjectSummaryCards
                 metrics={metrics}
@@ -938,7 +1266,7 @@ export default function ConstructionPlanningPage() {
               {/* Toolbar: Views Switcher, Search & Filters */}
               <TaskToolbar
                 currentView={currentView}
-                onViewChange={setCurrentView}
+                onViewChange={handleViewChange}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 statusFilter={statusFilter}
@@ -951,96 +1279,133 @@ export default function ConstructionPlanningPage() {
                 onExpandAll={handleExpandAll}
                 onCollapseAll={handleCollapseAll}
                 isAllExpanded={isAllExpanded}
+                dateFilter={taskDateFilter}
+                onDateFilterChange={setTaskDateFilter}
+                areAllNotesOpen={areAllNotesOpen}
+                onToggleAllNotes={handleToggleAllNotes}
               />
             </>
           )}
 
           {/* Active View Container */}
           <section className="transition-all duration-200 w-full">
-            {currentView === 'list' && (
-              <ConstructionTaskTable
-                tasks={displayedFlattenedTasks}
-                allTasksCount={tasks.length}
-                expandedIds={expandedIds}
-                onToggleExpand={handleToggleExpand}
-                onSelectTask={handleSelectTask}
-                onStartTask={handleInitiateStartTask}
-                onRecordProgress={handleOpenDailyProgress}
-                onCompleteTask={handleCompleteTask}
-                onAddChildTask={handleAddChildTask}
-                onEditTask={handleEditTask}
-                onDeleteTask={handleDeleteTask}
-                dependencies={dependencies}
-                onOpenDependencyManager={handleOpenDependencyManager}
-              />
-            )}
+            {userRole && isOnlyAllowRole(userRole.role) && !isViewAllowed(currentView, userRole.role, userRole.page) ? (
+              <div className="bg-white rounded-2xl border border-rose-200/80 p-8 sm:p-12 text-center max-w-lg mx-auto my-12 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1">
+                  Access Restricted ({userRole.role})
+                </h3>
+                <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                  Your account is restricted to designated views only ({userRole.page || 'None configured'}).
+                  You do not have permission to view the <span className="font-semibold text-slate-700">"{currentView}"</span> module.
+                </p>
+                {getFirstAllowedView(userRole.role, userRole.page) && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView(getFirstAllowedView(userRole.role, userRole.page)!)}
+                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    Go to Allowed Page ({getFirstAllowedView(userRole.role, userRole.page)})
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {currentView === 'list' && (
+                  <ConstructionTaskTable
+                    tasks={displayedFlattenedTasks}
+                    allTasksCount={tasks.length}
+                    expandedIds={expandedIds}
+                    onToggleExpand={handleToggleExpand}
+                    onSelectTask={handleSelectTask}
+                    onStartTask={handleInitiateStartTask}
+                    onRecordProgress={handleOpenDailyProgress}
+                    onCompleteTask={handleCompleteTask}
+                    onAddChildTask={handleAddChildTask}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
+                    dependencies={dependencies}
+                    onOpenDependencyManager={handleOpenDependencyManager}
+                    areAllNotesOpen={areAllNotesOpen}
+                    onToggleAllNotes={handleToggleAllNotes}
+                  />
+                )}
 
-            {currentView === 'gantt' && (
-              <GanttTimeline
-                tasks={displayedFlattenedTasks}
-                allTasks={tasks}
-                expandedIds={expandedIds}
-                onToggleExpand={handleToggleExpand}
-                onSelectTask={handleSelectTask}
-              />
-            )}
+                {currentView === 'gantt' && (
+                  <GanttTimeline
+                    tasks={displayedFlattenedTasks}
+                    allTasks={tasks}
+                    expandedIds={expandedIds}
+                    onToggleExpand={handleToggleExpand}
+                    onSelectTask={handleSelectTask}
+                  />
+                )}
 
-            {currentView === 'critical' && (
-              <CriticalPathView
-                project={project}
-                tasks={tasks}
-                dependencies={dependencies}
-                onSelectTask={handleSelectTask}
-              />
-            )}
+                {currentView === 'critical' && (
+                  <CriticalPathView
+                    project={project}
+                    tasks={tasks}
+                    dependencies={dependencies}
+                    onSelectTask={handleSelectTask}
+                  />
+                )}
 
-            {currentView === 'progress' && (
-              <ProgressHistory
-                entries={progressEntries}
-                tasks={tasks}
-                onOpenRecordDialog={() => handleOpenDailyProgress()}
-                onSelectTask={handleSelectTask}
-              />
-            )}
+                {currentView === 'progress' && (
+                  <ProgressHistory
+                    entries={progressEntries}
+                    tasks={tasks}
+                    onOpenRecordDialog={() => handleOpenDailyProgress()}
+                    onSelectTask={handleSelectTask}
+                  />
+                )}
 
-            {currentView === 'milestones' && (
-              <MilestonesView
-                milestones={milestones}
-                onSelectMilestone={handleSelectTask}
-              />
-            )}
+                {currentView === 'milestones' && (
+                  <MilestonesView
+                    milestones={milestones}
+                    onSelectMilestone={handleSelectTask}
+                  />
+                )}
 
-            {currentView === 'subcontractor-bills' && (
-              <SubcontractorBillsView
-                bills={subcontractorBills}
-                project={project}
-                parties={parties}
-                tasks={tasks}
-                onSaveBill={handleSaveSubcontractorBill}
-                onDeleteBill={handleDeleteSubcontractorBill}
-                showToast={showToast}
-              />
-            )}
+                {(currentView === 'expenses' || currentView === 'subcontractor-bills') && (
+                  <CommercialBillsAndExpensesView
+                    initialTab={currentView === 'subcontractor-bills' ? 'subcontractor-bills' : 'expenses'}
+                    project={project}
+                    projectId={activeDbProject?.id || 'f0e510da-9530-468f-bb09-59920070d55e'}
+                    userEmail={user.email || undefined}
+                    showToast={showToast}
+                    externalActionTrigger={triggerExpenseAction}
+                    subcontractorBills={subcontractorBills}
+                    parties={parties}
+                    tasks={tasks}
+                    onSaveSubcontractorBill={handleSaveSubcontractorBill}
+                    onDeleteSubcontractorBill={handleDeleteSubcontractorBill}
+                    onTabChange={(tab) => setCurrentView(tab)}
+                  />
+                )}
 
-            {currentView === 'files-archive' && (
-              <FilesArchiveView
-                project={project}
-                projectId={activeDbProject?.id || 'f0e510da-9530-468f-bb09-59920070d55e'}
-                userEmail={user.email || undefined}
-                onOpenSitesManager={() => setIsSitesManagerOpen(true)}
-                initialCategory={archiveCategoryFilter}
-                onCategoryChange={setArchiveCategoryFilter}
-              />
-            )}
+                {currentView === 'files-archive' && (
+                  <FilesArchiveView
+                    project={project}
+                    projectId={activeDbProject?.id || 'f0e510da-9530-468f-bb09-59920070d55e'}
+                    userEmail={user.email || undefined}
+                    onOpenSitesManager={() => setIsSitesManagerOpen(true)}
+                    initialCategory={archiveCategoryFilter}
+                    onCategoryChange={setArchiveCategoryFilter}
+                  />
+                )}
 
-            {currentView === 'materials' && (
-              <SiteInventoryManagement
-                allTasks={tasks}
-                project={project}
-                initialTab={inventorySubTab}
-                showToast={showToast}
-                externalActionTrigger={triggerMaterialAction}
-              />
+                {currentView === 'materials' && (
+                  <SiteInventoryManagement
+                    allTasks={tasks}
+                    project={project}
+                    initialTab={inventorySubTab}
+                    showToast={showToast}
+                    externalActionTrigger={triggerMaterialAction}
+                  />
+                )}
+              </>
             )}
           </section>
 
@@ -1077,6 +1442,7 @@ export default function ConstructionPlanningPage() {
         defaultParentId={addTaskDefaultParent}
         defaultType={addTaskDefaultType}
         allTasks={tasks}
+        dependencies={dependencies}
       />
 
       {/* Daily Progress Reporting Modal */}

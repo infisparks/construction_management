@@ -113,7 +113,7 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
             <div className="flex items-center justify-between pt-2 border-t border-slate-200">
               <span className="text-xs font-bold text-slate-700">Net Payable Amount</span>
               <span className="text-base font-extrabold text-slate-900 font-mono">
-                ₹ {Number(bill.grandTotal || 0).toLocaleString('en-IN')}
+                Rs. {Number(bill.grandTotal || 0).toLocaleString('en-IN')}
               </span>
             </div>
           </div>

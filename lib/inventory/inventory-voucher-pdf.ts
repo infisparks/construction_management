@@ -4,12 +4,38 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { InventoryTransaction } from './mock-inventory-data';
 
+/**
+ * Formats a monetary value safely without using the unicode rupee symbol (₹),
+ * which is unsupported in standard PDF fonts and renders as a broken single quote (').
+ * Uses standard "Rs." notation with clean Indian comma separators.
+ */
 export function formatINR(val: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+  if (val === undefined || val === null || isNaN(val)) return '—';
+  return `Rs. ${Number(val).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(val);
+  })}`;
+}
+
+/**
+ * Resolves a clean, human-readable Serial Item Code for bills and vouchers.
+ * Replaces raw UUIDs (e.g. 'd6ddc9b6-50ad-4e52-8399-7a3b2f915cf3') with clean serial numbers like MAT-001.
+ */
+export function getCleanItemCode(
+  materialCode?: string,
+  materialId?: string,
+  fallbackIndex: number = 1
+): string {
+  const isUuid = (val?: string) =>
+    Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim()));
+
+  if (materialCode && materialCode.trim() && !isUuid(materialCode)) {
+    return materialCode.trim();
+  }
+  if (materialId && materialId.trim() && !isUuid(materialId)) {
+    return materialId.trim();
+  }
+  return `MAT-${String(fallbackIndex).padStart(3, '0')}`;
 }
 
 /**
@@ -183,10 +209,12 @@ export function generateInventoryVoucherPdf(
   }
 
   // --- 5. Item AutoTable ---
+  const itemCode = getCleanItemCode(transaction.materialCode, transaction.materialId, 1);
+
   const tableData = [
     [
       '1',
-      transaction.materialId || 'MAT-01',
+      itemCode,
       transaction.materialName,
       transaction.category,
       `${isCheckIn ? '+' : '-'}${transaction.quantity} ${transaction.unit}`,
@@ -203,12 +231,12 @@ export function generateInventoryVoucherPdf(
     theme: 'grid',
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 22, fontStyle: 'bold' },
-      2: { cellWidth: 50 },
-      3: { cellWidth: 28 },
+      1: { cellWidth: 26, fontStyle: 'bold' },
+      2: { cellWidth: 46 },
+      3: { cellWidth: 26 },
       4: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
-      5: { cellWidth: 22, halign: 'right' },
-      6: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+      5: { cellWidth: 24, halign: 'right' },
+      6: { cellWidth: 32, halign: 'right', fontStyle: 'bold' },
     },
     styles: {
       fontSize: 8,
@@ -610,7 +638,7 @@ export function generateMaterialCheckoutHistoryPdf(
   doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    'Certified Site Issue Register. Generated from InfiBuild PMS Material Store Module. Official record for audit & subcontractor billing.',
+    'Certified Site Issue Register. Generated from Armee Enterprises PMS Material Store Module. Official record for audit & subcontractor billing.',
     pageWidth / 2,
     pageHeight - margin + 2,
     { align: 'center' }

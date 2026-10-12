@@ -44,11 +44,6 @@ import {
   InventorySubcontractor,
   VendorProfile,
   VendorPartyType,
-  INITIAL_CONSTRUCTION_MATERIALS,
-  INITIAL_INVENTORY_TRANSACTIONS,
-  INITIAL_INVENTORY_SUPPLIERS,
-  INITIAL_INVENTORY_SUBCONTRACTORS,
-  INITIAL_VENDOR_PROFILES
 } from '@/lib/inventory/mock-inventory-data';
 import { ConstructionTask, ProjectInfo } from '@/lib/construction-planning/types';
 import {
@@ -62,6 +57,11 @@ import { VoucherSlipModal } from './VoucherSlipModal';
 import { MaterialHistoryDrawer } from './MaterialHistoryDrawer';
 import { ProductProfileDrawer } from './ProductProfileDrawer';
 import { VendorProfileDrawer } from './VendorProfileDrawer';
+import { StockSummaryPdfModal } from './StockSummaryPdfModal';
+import {
+  viewInventoryStockSummaryPdfInNewTab,
+  downloadInventoryStockSummaryPdf,
+} from '@/lib/inventory/inventory-stock-pdf';
 
 import { ProductProfileView } from './ProductProfileView';
 import { VendorProfileView } from './VendorProfileView';
@@ -76,7 +76,16 @@ import {
 import {
   fetchProfileProducts,
   fetchProfileVendors,
+  createProfileProduct,
+  createProfileVendor,
 } from '@/lib/supabase/profile-services';
+import { 
+  DateFilterControl, 
+  DateFilterState, 
+  DEFAULT_DATE_FILTER, 
+  matchesDateFilter, 
+  isDateFilterActive 
+} from '@/components/common/DateFilterControl';
 
 interface SiteInventoryManagementProps {
   allTasks?: ConstructionTask[];
@@ -93,78 +102,126 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   showToast,
   externalActionTrigger,
 }) => {
-  // Master In-Memory State
-  const [materials, setMaterials] = useState<ConstructionMaterial[]>(INITIAL_CONSTRUCTION_MATERIALS);
-  const [transactions, setTransactions] = useState<InventoryTransaction[]>(INITIAL_INVENTORY_TRANSACTIONS);
-  const [suppliers, setSuppliers] = useState<InventorySupplier[]>(INITIAL_INVENTORY_SUPPLIERS);
-  const [subcontractors, setSubcontractors] = useState<InventorySubcontractor[]>(INITIAL_INVENTORY_SUBCONTRACTORS);
-  const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>(INITIAL_VENDOR_PROFILES);
+  // Master Live State (Loaded purely from Supabase)
+  const [materials, setMaterials] = useState<ConstructionMaterial[]>([]);
+  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
+  const [suppliers, setSuppliers] = useState<InventorySupplier[]>([]);
+  const [subcontractors, setSubcontractors] = useState<InventorySubcontractor[]>([]);
+  const [vendorProfiles, setVendorProfiles] = useState<VendorProfile[]>([]);
 
   // Supabase Live State
   const [dbSummary, setDbSummary] = useState<InventoryQuickSummary | null>(null);
-  const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [isLoadingDb, setIsLoadingDb] = useState(true);
 
-  // Synchronize Live Data from Supabase (profile_product & inventory_transactions)
+  // Synchronize Live Data from Supabase (profile_product, profile_vendor & inventory_transactions)
   const loadDataFromSupabase = async () => {
     setIsLoadingDb(true);
     try {
       const [prodList, txList, summary, vendList] = await Promise.all([
         fetchProfileProducts(),
-        fetchInventoryTransactions({ limit: 100 }),
+        fetchInventoryTransactions({ limit: 200 }),
         fetchQuickStockSummary(),
         fetchProfileVendors(),
       ]);
 
-      if (prodList && prodList.length > 0) {
-        setMaterials((prev) => {
-          return prodList.map((p) => {
-            const existing = prev.find((m) => m.id === p.id || m.code === p.code);
-            return {
-              id: p.id,
-              code: p.code || 'MAT-000',
-              name: p.name,
-              description: p.description || '',
-              category: (p.category || 'General') as any,
-              unit: (p.unit || 'Nos') as any,
-              currentStock: Number(p.current_stock ?? existing?.currentStock ?? 0),
-              minimumAlertStock: Number(p.minimum_alert_stock ?? existing?.minimumAlertStock ?? 0),
-              averageUnitRate: existing?.averageUnitRate ?? 0,
-              gstRate: (existing?.gstRate ?? 18) as any,
-              storageLocation: p.storage_location || existing?.storageLocation || 'Central Site Store #1',
-              hsnCode: p.hsn_code || existing?.hsnCode,
-              brand: p.brand || existing?.brand,
-              lastUpdated: p.updated_at ? p.updated_at.split('T')[0] : (existing?.lastUpdated || new Date().toISOString().split('T')[0]),
-            };
-          });
-        });
-      }
+      // 1. Process materials from Supabase profile_product
+      const mappedMaterials: ConstructionMaterial[] = (prodList || []).map((p) => {
+        // Find latest rate from inward transactions if available
+        const relatedTxs = (txList || []).filter(
+          (t) => t.product_id === p.id && (t.type === 'in' || t.type === 'check_in') && Number(t.unit_rate) > 0
+        );
+        const latestRate = relatedTxs.length > 0 ? Number(relatedTxs[0].unit_rate) : 0;
 
-      if (txList && txList.length > 0) {
+        return {
+          id: p.id,
+          code: p.code || 'MAT-000',
+          name: p.name,
+          description: p.description || '',
+          category: (p.category || 'General') as any,
+          unit: (p.unit || 'Nos') as any,
+          currentStock: Number(p.current_stock ?? 0),
+          minimumAlertStock: Number(p.minimum_alert_stock ?? 0),
+          averageUnitRate: latestRate,
+          gstRate: 18 as any,
+          storageLocation: p.storage_location || 'Central Site Store #1',
+          hsnCode: p.hsn_code,
+          brand: p.brand,
+          lastUpdated: p.updated_at
+            ? p.updated_at.split('T')[0]
+            : (p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+        };
+      });
+      setMaterials(mappedMaterials);
+
+      // 2. Process transactions from Supabase inventory_transactions
+      if (txList) {
         const mapped = txList.map(mapDbToInventoryTransaction);
         setTransactions(mapped);
+      } else {
+        setTransactions([]);
       }
 
+      // 3. KPI Summary
       if (summary) {
         setDbSummary(summary);
       }
 
-      if (vendList && vendList.length > 0) {
-        setVendorProfiles(
-          vendList.map((v) => ({
+      // 4. Process vendors from Supabase profile_vendor
+      if (vendList) {
+        const mappedVendors: VendorProfile[] = vendList.map((v) => ({
+          id: v.id,
+          name: v.name,
+          type: (v.type === 'contractor' ? 'contractor' : v.type === 'vendor' ? 'vendor' : 'other') as any,
+          contactPerson: v.contact_person || '',
+          phone: v.phone || '',
+          email: v.email || '',
+          trade: v.trade || '',
+          gstin: v.gstin || '',
+          address: v.address || '',
+          location: v.location || v.city || '',
+          notes: v.notes || '',
+          createdAt: v.created_at || new Date().toISOString(),
+        }));
+        setVendorProfiles(mappedVendors);
+
+        // Derive suppliers from vendorProfiles
+        const supList: InventorySupplier[] = vendList
+          .filter((v) => v.type === 'vendor' || v.type === 'other' || !v.type)
+          .map((v) => ({
             id: v.id,
             name: v.name,
-            type: (v.type === 'contractor' ? 'contractor' : v.type === 'vendor' ? 'vendor' : 'other') as any,
-            contactPerson: v.contact_person || '',
+            type: v.type as any,
+            trade: v.trade || '',
             phone: v.phone || '',
             email: v.email || '',
-            trade: v.trade || '',
             gstin: v.gstin || '',
+            city: v.city || v.location || '',
             address: v.address || '',
             location: v.location || '',
             notes: v.notes || '',
-            createdAt: v.created_at || new Date().toISOString(),
-          }))
-        );
+          }));
+        setSuppliers(supList);
+
+        // Derive subcontractors from vendorProfiles
+        const subList: InventorySubcontractor[] = vendList
+          .filter((v) => v.type === 'contractor' || v.type === 'other')
+          .map((v) => ({
+            id: v.id,
+            name: v.name,
+            type: v.type as any,
+            trade: v.trade || '',
+            foremanName: v.contact_person || '',
+            phone: v.phone || '',
+            address: v.address || '',
+            location: v.location || '',
+            activeWorkers: 0,
+            notes: v.notes || '',
+          }));
+        setSubcontractors(subList);
+      } else {
+        setVendorProfiles([]);
+        setSuppliers([]);
+        setSubcontractors([]);
       }
     } catch (err) {
       console.error('Error syncing inventory from Supabase:', err);
@@ -183,6 +240,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   const [vendorDrawerDefaultType, setVendorDrawerDefaultType] = useState<VendorPartyType>('vendor');
   const [vendorTypeFilter, setVendorTypeFilter] = useState<'all' | 'vendor' | 'contractor' | 'other'>('all');
 
+  // Stock Summary PDF Modal
+  const [isStockPdfModalOpen, setIsStockPdfModalOpen] = useState(false);
+
   // Active View Tab
   const [activeTab, setActiveTab] = useState<'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock'>(initialTab);
 
@@ -198,6 +258,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'depleted'>('all');
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState<'all' | 'check_in' | 'check_out' | 'return' | 'damage'>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
 
   // Unified Action Modal State
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -255,7 +316,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         searchQuery === '' ||
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.storageLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.storageLocation && m.storageLocation.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (m.brand && m.brand.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesCategory = selectedCategory === 'all' || m.category === selectedCategory;
@@ -275,22 +336,62 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
   // Filtered Inward Transactions
   const inwardTransactions = useMemo(() => {
-    return transactions.filter((t) => t.type === 'check_in');
-  }, [transactions]);
+    return transactions.filter((t) => {
+      if (t.type !== 'check_in') return false;
+      if (!matchesDateFilter(t.date, dateFilter)) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          t.voucherNumber.toLowerCase().includes(q) ||
+          t.materialName.toLowerCase().includes(q) ||
+          (t.supplierName && t.supplierName.toLowerCase().includes(q)) ||
+          (t.vehicleNumber && t.vehicleNumber.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [transactions, dateFilter, searchQuery]);
 
   // Filtered Outward Transactions
   const outwardTransactions = useMemo(() => {
-    return transactions.filter((t) => t.type === 'check_out');
-  }, [transactions]);
+    return transactions.filter((t) => {
+      if (t.type !== 'check_out') return false;
+      if (!matchesDateFilter(t.date, dateFilter)) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          t.voucherNumber.toLowerCase().includes(q) ||
+          t.materialName.toLowerCase().includes(q) ||
+          (t.subcontractorName && t.subcontractorName.toLowerCase().includes(q)) ||
+          (t.vehicleNumber && t.vehicleNumber.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [transactions, dateFilter, searchQuery]);
 
   // Filtered Returns & Damages
   const returnsAndDamagesTransactions = useMemo(() => {
-    return transactions.filter((t) => t.type === 'return' || t.type === 'damage');
-  }, [transactions]);
+    return transactions.filter((t) => {
+      if (t.type !== 'return' && t.type !== 'damage') return false;
+      if (!matchesDateFilter(t.date, dateFilter)) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          t.voucherNumber.toLowerCase().includes(q) ||
+          t.materialName.toLowerCase().includes(q) ||
+          (t.returnReason && t.returnReason.toLowerCase().includes(q)) ||
+          (t.damageReason && t.damageReason.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [transactions, dateFilter, searchQuery]);
 
   // Filtered Ledger Transactions
   const filteredLedger = useMemo(() => {
     return transactions.filter((t) => {
+      if (!matchesDateFilter(t.date, dateFilter)) return false;
       const matchesSearch =
         searchQuery === '' ||
         t.voucherNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -306,7 +407,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
       return matchesSearch && matchesType;
     });
-  }, [transactions, searchQuery, ledgerTypeFilter]);
+  }, [transactions, searchQuery, ledgerTypeFilter, dateFilter]);
 
   // Low Stock Items
   const lowStockMaterials = useMemo(() => {
@@ -502,15 +603,37 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   };
 
   // Product Profile Creation Handler
-  const handleSaveProduct = (newProduct: ConstructionMaterial) => {
+  const handleSaveProduct = async (newProduct: ConstructionMaterial) => {
     setMaterials((prev) => [newProduct, ...prev]);
+    try {
+      const { data, error } = await createProfileProduct({
+        code: newProduct.code,
+        name: newProduct.name,
+        category: newProduct.category,
+        unit: newProduct.unit,
+        description: newProduct.description,
+        brand: newProduct.brand,
+        storage_location: newProduct.storageLocation,
+        minimum_alert_stock: newProduct.minimumAlertStock,
+        current_stock: newProduct.currentStock,
+        is_active: true,
+      });
+      if (data) {
+        setMaterials((prev) => prev.map((m) => (m.id === newProduct.id ? { ...m, id: data.id } : m)));
+      }
+      if (error) {
+        console.error('Error creating product in Supabase:', error);
+      }
+    } catch (err) {
+      console.error('Failed to create product in Supabase:', err);
+    }
     if (showToast) {
       showToast(`Product profile "${newProduct.name}" created (Code: ${newProduct.code})!`, 'success');
     }
   };
 
   // Vendor Profile Creation Handler
-  const handleSaveVendor = (newVendor: VendorProfile) => {
+  const handleSaveVendor = async (newVendor: VendorProfile) => {
     setVendorProfiles((prev) => [newVendor, ...prev]);
 
     // Automatically register into suppliers and/or subcontractors so it populates all dropdowns
@@ -545,6 +668,32 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         notes: newVendor.notes || '',
       };
       setSubcontractors((prev) => [newSub, ...prev]);
+    }
+
+    try {
+      const { data, error } = await createProfileVendor({
+        name: newVendor.name,
+        type: newVendor.type,
+        phone: newVendor.phone,
+        email: newVendor.email,
+        contact_person: newVendor.contactPerson,
+        trade: newVendor.trade,
+        gstin: newVendor.gstin,
+        address: newVendor.address,
+        location: newVendor.location,
+        notes: newVendor.notes,
+        is_active: true,
+      });
+      if (data) {
+        setVendorProfiles((prev) => prev.map((v) => (v.id === newVendor.id ? { ...v, id: data.id } : v)));
+        setSuppliers((prev) => prev.map((s) => (s.id === newVendor.id ? { ...s, id: data.id } : s)));
+        setSubcontractors((prev) => prev.map((s) => (s.id === newVendor.id ? { ...s, id: data.id } : s)));
+      }
+      if (error) {
+        console.error('Error creating vendor in Supabase:', error);
+      }
+    } catch (err) {
+      console.error('Failed to create vendor in Supabase:', err);
     }
 
     if (showToast) {
@@ -615,6 +764,20 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
             <span>Export</span>
+          </button>
+
+          {/* Preview Stock Balance PDF (Opens Blob URL in new tab & viewer) */}
+          <button
+            type="button"
+            onClick={() => {
+              viewInventoryStockSummaryPdfInNewTab(materials, project?.name || 'Noori Crest Tower');
+              setIsStockPdfModalOpen(true);
+            }}
+            className="h-8 px-2.5 rounded-lg border border-purple-200 bg-white hover:bg-purple-50 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            title="Preview all inventory stock as PDF statement (opens Blob URL)"
+          >
+            <Printer className="w-3.5 h-3.5 text-purple-600" />
+            <span>Preview PDF</span>
           </button>
 
           <div className="h-4 w-[1px] bg-slate-200 mx-0.5 shrink-0 hidden sm:block" />
@@ -800,8 +963,21 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         </div>
       </div>
 
-      {/* 3. Navigation Tabs (Clean & Professional) */}
+      {/* 3. Navigation Tabs (Clean & Professional - Current Stock is Tab #1) */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-1 shadow-2xs flex items-center gap-1 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab('catalog')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+            activeTab === 'catalog'
+              ? 'bg-purple-600 text-white shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Current Stock ({materials.length})</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('products')}
@@ -829,19 +1005,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         </button>
 
         <div className="h-4 w-[1px] bg-slate-200 mx-1 shrink-0" />
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('catalog')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-            activeTab === 'catalog'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Current Stock ({materials.length})</span>
-        </button>
 
         <button
           type="button"
@@ -961,6 +1124,20 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 <option value="low_stock">Low Stock (Alert)</option>
                 <option value="depleted">Depleted (0 Stock)</option>
               </select>
+
+              {/* Quick Preview Stock PDF Button in Toolbar */}
+              <button
+                type="button"
+                onClick={() => {
+                  viewInventoryStockSummaryPdfInNewTab(materials, project?.name || 'Noori Crest Tower');
+                  setIsStockPdfModalOpen(true);
+                }}
+                className="h-8.5 px-3 rounded-lg border border-purple-200 bg-white hover:bg-purple-50 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                title="Preview all inventory with stock as PDF statement"
+              >
+                <Printer className="w-3.5 h-3.5 text-purple-600" />
+                <span>Preview PDF</span>
+              </button>
             </>
           )}
 
@@ -981,7 +1158,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             <select
               value={ledgerTypeFilter}
               onChange={(e) => setLedgerTypeFilter(e.target.value as any)}
-              className="h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600"
+              className="h-8.5 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600"
             >
               <option value="all">All Transaction Types</option>
               <option value="check_in">(+) Check-In (GRN)</option>
@@ -989,6 +1166,32 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <option value="return">(-) Return to Vendor</option>
               <option value="damage">(-) Damaged / Breakage</option>
             </select>
+          )}
+
+          {/* Universal Date Filter for Inward, Outward, Returns, and Ledger */}
+          {['inward', 'outward', 'returns_damages', 'ledger'].includes(activeTab) && (
+            <DateFilterControl
+              value={dateFilter}
+              onChange={setDateFilter}
+              label={activeTab === 'inward' ? 'GRN Date' : activeTab === 'outward' ? 'Dispatch Date' : 'Transaction Date'}
+            />
+          )}
+
+          {/* Reset Filters button if search or filters active */}
+          {(searchQuery || isDateFilterActive(dateFilter) || selectedCategory !== 'all' || statusFilter !== 'all' || ledgerTypeFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDateFilter(DEFAULT_DATE_FILTER);
+                setSelectedCategory('all');
+                setStatusFilter('all');
+                setLedgerTypeFilter('all');
+              }}
+              className="text-xs text-purple-700 hover:underline px-2 py-1 font-semibold cursor-pointer"
+            >
+              Reset
+            </button>
           )}
         </div>
       </div>
@@ -1008,17 +1211,29 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   <th className="px-4 py-3">Storage Godown / Yard</th>
                   <th className="px-4 py-3 text-right">Current Stock</th>
                   <th className="px-4 py-3 text-right">Min Buffer</th>
-                  <th className="px-4 py-3 text-right">Avg Rate (₹)</th>
+                  <th className="px-4 py-3 text-right">Avg Rate (Rs.)</th>
                   <th className="px-4 py-3 text-right">Est. Valuation</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-right">Actions (Movement)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredMaterials.length === 0 ? (
+                {isLoadingDb ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
+                        <span className="text-xs font-semibold text-slate-700">Loading inventory from Supabase...</span>
+                        <span className="text-[11px] text-slate-400">Fetching live products & store balance</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredMaterials.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                      No construction materials matched your search or filter.
+                      <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">No construction materials found in Supabase.</p>
+                      <p className="text-xs text-slate-400 mt-1">Click &quot;+ Product&quot; above to create your first product profile.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1082,7 +1297,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         {/* Avg Rate */}
                         <td className="px-4 py-3 text-right font-mono text-slate-600">
                           {m.averageUnitRate > 0 ? (
-                            `₹${m.averageUnitRate.toLocaleString('en-IN')}`
+                            `Rs. ${m.averageUnitRate.toLocaleString('en-IN')}`
                           ) : (
                             <span className="text-slate-400 text-[11px] font-sans font-normal italic">
                               Set on purchase
@@ -1092,7 +1307,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
                         {/* Valuation */}
                         <td className="px-4 py-3 text-right font-bold font-mono text-slate-900">
-                          ₹{Math.round(valuation).toLocaleString('en-IN')}
+                          Rs. {Math.round(valuation).toLocaleString('en-IN')}
                         </td>
 
                         {/* Status Badge */}
@@ -1212,16 +1427,27 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   <th className="px-4 py-3">Challan / Vehicle #</th>
                   <th className="px-4 py-3">Material Received</th>
                   <th className="px-4 py-3 text-right">Quantity</th>
-                  <th className="px-4 py-3 text-right">Total (₹)</th>
+                  <th className="px-4 py-3 text-right">Total (Rs.)</th>
                   <th className="px-4 py-3 text-right">Storekeeper</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {inwardTransactions.length === 0 ? (
+                {isLoadingDb ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
+                        <span className="text-xs font-semibold text-slate-700">Loading inward receipts from Supabase...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : inwardTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                      No inward deliveries recorded yet.
+                      <ArrowDownLeft className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">No inward deliveries recorded yet.</p>
+                      <p className="text-xs text-slate-400 mt-1">Click &quot;Record Check In (GRN)&quot; to log incoming delivery.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1249,7 +1475,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         +{tx.quantity} {tx.unit}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
-                        {tx.totalAmount ? `₹${tx.totalAmount.toLocaleString('en-IN')}` : '—'}
+                        {tx.totalAmount ? `Rs. ${tx.totalAmount.toLocaleString('en-IN')}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-500">
                         {tx.receivedOrIssuedBy}
@@ -1319,10 +1545,21 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {outwardTransactions.length === 0 ? (
+                {isLoadingDb ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
+                        <span className="text-xs font-semibold text-slate-700">Loading site dispatches from Supabase...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : outwardTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                      No material dispatches recorded yet.
+                      <ArrowUpRight className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">No material dispatches recorded yet.</p>
+                      <p className="text-xs text-slate-400 mt-1">Click &quot;Issue Material (MIN)&quot; to issue stock to site work.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1439,10 +1676,21 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {returnsAndDamagesTransactions.length === 0 ? (
+                {isLoadingDb ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
+                        <span className="text-xs font-semibold text-slate-700">Loading returns & defects from Supabase...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : returnsAndDamagesTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
-                      No returns or damaged items recorded.
+                      <RotateCcw className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">No returns or damaged items recorded.</p>
+                      <p className="text-xs text-slate-400 mt-1">All vendor returns and scrap write-offs will be tracked here.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1545,10 +1793,20 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredLedger.length === 0 ? (
+                {isLoadingDb ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
+                        <span className="text-xs font-semibold text-slate-700">Loading audit ledger from Supabase...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredLedger.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
-                      No history transactions match your query.
+                      <History className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="font-semibold text-slate-600">No history transactions found in Supabase.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1665,51 +1923,64 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {lowStockMaterials.map((m) => {
-              const shortfall = Math.max(0, m.minimumAlertStock * 2 - m.currentStock);
-              const estCost = shortfall * m.averageUnitRate;
+          {isLoadingDb ? (
+            <div className="bg-white rounded-xl border border-slate-200/80 p-12 text-center">
+              <RefreshCw className="w-6 h-6 text-purple-600 animate-spin mx-auto mb-2" />
+              <span className="text-xs font-semibold text-slate-700">Checking stock buffer levels...</span>
+            </div>
+          ) : lowStockMaterials.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200/80 p-12 text-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+              <p className="font-semibold text-slate-800">All materials are adequately stocked</p>
+              <p className="text-xs text-slate-400 mt-1">No items currently below safety reorder threshold.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {lowStockMaterials.map((m) => {
+                const shortfall = Math.max(0, m.minimumAlertStock * 2 - m.currentStock);
+                const estCost = shortfall * m.averageUnitRate;
 
-              return (
-                <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[11px] font-mono font-bold text-purple-700">{m.code}</span>
-                      <h4 className="text-sm font-bold text-slate-900 mt-0.5">{m.name}</h4>
-                      <span className="text-[11px] text-slate-500">{m.category}</span>
+                return (
+                  <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="text-[11px] font-mono font-bold text-purple-700">{m.code}</span>
+                        <h4 className="text-sm font-bold text-slate-900 mt-0.5">{m.name}</h4>
+                        <span className="text-[11px] text-slate-500">{m.category}</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                        Low Stock
+                      </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
-                      Low Stock
-                    </span>
+
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Current In-Store:</span>
+                        <strong className="text-rose-700">{m.currentStock} {m.unit}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Minimum Safe Threshold:</span>
+                        <strong className="text-slate-800">{m.minimumAlertStock} {m.unit}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Recommended Order:</span>
+                        <strong className="text-purple-700">+{shortfall} {m.unit} (Rs. {Math.round(estCost).toLocaleString('en-IN')})</strong>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openActionModal('check_in', m.id)}
+                      className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowDownLeft className="w-3.5 h-3.5" />
+                      <span>Create Check-In / Reorder</span>
+                    </button>
                   </div>
-
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs space-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Current In-Store:</span>
-                      <strong className="text-rose-700">{m.currentStock} {m.unit}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Minimum Safe Threshold:</span>
-                      <strong className="text-slate-800">{m.minimumAlertStock} {m.unit}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Recommended Order:</span>
-                      <strong className="text-purple-700">+{shortfall} {m.unit} (₹{Math.round(estCost).toLocaleString('en-IN')})</strong>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => openActionModal('check_in', m.id)}
-                    className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <ArrowDownLeft className="w-3.5 h-3.5" />
-                    <span>Create Check-In / Reorder</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1775,6 +2046,14 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         onClose={() => setIsVendorDrawerOpen(false)}
         onSaveVendor={handleSaveVendor}
         defaultType={vendorDrawerDefaultType}
+      />
+
+      {/* Site Stock Summary PDF Modal (Blob URL Preview) */}
+      <StockSummaryPdfModal
+        isOpen={isStockPdfModalOpen}
+        onClose={() => setIsStockPdfModalOpen(false)}
+        materials={materials}
+        projectName={project?.name || 'Noori Crest Tower'}
       />
     </div>
   );

@@ -52,6 +52,17 @@ import {
 } from '@/lib/supabase/project-files';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
+import {
+  fetchDropdownCategory,
+  DEFAULT_DOCUMENT_CATEGORIES
+} from '@/lib/supabase/category-services';
+import { 
+  DateFilterControl, 
+  DateFilterState, 
+  DEFAULT_DATE_FILTER, 
+  matchesDateFilter, 
+  isDateFilterActive 
+} from '@/components/common/DateFilterControl';
 
 interface FilesArchiveViewProps {
   project: ProjectInfo;
@@ -62,7 +73,7 @@ interface FilesArchiveViewProps {
   onCategoryChange?: (category: FileCategory | 'all') => void;
 }
 
-const CATEGORIES: { label: string; value: FileCategory | 'all' }[] = [
+const BASE_CATEGORIES: { label: string; value: FileCategory | 'all' }[] = [
   { label: 'All Categories', value: 'all' },
   { label: 'Architectural Drawings', value: 'Architectural drawings' },
   { label: 'Structural & RCC Drawings', value: 'Structural and RCC drawings' },
@@ -97,11 +108,53 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>(projectId || 'all');
 
+  // Dynamic Categories from Supabase category table
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>(DEFAULT_DOCUMENT_CATEGORIES);
+
+  useEffect(() => {
+    fetchDropdownCategory('document_category', DEFAULT_DOCUMENT_CATEGORIES).then((cats) => {
+      if (cats && cats.length > 0) {
+        setDynamicCategories(cats);
+      }
+    });
+  }, []);
+
+  const categoryOptions = useMemo(() => {
+    const list: { label: string; value: FileCategory | 'all' }[] = [
+      { label: 'All Categories', value: 'all' }
+    ];
+    const seen = new Set<string>(['all']);
+
+    BASE_CATEGORIES.forEach(c => {
+      if (c.value !== 'all') {
+        list.push(c);
+        seen.add(c.value);
+      }
+    });
+
+    dynamicCategories.forEach(cat => {
+      if (!seen.has(cat)) {
+        list.push({ label: cat, value: cat as FileCategory });
+        seen.add(cat);
+      }
+    });
+
+    activeFiles.forEach(f => {
+      if (f.category && !seen.has(f.category)) {
+        list.push({ label: f.category, value: f.category as FileCategory });
+        seen.add(f.category);
+      }
+    });
+
+    return list;
+  }, [dynamicCategories, activeFiles]);
+
   // Filters & State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<FileCategory | 'all'>(initialCategory || 'all');
   const [selectedFileType, setSelectedFileType] = useState<FileType | 'all'>('all');
   const [onlyStarred, setOnlyStarred] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
 
   // Default to list / table format per user request
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
@@ -290,9 +343,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         return false;
       }
 
+      // Universal Date Filter (Range or Particular Date)
+      if (!matchesDateFilter(file.created_at, dateFilter)) {
+        return false;
+      }
+
       return true;
     });
-  }, [currentList, searchQuery, selectedCategory, selectedFileType, onlyStarred]);
+  }, [currentList, searchQuery, selectedCategory, selectedFileType, onlyStarred, dateFilter]);
 
   // Storage calculation for active vault
   const totalStorageBytes = useMemo(() => {
@@ -372,8 +430,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
       )}
 
       {/* Top Banner & Stats Section */}
-      <div className="bg-white border-b border-slate-200 px-6 py-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-6 w-full">
+        <div className="w-full">
           
           {/* Header Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
@@ -483,8 +541,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto w-full px-6 py-5 space-y-4">
+      {/* Main Content Area - 100% Full Width */}
+      <div className="w-full px-4 sm:px-6 py-5 space-y-4">
         
         {/* Recycle Bin Notice Banner when on Bin Tab */}
         {activeTab === 'bin' && (
@@ -555,12 +613,21 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               onChange={(e) => handleCategorySelect(e.target.value as FileCategory | 'all')}
               className="w-full md:w-auto text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
             >
-              {CATEGORIES.map(c => (
+              {categoryOptions.map(c => (
                 <option key={c.value} value={c.value}>
                   {c.label}
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* 3b. Universal Date Filter: Start & End Date (Range) + Particular Date */}
+          <div className="shrink-0">
+            <DateFilterControl
+              value={dateFilter}
+              onChange={setDateFilter}
+              label="Upload Date"
+            />
           </div>
 
           {/* 4. File Type Filter Pills */}
@@ -658,9 +725,9 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           </div>
         )}
 
-        {/* 1. GRID CARDS VIEW */}
+        {/* 1. GRID CARDS VIEW - Full-Width Multi-Column Grid */}
         {!isLoading && viewMode === 'grid' && filteredFiles.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 w-full">
             {filteredFiles.map((file) => (
               <div
                 key={file.id}
@@ -789,6 +856,26 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                   <span className="inline-block text-[10px] font-semibold text-purple-700 bg-purple-50/70 border border-purple-100 px-2 py-0.5 rounded-md truncate max-w-full">
                     {file.category}
                   </span>
+
+                  {/* Image Preview Thumbnail if Image File */}
+                  {file.file_type === 'image' && (
+                    <div 
+                      onClick={() => {
+                        setPreviewFile(file);
+                        setIsPreviewOpen(true);
+                      }}
+                      className="w-full h-36 bg-slate-100 rounded-lg overflow-hidden my-2 relative cursor-pointer border border-slate-200/60 flex items-center justify-center group/img"
+                    >
+                      <img 
+                        src={resolveFileUrl(file.file_url)} 
+                        alt={file.title} 
+                        className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {/* Description preview */}
                   {file.description && (
@@ -1025,6 +1112,12 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         userEmail={userEmail}
         onFileUploaded={(newFile) => {
           setActiveFiles(prev => [newFile, ...prev]);
+          fetchDropdownCategory('document_category', DEFAULT_DOCUMENT_CATEGORIES).then(setDynamicCategories);
+        }}
+        onSiteCreated={async (newProj) => {
+          const projs = await fetchAvailableProjects();
+          setAvailableProjects(projs);
+          setProjectFilter(newProj.id);
         }}
       />
 

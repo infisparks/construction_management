@@ -36,6 +36,73 @@ export function calculateDaysBetween(startDate: string, endDate: string): number
 }
 
 /**
+ * Accurately calculates duration between two YYYY-MM-DD dates with full breakdown:
+ * - Total calendar days (e.g. 541 days)
+ * - Exact elapsed months & remaining days (e.g. 17 Mo 25d)
+ * - Decimal months (e.g. 17.8 Mo)
+ * - Clean human-friendly summary string
+ */
+export function calculateDurationDetails(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) {
+    return {
+      days: 0,
+      months: 0,
+      remDays: 0,
+      decimalMonths: 0,
+      formatted: '—',
+    };
+  }
+
+  try {
+    const days = Math.max(1, calculateDaysBetween(startDate, endDate));
+    const [sY, sM, sD] = startDate.split('-').map(Number);
+    const [eY, eM, eD] = endDate.split('-').map(Number);
+
+    if (!sY || !sM || !sD || !eY || !eM || !eD) {
+      return {
+        days,
+        months: Math.floor(days / 30.4375),
+        remDays: days % 30,
+        decimalMonths: Number((days / 30.4375).toFixed(1)),
+        formatted: `${days}d`,
+      };
+    }
+
+    let months = (eY - sY) * 12 + (eM - sM);
+    let remDays = eD - sD;
+
+    if (remDays < 0) {
+      months -= 1;
+      const daysInPrevMonth = new Date(eY, eM - 1, 0).getDate();
+      remDays += daysInPrevMonth;
+    }
+
+    const decimalMonths = Number((days / 30.4375).toFixed(1));
+
+    let formatted = `${days} Days`;
+    if (months > 0) {
+      formatted = remDays > 0 ? `${months} Mo ${remDays}d (${days}d)` : `${months} Mo (${days}d)`;
+    }
+
+    return {
+      days,
+      months: Math.max(0, months),
+      remDays: Math.max(0, remDays),
+      decimalMonths,
+      formatted,
+    };
+  } catch {
+    return {
+      days: 0,
+      months: 0,
+      remDays: 0,
+      decimalMonths: 0,
+      formatted: '—',
+    };
+  }
+}
+
+/**
  * Formats day delay into friendly human readable string:
  * e.g., 4 -> "4 Days Delay"
  * e.g., 40 -> "1 Month 10 Days Delay"

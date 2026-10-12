@@ -4,12 +4,17 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SubcontractorBill, ProjectInfo } from './types';
 
+/**
+ * Formats a monetary value safely without using the unicode rupee symbol (₹),
+ * which is unsupported in standard PDF fonts and renders as a broken single quote (').
+ * Uses standard "Rs." notation with clean Indian comma separators.
+ */
 export function formatINR(val: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+  if (val === undefined || val === null || isNaN(val)) return '—';
+  return `Rs. ${Number(val).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(val);
+  })}`;
 }
 
 export function generateSubcontractorBillPdf(
@@ -36,13 +41,13 @@ export function generateSubcontractorBillPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(17, 24, 39); // #111827
-  doc.text('InfiBuild Infrastructure & Construction', margin, currentY);
+  doc.text('Armee Enterprises', margin, currentY);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(107, 114, 128); // #6B7280
   doc.text('Civil Engineering, High-Rise & Commercial General Contracting', margin, currentY + 4);
-  doc.text('Reg Office: Plot 44, Tech Boulevard, Sector 62, Gurgaon, HR | GSTIN: 06AABCI9921D1ZZ', margin, currentY + 8);
+  doc.text('Civil & Project Management Office | Contact: +91 98201 55000', margin, currentY + 8);
 
   // Title on right side
   doc.setFont('helvetica', 'bold');
@@ -70,9 +75,27 @@ export function generateSubcontractorBillPdf(
   doc.line(margin, currentY, pageWidth - margin, currentY);
   currentY += 5;
 
+  // --- Dynamic Vendor Details (Print ONLY details that are present) ---
+  const vendorLines: string[] = [];
+  if (bill.vendorTrade && bill.vendorTrade.trim()) {
+    vendorLines.push(`Trade / Work: ${bill.vendorTrade.trim()}`);
+  }
+  if (bill.vendorPhone && bill.vendorPhone.trim()) {
+    vendorLines.push(`Phone: ${bill.vendorPhone.trim()}`);
+  }
+  const taxIdParts: string[] = [];
+  if (bill.vendorGstin && bill.vendorGstin.trim()) taxIdParts.push(`GSTIN: ${bill.vendorGstin.trim()}`);
+  if (bill.vendorPan && bill.vendorPan.trim()) taxIdParts.push(`PAN: ${bill.vendorPan.trim()}`);
+  if (taxIdParts.length > 0) {
+    vendorLines.push(taxIdParts.join('  |  '));
+  }
+  if (bill.vendorBankDetails && bill.vendorBankDetails.trim()) {
+    vendorLines.push(`Bank: ${bill.vendorBankDetails.trim()}`);
+  }
+
   // --- Two-Column Meta Box ---
   const boxWidth = (pageWidth - margin * 2 - 6) / 2;
-  const boxHeight = 32;
+  const boxHeight = Math.max(32, 14 + vendorLines.length * 4.5);
 
   // Box 1: Project Information
   doc.setFillColor(248, 250, 252);
@@ -87,17 +110,19 @@ export function generateSubcontractorBillPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(17, 24, 39);
-  doc.text(project?.name || 'The Grand Horizon Towers - Tower B', margin + 3, currentY + 10);
+  doc.text(project?.name || 'Construction Site', margin + 3, currentY + 10);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(75, 85, 99);
-  doc.text(`Project Code: ${project?.code || 'PRJ-2026-GHT-B'}`, margin + 3, currentY + 15);
-  doc.text(`Location: ${project?.location || 'Sector 74, Gurgaon, NCR'}`, margin + 3, currentY + 19);
-  doc.text(`Client: ${project?.clientName || 'Horizon Realty & Infrastructure Ltd'}`, margin + 3, currentY + 23);
-  doc.text(`Principal Contractor: ${project?.generalContractor || 'InfiBuild EPC Ltd'}`, margin + 3, currentY + 27);
+  doc.text(`Project Code: ${project?.code || 'PRJ-SITE-01'}`, margin + 3, currentY + 15);
+  doc.text(`Location: ${project?.location || 'Jobsite Location'}`, margin + 3, currentY + 19);
+  if (project?.clientName) {
+    doc.text(`Client: ${project.clientName}`, margin + 3, currentY + 23);
+  }
+  doc.text(`Principal Contractor: ${project?.generalContractor || 'Armee Enterprises'}`, margin + 3, currentY + (project?.clientName ? 27 : 23));
 
-  // Box 2: Vendor / Subcontractor Information
+  // Box 2: Vendor / Subcontractor Information (Only Present Details Printed)
   const box2X = margin + boxWidth + 6;
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(box2X, currentY, boxWidth, boxHeight, 2, 2, 'FD');
@@ -110,15 +135,16 @@ export function generateSubcontractorBillPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(17, 24, 39);
-  doc.text(bill.vendorName || 'Apex Civil Contractors', box2X + 3, currentY + 10);
+  doc.text(bill.vendorName || 'Subcontractor', box2X + 3, currentY + 10);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(75, 85, 99);
-  doc.text(`Trade / Work: ${bill.vendorTrade || 'Civil & RCC Specialist'}`, box2X + 3, currentY + 15);
-  doc.text(`Phone: ${bill.vendorPhone || '+91 98201 44512'}`, box2X + 3, currentY + 19);
-  doc.text(`GSTIN: ${bill.vendorGstin || '27AABCS1429B1Z4'}  |  PAN: ${bill.vendorPan || 'AABCS1429B'}`, box2X + 3, currentY + 23);
-  doc.text(`Bank: ${bill.vendorBankDetails || 'HDFC Bank A/C: 501002391024 (IFSC: HDFC0000128)'}`, box2X + 3, currentY + 27);
+  let vLineY = currentY + 15;
+  vendorLines.forEach((line) => {
+    doc.text(line, box2X + 3, vLineY);
+    vLineY += 4.5;
+  });
 
   currentY += boxHeight + 6;
 
@@ -128,9 +154,9 @@ export function generateSubcontractorBillPdf(
     item.name || 'Work item',
     `${item.billedQty || 0} / ${item.unbilledQty || item.quantity || 0}`,
     item.unit || 'sqm',
-    `INR ${Number(item.rate || 0).toLocaleString('en-IN')}`,
+    `Rs. ${Number(item.rate || 0).toLocaleString('en-IN')}`,
     `${Number(item.quantity || 0).toLocaleString('en-IN')}`,
-    `INR ${Number(item.amount || 0).toLocaleString('en-IN')}`,
+    `Rs. ${Number(item.amount || 0).toLocaleString('en-IN')}`,
   ]);
 
   autoTable(doc, {
@@ -195,7 +221,7 @@ export function generateSubcontractorBillPdf(
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(75, 85, 99);
-      doc.text(`- ${d.name}: INR ${Number(d.amount).toLocaleString('en-IN')}`, margin + 5, leftY);
+      doc.text(`- ${d.name}: Rs. ${Number(d.amount).toLocaleString('en-IN')}`, margin + 5, leftY);
       leftY += 3.2;
     });
   } else {
@@ -220,7 +246,7 @@ export function generateSubcontractorBillPdf(
       doc.setFontSize(7);
       doc.setTextColor(75, 85, 99);
       const dueInfo = r.dueDate ? ` (Due: ${r.dueDate})` : '';
-      doc.text(`- ${r.name}: INR ${Number(r.amount).toLocaleString('en-IN')}${dueInfo}`, margin + 5, leftY);
+      doc.text(`- ${r.name}: Rs. ${Number(r.amount).toLocaleString('en-IN')}${dueInfo}`, margin + 5, leftY);
       leftY += 3.2;
     });
   }
@@ -262,19 +288,19 @@ export function generateSubcontractorBillPdf(
     rightY += 5.2;
   };
 
-  printRow('Item Subtotal', `INR ${Number(bill.itemSubtotal || 0).toLocaleString('en-IN')}`, false);
-  printRow('(-) Pre-Tax Deduction', `- INR ${Number(bill.preTaxDeductionTotal || 0).toLocaleString('en-IN')}`, false, true);
-  printRow('(-) Pre-Tax Retention', `- INR ${Number(bill.preTaxRetentionTotal || 0).toLocaleString('en-IN')}`, false, true);
+  printRow('Item Subtotal', `Rs. ${Number(bill.itemSubtotal || 0).toLocaleString('en-IN')}`, false);
+  printRow('(-) Pre-Tax Deduction', `- Rs. ${Number(bill.preTaxDeductionTotal || 0).toLocaleString('en-IN')}`, false, true);
+  printRow('(-) Pre-Tax Retention', `- Rs. ${Number(bill.preTaxRetentionTotal || 0).toLocaleString('en-IN')}`, false, true);
   
   // Divider
   doc.setDrawColor(209, 213, 219);
   doc.line(sumBoxX + 3, rightY - 1.5, sumBoxX + sumBoxWidth - 3, rightY - 1.5);
   rightY += 1.5;
 
-  printRow('Net Subtotal', `INR ${Number(bill.netSubtotal || 0).toLocaleString('en-IN')}`, true);
-  printRow(`GST (${bill.gstRate || 0}%)`, `+ INR ${Number(bill.gstAmount || 0).toLocaleString('en-IN')}`, false);
+  printRow('Net Subtotal', `Rs. ${Number(bill.netSubtotal || 0).toLocaleString('en-IN')}`, true);
+  printRow(`GST (${bill.gstRate || 0}%)`, `+ Rs. ${Number(bill.gstAmount || 0).toLocaleString('en-IN')}`, false);
   if (bill.additionalCharges > 0) {
-    printRow('(+) Additional Charges', `+ INR ${Number(bill.additionalCharges || 0).toLocaleString('en-IN')}`, false);
+    printRow('(+) Additional Charges', `+ Rs. ${Number(bill.additionalCharges || 0).toLocaleString('en-IN')}`, false);
   }
 
   // Highlight Box for Grand Total
@@ -286,7 +312,7 @@ export function generateSubcontractorBillPdf(
   doc.setFontSize(9.5);
   doc.setTextColor(255, 255, 255);
   doc.text('NET PAYABLE', sumBoxX + 5, rightY + 5.5);
-  doc.text(`INR ${Number(bill.grandTotal || 0).toLocaleString('en-IN')}`, valX - 2, rightY + 5.5, { align: 'right' });
+  doc.text(`Rs. ${Number(bill.grandTotal || 0).toLocaleString('en-IN')}`, valX - 2, rightY + 5.5, { align: 'right' });
 
   currentY += 66;
 
@@ -331,7 +357,7 @@ export function generateSubcontractorBillPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(156, 163, 175);
-  doc.text('This is a computer generated Sub-Contractor RA Bill created on InfiBuild PMS. Valid without physical signature when digital verification token is present.', margin, footerY);
+  doc.text('This is a computer generated Sub-Contractor RA Bill created on Armee Enterprises PMS. Valid without physical signature when digital verification token is present.', margin, footerY);
   doc.text('Page 1 of 1', pageWidth - margin, footerY, { align: 'right' });
 
   return doc;
