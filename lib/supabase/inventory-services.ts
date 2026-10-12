@@ -174,6 +174,32 @@ export async function createInventoryTransaction(
 }
 
 /**
+ * Delete an inventory transaction.
+ * The database trigger trg_sync_product_stock automatically recalculates
+ * current_stock in profile_product using the indexed transaction ledger.
+ */
+export async function deleteInventoryTransaction(
+  id: string
+): Promise<{ success: boolean; error: any }> {
+  try {
+    const { error } = await supabase
+      .from('inventory_transactions')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Failed to delete inventory transaction:', error);
+      return { success: false, error };
+    }
+    return { success: true, error: null };
+  } catch (err) {
+    console.error('Failed to delete inventory transaction:', err);
+    return { success: false, error: err };
+  }
+}
+
+
+/**
  * Quick load low stock alerts using index idx_profile_prod_alert.
  * Instantly filters products where current_stock <= minimum_alert_stock.
  */

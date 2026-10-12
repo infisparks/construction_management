@@ -132,6 +132,22 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         );
         const latestRate = relatedTxs.length > 0 ? Number(relatedTxs[0].unit_rate) : 0;
 
+        // Calculate live stock balance directly from inventory_transactions ledger
+        // Inward (+), Outward / Defect / Return (-)
+        const productTxs = (txList || []).filter((t) => t.product_id === p.id);
+        let liveStockBalance = 0;
+        for (const t of productTxs) {
+          const type = (t.type || '').toLowerCase();
+          const qty = Number(t.quantity) || 0;
+          if (type === 'in' || type === 'check_in') {
+            liveStockBalance += qty;
+          } else {
+            liveStockBalance = Math.max(0, liveStockBalance - qty);
+          }
+        }
+
+        const effectiveStock = txList !== null && txList !== undefined ? liveStockBalance : Number(p.current_stock ?? 0);
+
         return {
           id: p.id,
           code: p.code || 'MAT-000',
@@ -139,7 +155,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           description: p.description || '',
           category: (p.category || 'General') as any,
           unit: (p.unit || 'Nos') as any,
-          currentStock: Number(p.current_stock ?? 0),
+          currentStock: effectiveStock,
           minimumAlertStock: Number(p.minimum_alert_stock ?? 0),
           averageUnitRate: latestRate,
           gstRate: 18 as any,
