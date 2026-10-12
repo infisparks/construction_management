@@ -254,7 +254,7 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
-                node.progress === 100 
+                node.status === 'completed' || node.progress === 100 
                   ? 'bg-emerald-500' 
                   : node.status === 'delayed' 
                     ? 'bg-rose-500' 
@@ -265,7 +265,9 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
               style={{ width: `${node.progress}%` }}
             />
           </div>
-          <span className="text-[11px] font-bold text-slate-800 w-8 text-right font-mono">
+          <span className={`text-[11px] font-bold w-8 text-right font-mono ${
+            node.status === 'completed' ? 'text-emerald-800' : 'text-slate-800'
+          }`}>
             {node.progress}%
           </span>
         </div>
@@ -377,17 +379,6 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
                     </button>
                   )}
                 </>
-              )}
-
-              {node.status === 'completed' && onRevertTaskStatus && (
-                <button
-                  onClick={() => onRevertTaskStatus(node.id, 'in_progress')}
-                  className="px-2 py-1 text-[10px] font-semibold rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors inline-flex items-center gap-1 shadow-2xs"
-                  title="Undo completion and revert task back to In Progress"
-                >
-                  <RotateCcw className="w-2.5 h-2.5 text-amber-700" />
-                  <span>Revert Done</span>
-                </button>
               )}
             </>
           )}

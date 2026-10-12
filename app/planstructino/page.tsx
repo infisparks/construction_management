@@ -51,6 +51,8 @@ import { MilestonesView } from '@/components/construction-planning/MilestonesVie
 import { ScheduleImpactModal } from '@/components/construction-planning/ScheduleImpactModal';
 import { ProjectSettingsModal } from '@/components/construction-planning/ProjectSettingsModal';
 import { StartTaskConfirmationModal } from '@/components/construction-planning/StartTaskConfirmationModal';
+import { CompleteTaskConfirmModal } from '@/components/construction-planning/CompleteTaskConfirmModal';
+import { RevertTaskConfirmModal } from '@/components/construction-planning/RevertTaskConfirmModal';
 import { MaterialBillingDrawer } from '@/components/construction-planning/MaterialBillingDrawer';
 import { SubcontractorBillsView } from '@/components/construction-planning/SubcontractorBillsView';
 import { FilesArchiveView } from '@/components/documents/FilesArchiveView';
@@ -308,6 +310,13 @@ export default function ConstructionPlanningPage() {
 
   const [isStartConfirmModalOpen, setIsStartConfirmModalOpen] = useState(false);
   const [taskToStart, setTaskToStart] = useState<ConstructionTask | null>(null);
+
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<ConstructionTask | null>(null);
+
+  const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
+  const [revertConfirmTask, setRevertConfirmTask] = useState<ConstructionTask | null>(null);
+  const [revertTargetStatus, setRevertTargetStatus] = useState<'not_started' | 'in_progress' | null>(null);
 
   const [isDependencyEditorOpen, setIsDependencyEditorOpen] = useState(false);
   const [taskForDependencyEditor, setTaskForDependencyEditor] = useState<ConstructionTask | null>(null);
@@ -816,20 +825,42 @@ export default function ConstructionPlanningPage() {
     await logPlanActivity(taskId, actionText, detailsText, performedBy, activeProjectId);
   };
 
-  // Execution Handlers: Complete Task
-  const handleCompleteTask = async (taskId: string) => {
-    const today = new Date().toISOString().split('T')[0] || '2026-08-29';
+  // Execution Handlers: Complete Task Modal Flow
+  const handleInitiateCompleteTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    const completedQty = task?.plannedQuantity || task?.completedQuantity;
+    if (!task) return;
+    setTaskToComplete(task);
+    setIsCompleteModalOpen(true);
+  };
+
+  const handleExecuteCompleteTask = async (
+    taskId: string, 
+    setProgressTo100: boolean, 
+    completionDate?: string, 
+    notes?: string
+  ) => {
+    const today = completionDate || new Date().toISOString().split('T')[0] || '2026-10-12';
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const finalProgress = setProgressTo100 ? 100 : (task.progress || 0);
+    const completedQty = setProgressTo100 
+      ? (task.plannedQuantity || task.completedQuantity) 
+      : (task.completedQuantity || 0);
+
+    const updatedNotes = notes 
+      ? (task.notes ? `${task.notes}\n[COMPLETED: ${notes}]` : `[COMPLETED: ${notes}]`) 
+      : task.notes;
 
     const updated = tasks.map((t) => {
       if (t.id === taskId) {
         return {
           ...t,
           status: 'completed' as ScheduleStatus,
-          progress: 100,
+          progress: finalProgress,
           actualEndDate: today,
           completedQuantity: completedQty,
+          notes: updatedNotes,
         };
       }
       return t;
@@ -840,37 +871,51 @@ export default function ConstructionPlanningPage() {
       setSelectedTaskForDrawer((prev) => prev ? {
         ...prev,
         status: 'completed',
-        progress: 100,
+        progress: finalProgress,
         actualEndDate: today,
         completedQuantity: completedQty,
+        notes: updatedNotes,
       } : null);
     }
 
     const performedBy = user?.email?.split('@')[0] || 'Quality Inspector';
+    const detailsText = setProgressTo100
+      ? `Execution 100% finished. Actual completion date recorded as ${today}.`
+      : `Activity closed as Completed with recorded ${finalProgress}% progress. Actual completion date recorded as ${today}.`;
+
     const newLog: TaskActivityLog = {
       id: `act-${Date.now()}`,
       taskId,
       action: 'Task Marked Completed',
-      details: `Execution 100% finished. Actual completion date recorded as ${today}.`,
+      details: detailsText,
       performedBy,
       timestamp: `${today} 17:00`,
     };
     setActivityLogs((prev) => [newLog, ...prev]);
 
-    showToast(`Activity "${task?.name}" marked as 100% completed.`);
+    showToast(`Activity "${task.name}" marked as Completed (${finalProgress}%).`);
 
     // Persist live to Supabase plan_* tables
     await updatePlanTask(taskId, {
       status: 'completed',
-      progress: 100,
+      progress: finalProgress,
       actualEndDate: today,
       completedQuantity: completedQty,
+      notes: updatedNotes,
     }, activeProjectId);
-    await logPlanActivity(taskId, 'Task Marked Completed', `Execution 100% finished. Actual completion date recorded as ${today}.`, performedBy, activeProjectId);
+    await logPlanActivity(taskId, 'Task Marked Completed', detailsText, performedBy, activeProjectId);
   };
 
-  // Execution Handlers: Revert Task Status (Mistakenly started or completed)
-  const handleRevertTaskStatus = async (taskId: string, targetStatus: 'not_started' | 'in_progress') => {
+  // Execution Handlers: Revert Task Status Modal Flow (Requires Typing "CONFIRM")
+  const handleInitiateRevertTask = (taskId: string, targetStatus: 'not_started' | 'in_progress') => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    setRevertConfirmTask(task);
+    setRevertTargetStatus(targetStatus);
+    setIsRevertModalOpen(true);
+  };
+
+  const handleExecuteRevertTask = async (taskId: string, targetStatus: 'not_started' | 'in_progress') => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -1485,8 +1530,8 @@ export default function ConstructionPlanningPage() {
                     onSelectTask={handleSelectTask}
                     onStartTask={handleInitiateStartTask}
                     onRecordProgress={handleOpenDailyProgress}
-                    onCompleteTask={handleCompleteTask}
-                    onRevertTaskStatus={handleRevertTaskStatus}
+                    onCompleteTask={handleInitiateCompleteTask}
+                    onRevertTaskStatus={handleInitiateRevertTask}
                     onAddChildTask={handleAddChildTask}
                     onEditTask={handleEditTask}
                     onDeleteTask={handleDeleteTask}
@@ -1590,8 +1635,8 @@ export default function ConstructionPlanningPage() {
         issues={issues}
         activityLogs={activityLogs}
         onStartTask={handleInitiateStartTask}
-        onCompleteTask={handleCompleteTask}
-        onRevertTaskStatus={handleRevertTaskStatus}
+        onCompleteTask={handleInitiateCompleteTask}
+        onRevertTaskStatus={handleInitiateRevertTask}
         onRecordProgress={handleOpenDailyProgress}
         onSelectTaskById={handleSelectTaskById}
         onAddDependency={handleAddDependency}
@@ -1672,6 +1717,23 @@ export default function ConstructionPlanningPage() {
         dependencies={dependencies}
         onConfirmStart={handleConfirmStartTask}
         onNavigateToTask={handleSelectTask}
+      />
+
+      {/* Complete Task Confirmation Modal */}
+      <CompleteTaskConfirmModal
+        isOpen={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        task={taskToComplete}
+        onConfirmComplete={handleExecuteCompleteTask}
+      />
+
+      {/* Revert Task Confirmation Modal (Requires Typing "CONFIRM") */}
+      <RevertTaskConfirmModal
+        isOpen={isRevertModalOpen}
+        onClose={() => setIsRevertModalOpen(false)}
+        task={revertConfirmTask}
+        targetStatus={revertTargetStatus}
+        onConfirmRevert={handleExecuteRevertTask}
       />
 
       {/* Project Baseline Settings Modal */}

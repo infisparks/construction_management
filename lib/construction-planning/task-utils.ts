@@ -118,7 +118,7 @@ export function recalculateParentRollups(tasks: ConstructionTask[]): Constructio
 
       // Determine parent status
       let newStatus: ScheduleStatus = parent.status;
-      if (avgProgress === 100) {
+      if (avgProgress === 100 || (directChildren.length > 0 && directChildren.every((c) => c.status === 'completed'))) {
         newStatus = 'completed';
       } else if (directChildren.some((c) => c.status === 'delayed')) {
         newStatus = 'delayed';
