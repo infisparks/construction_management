@@ -77,6 +77,10 @@ export interface InventoryTransaction {
   // Audit attributes
   receivedOrIssuedBy: string;
   notes?: string;
+
+  // Attached Bill / Document Proof (PNG, PDF, etc.)
+  fileUrl?: string;
+  fileName?: string;
 }
 
 export type VendorPartyType = 'vendor' | 'contractor' | 'other';

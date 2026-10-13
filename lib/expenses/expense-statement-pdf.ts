@@ -567,8 +567,9 @@ export function generateSingleExpenseVoucherPdf(
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
   const auditDate = expense.created_at ? new Date(expense.created_at).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
+  const attachedBillNote = expense.receipt_url ? `  •  Bill Copy On File (${expense.receipt_file_name || 'Verified'})` : '';
   doc.text(
-    `[VERIFIED DIGITAL VOUCHER]  •  Audited Site Expenditure  •  Logged in Supabase public.site_expenses at ${auditDate}`,
+    `[VERIFIED DIGITAL VOUCHER]  •  Audited Site Expenditure${attachedBillNote}  •  Logged in Supabase public.site_expenses at ${auditDate}`,
     margin + 1,
     currentY
   );

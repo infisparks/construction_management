@@ -7,9 +7,11 @@ import {
   ExternalLink,
   Receipt,
   Printer,
-  FileText
+  FileText,
+  Paperclip
 } from 'lucide-react';
 import { SiteExpense } from '@/lib/supabase/types';
+import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
 import {
   getSingleExpenseVoucherBlobUrl,
   downloadSingleExpenseVoucherPdf,
@@ -29,6 +31,7 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
   projectName = 'Noori Crest Tower',
 }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && expense) {
@@ -83,6 +86,18 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 shrink-0">
+            {expense.receipt_url && (
+              <button
+                type="button"
+                onClick={() => setIsBillModalOpen(true)}
+                className="h-8 px-3 rounded-lg bg-white border border-purple-200 hover:bg-purple-50 text-purple-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                title={`View original uploaded bill document (${expense.receipt_file_name || 'Receipt'})`}
+              >
+                <Paperclip className="w-3.5 h-3.5 text-purple-600" />
+                <span className="hidden sm:inline">Attached Bill</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleOpenNewTab}
@@ -120,6 +135,17 @@ export const ExpenseVoucherModal: React.FC<ExpenseVoucherModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Attached Bill / Document Viewer Modal */}
+      {expense.receipt_url && (
+        <ExpenseBillViewerModal
+          isOpen={isBillModalOpen}
+          onClose={() => setIsBillModalOpen(false)}
+          fileUrl={expense.receipt_url}
+          fileName={expense.receipt_file_name || 'Expense-Bill'}
+          voucherNumber={expense.expense_code}
+        />
+      )}
     </div>
   );
 };

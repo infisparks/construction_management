@@ -2,6 +2,94 @@ import { supabase } from './client';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from './types';
 import { ProfileVendor, fetchProfileVendors } from './profile-services';
 
+export const EXPENSE_STORAGE_BUCKET = 'expense-documents';
+
+/**
+ * Extracts strictly relative path inside the Supabase Storage bucket.
+ */
+export function extractExpenseStoragePath(pathOrUrl?: string | null): string {
+  if (!pathOrUrl) return '';
+  const trimmed = pathOrUrl.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  const bucketMatch = trimmed.match(new RegExp(`/${EXPENSE_STORAGE_BUCKET}/(.+)$`));
+  if (bucketMatch && bucketMatch[1]) {
+    return bucketMatch[1].split('?')[0].replace(/^\/+/, '');
+  }
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const urlObj = new URL(trimmed);
+      const pathname = urlObj.pathname.replace(/^\/+/, '');
+      const storagePrefix = `storage/v1/object/public/${EXPENSE_STORAGE_BUCKET}/`;
+      if (pathname.includes(storagePrefix)) {
+        return pathname.split(storagePrefix)[1] || pathname;
+      }
+      return pathname;
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return trimmed.replace(/^\/+/, '');
+}
+
+/**
+ * Resolves a storage path or full URL to active public URL from Supabase client.
+ */
+export function resolveExpenseFileUrl(pathOrUrl?: string | null): string {
+  if (!pathOrUrl) return '';
+  const trimmed = pathOrUrl.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  const cleanPath = extractExpenseStoragePath(trimmed);
+  if (!cleanPath) return '';
+
+  const { data } = supabase.storage
+    .from(EXPENSE_STORAGE_BUCKET)
+    .getPublicUrl(cleanPath);
+
+  return data?.publicUrl || cleanPath;
+}
+
+/**
+ * Upload an expense bill/receipt (all image types including iOS HEIC/HEIF, PNG, JPG, or PDF) to Supabase Storage.
+ */
+export async function uploadExpenseBillToStorage(
+  file: File,
+  folder: string = 'receipts'
+): Promise<{ publicUrl: string; filePath: string; fileName: string }> {
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const filePath = `${folder}/${Date.now()}_${cleanFileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(EXPENSE_STORAGE_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Storage upload failed: ${uploadError.message}`);
+  }
+
+  const publicUrl = resolveExpenseFileUrl(filePath);
+
+  return {
+    publicUrl,
+    filePath,
+    fileName: file.name,
+  };
+}
+
 export interface CreateExpensePayload {
   title: string;
   category: string;
@@ -14,6 +102,7 @@ export interface CreateExpensePayload {
   paid_by?: string | null;
   bill_number?: string | null;
   receipt_url?: string | null;
+  receipt_file_name?: string | null;
   notes?: string | null;
   project_id?: string | null;
 }
@@ -80,6 +169,8 @@ export async function fetchSiteExpenses(projectId?: string): Promise<SiteExpense
     return (data || []).map((row) => ({
       ...row,
       amount: Number(row.amount) || 0,
+      receipt_url: row.receipt_url ? resolveExpenseFileUrl(row.receipt_url) : null,
+      receipt_file_name: row.receipt_file_name || null,
     })) as SiteExpense[];
   } catch (err) {
     console.error('[expense-services] Exception in fetchSiteExpenses:', err);
@@ -111,6 +202,7 @@ export async function createSiteExpense(
       paid_by: payload.paid_by ? payload.paid_by.trim() : null,
       bill_number: payload.bill_number ? payload.bill_number.trim() : null,
       receipt_url: payload.receipt_url || null,
+      receipt_file_name: payload.receipt_file_name || null,
       notes: payload.notes ? payload.notes.trim() : null,
       is_deleted: false,
     };
@@ -127,7 +219,12 @@ export async function createSiteExpense(
     }
 
     return {
-      data: { ...data, amount: Number(data.amount) || 0 } as SiteExpense,
+      data: {
+        ...data,
+        amount: Number(data.amount) || 0,
+        receipt_url: data.receipt_url ? resolveExpenseFileUrl(data.receipt_url) : null,
+        receipt_file_name: data.receipt_file_name || null,
+      } as SiteExpense,
       error: null,
     };
   } catch (err: any) {

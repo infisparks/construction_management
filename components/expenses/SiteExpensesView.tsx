@@ -27,9 +27,11 @@ import {
   Wrench,
   Truck,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Paperclip
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
+import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
 import { ProjectInfo } from '@/lib/construction-planning/types';
 import {
   fetchSiteExpenses,
@@ -77,6 +79,17 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   // Voucher Slip Modal State
   const [viewingExpense, setViewingExpense] = useState<SiteExpense | null>(null);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+
+  // Attached Bill / Receipt Viewer Modal State
+  const [billViewerState, setBillViewerState] = useState<{
+    isOpen: boolean;
+    fileUrl: string | null;
+    fileName?: string | null;
+    voucherNumber?: string;
+  }>({
+    isOpen: false,
+    fileUrl: null,
+  });
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -189,6 +202,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       'Paid By',
       'Bill Number',
       'Notes',
+      'Receipt File Name',
+      'Receipt URL',
     ];
 
     const rows = filteredExpenses.map(e => [
@@ -203,6 +218,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       `"${(e.paid_by || '').replace(/"/g, '""')}"`,
       `"${(e.bill_number || '').replace(/"/g, '""')}"`,
       `"${(e.notes || '').replace(/"/g, '""')}"`,
+      `"${(e.receipt_file_name || '').replace(/"/g, '""')}"`,
+      `"${(e.receipt_url || '').replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -593,7 +610,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
                       {/* Code & Date */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <button
                             type="button"
                             onClick={() => {
@@ -609,6 +626,22 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                             <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full border border-emerald-200">
                               Today
                             </span>
+                          )}
+                          {exp.receipt_url && (
+                            <button
+                              type="button"
+                              onClick={() => setBillViewerState({
+                                isOpen: true,
+                                fileUrl: exp.receipt_url || null,
+                                fileName: exp.receipt_file_name || 'Bill-Receipt',
+                                voucherNumber: exp.expense_code,
+                              })}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200 transition-colors cursor-pointer"
+                              title={`View uploaded bill copy (${exp.receipt_file_name || 'Receipt'}) - Supports iOS photos & PDF`}
+                            >
+                              <Paperclip className="w-3 h-3 text-purple-600" />
+                              <span>Bill Copy</span>
+                            </button>
                           )}
                         </div>
                         <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
@@ -702,6 +735,23 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {/* View Uploaded Bill Copy (supports iOS HEIC, PDF, images) */}
+                          {exp.receipt_url && (
+                            <button
+                              type="button"
+                              onClick={() => setBillViewerState({
+                                isOpen: true,
+                                fileUrl: exp.receipt_url || null,
+                                fileName: exp.receipt_file_name || 'Bill-Receipt',
+                                voucherNumber: exp.expense_code,
+                              })}
+                              className="p-1.5 rounded-md hover:bg-purple-100 text-purple-700 bg-purple-50 border border-purple-200 transition-colors cursor-pointer"
+                              title={`View attached bill copy (${exp.receipt_file_name || 'Document'})`}
+                            >
+                              <Paperclip className="w-3.5 h-3.5 text-purple-600" />
+                            </button>
+                          )}
+
                           {/* Preview Voucher Slip */}
                           <button
                             type="button"
@@ -777,6 +827,15 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         onClose={() => setIsVoucherModalOpen(false)}
         expense={viewingExpense}
         projectName={project?.name || 'Noori Crest Tower'}
+      />
+
+      {/* Uploaded Bill / Document Viewer Modal (supports iOS HEIC, PDF, images) */}
+      <ExpenseBillViewerModal
+        isOpen={billViewerState.isOpen}
+        onClose={() => setBillViewerState(prev => ({ ...prev, isOpen: false }))}
+        fileUrl={billViewerState.fileUrl}
+        fileName={billViewerState.fileName}
+        voucherNumber={billViewerState.voucherNumber}
       />
     </div>
   );

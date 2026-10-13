@@ -34,7 +34,8 @@ import {
   UserPlus,
   PlusCircle,
   Phone,
-  Tag
+  Tag,
+  Paperclip
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -58,6 +59,7 @@ import { MaterialHistoryDrawer } from './MaterialHistoryDrawer';
 import { ProductProfileDrawer } from './ProductProfileDrawer';
 import { VendorProfileDrawer } from './VendorProfileDrawer';
 import { StockSummaryPdfModal } from './StockSummaryPdfModal';
+import { InventoryBillViewerModal } from './InventoryBillViewerModal';
 import {
   viewInventoryStockSummaryPdfInNewTab,
   downloadInventoryStockSummaryPdf,
@@ -288,6 +290,17 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // Material Checkout & Movement History Drawer
   const [historyDrawerMaterial, setHistoryDrawerMaterial] = useState<ConstructionMaterial | null>(null);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
+
+  // Attached Bill Viewer Modal (PNG/PDF)
+  const [billViewerState, setBillViewerState] = useState<{
+    isOpen: boolean;
+    fileUrl: string | null;
+    fileName?: string;
+    voucherNumber?: string;
+  }>({
+    isOpen: false,
+    fileUrl: null,
+  });
 
   // KPI Calculations (combines instantaneous Supabase quick summary with local state)
   const metrics = useMemo(() => {
@@ -524,6 +537,8 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           reason: txData.returnReason || txData.damageReason || txData.purpose,
           person_name: txData.receivedOrIssuedBy || txData.foremanName || txData.authorizedBy,
           notes: txData.notes,
+          file_url: txData.fileUrl,
+          file_name: txData.fileName,
           transaction_date: txData.date,
           transaction_time: txData.time,
         });
@@ -1498,6 +1513,24 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {tx.fileUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBillViewerState({
+                                  isOpen: true,
+                                  fileUrl: tx.fileUrl!,
+                                  fileName: tx.fileName || 'Uploaded Bill Copy',
+                                  voucherNumber: tx.voucherNumber,
+                                })
+                              }
+                              className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                              title={`View uploaded physical bill (${tx.fileName || 'PNG/PDF'})`}
+                            >
+                              <Paperclip className="w-3 h-3 text-purple-600" />
+                              <span>Bill Copy</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleViewPdfBlob(tx)}
@@ -1610,6 +1643,24 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {tx.fileUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBillViewerState({
+                                  isOpen: true,
+                                  fileUrl: tx.fileUrl!,
+                                  fileName: tx.fileName || 'Uploaded Issue Slip',
+                                  voucherNumber: tx.voucherNumber,
+                                })
+                              }
+                              className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                              title={`View uploaded issue slip (${tx.fileName || 'PNG/PDF'})`}
+                            >
+                              <Paperclip className="w-3 h-3 text-purple-600" />
+                              <span>Bill Copy</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleViewPdfBlob(tx)}
@@ -1750,6 +1801,24 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {tx.fileUrl && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setBillViewerState({
+                                    isOpen: true,
+                                    fileUrl: tx.fileUrl!,
+                                    fileName: tx.fileName || 'Uploaded Return/Damage Document',
+                                    voucherNumber: tx.voucherNumber,
+                                  })
+                                }
+                                className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                title={`View uploaded return/damage document (${tx.fileName || 'PNG/PDF'})`}
+                              >
+                                <Paperclip className="w-3 h-3 text-purple-600" />
+                                <span>Bill Copy</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleViewPdfBlob(tx)}
@@ -1891,6 +1960,24 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {tx.fileUrl && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setBillViewerState({
+                                    isOpen: true,
+                                    fileUrl: tx.fileUrl!,
+                                    fileName: tx.fileName || 'Uploaded Bill Document',
+                                    voucherNumber: tx.voucherNumber,
+                                  })
+                                }
+                                className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                                title={`View uploaded bill document (${tx.fileName || 'PNG/PDF'})`}
+                              >
+                                <Paperclip className="w-3 h-3 text-purple-600" />
+                                <span>Bill Copy</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleViewPdfBlob(tx)}
@@ -2070,6 +2157,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         onClose={() => setIsStockPdfModalOpen(false)}
         materials={materials}
         projectName={project?.name || 'Noori Crest Tower'}
+      />
+
+      {/* Uploaded Physical Bill Viewer Modal (PNG/PDF) */}
+      <InventoryBillViewerModal
+        isOpen={billViewerState.isOpen}
+        onClose={() => setBillViewerState((prev) => ({ ...prev, isOpen: false }))}
+        fileUrl={billViewerState.fileUrl}
+        fileName={billViewerState.fileName}
+        voucherNumber={billViewerState.voucherNumber}
       />
     </div>
   );

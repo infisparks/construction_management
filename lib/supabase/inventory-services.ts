@@ -1,6 +1,94 @@
 import { supabase } from './client';
 import { ProfileProduct } from './profile-services';
 
+export const INVENTORY_STORAGE_BUCKET = 'inventory-documents';
+
+/**
+ * Extracts strictly the relative path inside the Supabase Storage bucket.
+ */
+export function extractInventoryStoragePath(pathOrUrl?: string | null): string {
+  if (!pathOrUrl) return '';
+  const trimmed = pathOrUrl.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  const bucketMatch = trimmed.match(new RegExp(`/${INVENTORY_STORAGE_BUCKET}/(.+)$`));
+  if (bucketMatch && bucketMatch[1]) {
+    return bucketMatch[1].split('?')[0].replace(/^\/+/, '');
+  }
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const urlObj = new URL(trimmed);
+      const pathname = urlObj.pathname.replace(/^\/+/, '');
+      const storagePrefix = `storage/v1/object/public/${INVENTORY_STORAGE_BUCKET}/`;
+      if (pathname.includes(storagePrefix)) {
+        return pathname.split(storagePrefix)[1] || pathname;
+      }
+      return pathname;
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return trimmed.replace(/^\/+/, '');
+}
+
+/**
+ * Resolves a storage path or full URL to active public URL from Supabase client.
+ */
+export function resolveInventoryFileUrl(pathOrUrl?: string | null): string {
+  if (!pathOrUrl) return '';
+  const trimmed = pathOrUrl.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  const cleanPath = extractInventoryStoragePath(trimmed);
+  if (!cleanPath) return '';
+
+  const { data } = supabase.storage
+    .from(INVENTORY_STORAGE_BUCKET)
+    .getPublicUrl(cleanPath);
+
+  return data?.publicUrl || cleanPath;
+}
+
+/**
+ * Upload a bill / voucher / document (PNG, JPG, PDF) to Supabase Storage bucket `inventory-documents`.
+ */
+export async function uploadInventoryBillToStorage(
+  file: File,
+  folder: string = 'bills'
+): Promise<{ publicUrl: string; filePath: string; fileName: string }> {
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const filePath = `${folder}/${Date.now()}_${cleanFileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(INVENTORY_STORAGE_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`Storage upload failed: ${uploadError.message}`);
+  }
+
+  const publicUrl = resolveInventoryFileUrl(filePath);
+
+  return {
+    publicUrl,
+    filePath,
+    fileName: file.name,
+  };
+}
+
 export type InventoryTxType =
   | 'in'
   | 'out'
@@ -30,6 +118,8 @@ export interface InventoryTransactionRecord {
   reason?: string;
   person_name?: string;
   notes?: string;
+  file_url?: string;
+  file_name?: string;
   transaction_date: string;
   transaction_time?: string;
   created_at?: string;
@@ -157,6 +247,8 @@ export async function createInventoryTransaction(
           reason: tx.reason || null,
           person_name: tx.person_name || null,
           notes: tx.notes || null,
+          file_url: tx.file_url || null,
+          file_name: tx.file_name || null,
           transaction_date: tx.transaction_date || new Date().toISOString().split('T')[0],
           transaction_time:
             tx.transaction_time ||
@@ -395,6 +487,8 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
     receivedOrIssuedBy: row.person_name || 'Storekeeper',
     notes: row.notes,
     remarks: row.notes,
+    fileUrl: row.file_url ? resolveInventoryFileUrl(row.file_url) : undefined,
+    fileName: row.file_name || undefined,
   };
 }
 

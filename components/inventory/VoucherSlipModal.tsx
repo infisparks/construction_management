@@ -17,7 +17,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ExternalLink,
-  FileText
+  FileText,
+  Paperclip
 } from 'lucide-react';
 import { InventoryTransaction } from '@/lib/inventory/inventory-types';
 import {
@@ -128,10 +129,23 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {transaction.fileUrl && (
+              <a
+                href={transaction.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-xs font-bold text-purple-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title={`View attached bill file: ${transaction.fileName || 'Document'}`}
+              >
+                <Paperclip className="w-3.5 h-3.5 text-purple-600" />
+                <span>Attached Bill</span>
+              </a>
+            )}
+
             <button
               type="button"
               onClick={handleOpenBlobUrl}
-              className="px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-xs font-bold text-purple-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Open real PDF Blob URL in new browser tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -327,6 +341,35 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                 <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700">
                   <span className="font-bold text-slate-900 block mb-0.5">Storekeeper Remarks:</span>
                   {transaction.notes}
+                </div>
+              )}
+
+              {/* Physical Bill Copy Verification Attachment */}
+              {transaction.fileUrl && (
+                <div className="p-3 rounded-xl bg-purple-50/60 border border-purple-200 text-slate-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
+                      <Paperclip className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-purple-900 block">
+                        Attached Physical Bill / Proof
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono truncate block">
+                        {transaction.fileName || 'Verified Document Attachment'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <a
+                    href={transaction.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-2xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>View Bill</span>
+                  </a>
                 </div>
               )}
             </div>

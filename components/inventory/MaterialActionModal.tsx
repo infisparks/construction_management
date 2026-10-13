@@ -16,7 +16,9 @@ import {
   FileText,
   UserCheck,
   UserPlus,
-  PlusCircle
+  PlusCircle,
+  Loader2,
+  Paperclip
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -26,6 +28,8 @@ import {
   InventorySubcontractor
 } from '@/lib/inventory/inventory-types';
 import { ConstructionTask } from '@/lib/construction-planning/types';
+import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
+import { InventoryBillUploader } from './InventoryBillUploader';
 
 interface MaterialActionModalProps {
   isOpen: boolean;
@@ -116,6 +120,10 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
   const [recordedBy, setRecordedBy] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
+  // Optional Bill/File Attachment (PNG, JPG, PDF)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+
   // Sync state when opened - reset all inputs to clean empty state (hints shown in placeholders)
   useEffect(() => {
     if (isOpen) {
@@ -143,6 +151,8 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       setReturnCustomNote('');
       setDamageLocation('');
       setDamageCustomNote('');
+      setSelectedFile(null);
+      setIsUploading(false);
     }
   }, [isOpen, selectedMaterialId, initialAction, materials]);
 
@@ -197,9 +207,9 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
     ? Math.max(0, Math.round((currentStock - qtyNum) * 100) / 100)
     : Math.round((currentStock + qtyNum) * 100) / 100;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentMat || qtyNum <= 0) return;
+    if (!currentMat || qtyNum <= 0 || isUploading) return;
 
     if (isDeduction && qtyNum > currentStock) {
       const proceed = confirm(
@@ -231,6 +241,33 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       onAddStorageLocation(customStorage.trim());
     }
 
+    let uploadedFileUrl: string | undefined = undefined;
+    let uploadedFileName: string | undefined = undefined;
+
+    if (selectedFile) {
+      try {
+        setIsUploading(true);
+        const folder =
+          actionType === 'check_in'
+            ? 'check_in_bills'
+            : actionType === 'check_out'
+            ? 'check_out_bills'
+            : actionType === 'return'
+            ? 'return_bills'
+            : 'damage_bills';
+        const uploadRes = await uploadInventoryBillToStorage(selectedFile, folder);
+        uploadedFileUrl = uploadRes.publicUrl;
+        uploadedFileName = uploadRes.fileName;
+      } catch (uploadErr: any) {
+        console.error('Failed to upload bill document:', uploadErr);
+        alert(`Failed to upload file: ${uploadErr?.message || 'Storage upload error'}. Please try again.`);
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
     const baseTx: Omit<InventoryTransaction, 'id' | 'runningStockBalance'> = {
       voucherNumber: voucherCode,
       type: actionType,
@@ -246,6 +283,8 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       date: date || new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       receivedOrIssuedBy: recordedBy,
+      fileUrl: uploadedFileUrl,
+      fileName: uploadedFileName,
     };
 
     if (actionType === 'check_in') {
@@ -908,6 +947,25 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
             </div>
           </div>
 
+          {/* Section: Optional Bill / Voucher Document Upload */}
+          <div className="pt-2 border-t border-slate-100">
+            <InventoryBillUploader
+              file={selectedFile}
+              onFileChange={setSelectedFile}
+              disabled={isUploading}
+              label={
+                actionType === 'check_in'
+                  ? 'Attach Supplier Bill / Invoice / Challan (Optional)'
+                  : actionType === 'check_out'
+                  ? 'Attach Material Requisition / Issue Slip (Optional)'
+                  : actionType === 'return'
+                  ? 'Attach Vendor Return Slip / Debit Note (Optional)'
+                  : 'Attach Damage Photo / Inspection Report (Optional)'
+              }
+              hint="Attach invoice, challan, or proof in PNG, JPG, or PDF (up to 25MB)"
+            />
+          </div>
+
           </div>
 
           {/* Sticky Drawer Footer */}
@@ -915,14 +973,16 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              disabled={isUploading}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+              disabled={isUploading}
+              className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                 actionType === 'check_in'
                   ? 'bg-purple-600 hover:bg-purple-700'
                   : actionType === 'check_out'
@@ -932,13 +992,22 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                   : 'bg-rose-600 hover:bg-rose-700'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                {actionType === 'check_in' && `Confirm Check In (+${qtyNum} ${currentMat?.unit || ''})`}
-                {actionType === 'check_out' && `Confirm Check Out (-${qtyNum} ${currentMat?.unit || ''})`}
-                {actionType === 'return' && `Confirm Return (-${qtyNum} ${currentMat?.unit || ''})`}
-                {actionType === 'damage' && `Confirm Damage (-${qtyNum} ${currentMat?.unit || ''})`}
-              </span>
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Uploading Bill & Saving...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    {actionType === 'check_in' && `Confirm Check In (+${qtyNum} ${currentMat?.unit || ''})`}
+                    {actionType === 'check_out' && `Confirm Check Out (-${qtyNum} ${currentMat?.unit || ''})`}
+                    {actionType === 'return' && `Confirm Return (-${qtyNum} ${currentMat?.unit || ''})`}
+                    {actionType === 'damage' && `Confirm Damage (-${qtyNum} ${currentMat?.unit || ''})`}
+                  </span>
+                </>
+              )}
             </button>
           </div>
         </form>

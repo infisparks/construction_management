@@ -49,6 +49,7 @@ export interface SiteExpense {
   vendor_name?: string | null;
   paid_by?: string | null;
   receipt_url?: string | null;
+  receipt_file_name?: string | null;
   bill_number?: string | null;
   notes?: string | null;
   is_deleted: boolean;

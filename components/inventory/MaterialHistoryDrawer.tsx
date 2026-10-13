@@ -18,7 +18,8 @@ import {
   ExternalLink,
   Printer,
   FileSpreadsheet,
-  CheckCircle2
+  CheckCircle2,
+  Paperclip
 } from 'lucide-react';
 import { ConstructionMaterial, InventoryTransaction } from '@/lib/inventory/inventory-types';
 import {
@@ -332,6 +333,19 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
 
                       {/* PDF Action Buttons */}
                       <div className="flex items-center gap-1.5">
+                        {tx.fileUrl && (
+                          <a
+                            href={tx.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                            title={`View attached bill copy (${tx.fileName || 'Document'})`}
+                          >
+                            <Paperclip className="w-3 h-3 text-purple-600" />
+                            <span>Bill Copy</span>
+                          </a>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleViewPdf(tx)}

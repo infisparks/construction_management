@@ -21,7 +21,12 @@ import {
   fetchDropdownCategory,
   addCustomCategory,
 } from '@/lib/supabase/category-services';
-import { createSiteExpense, CreateExpensePayload } from '@/lib/supabase/expense-services';
+import {
+  createSiteExpense,
+  CreateExpensePayload,
+  uploadExpenseBillToStorage,
+} from '@/lib/supabase/expense-services';
+import { ExpenseBillUploader } from './ExpenseBillUploader';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -73,6 +78,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [billNumber, setBillNumber] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Bill / Receipt Attachment (all images including iOS HEIC/HEIF and PDF)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -94,6 +103,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setIsCustomPayee(false);
       setBillNumber('');
       setNotes('');
+      setSelectedFile(null);
+      setIsUploading(false);
       setErrorMessage(null);
     }
   }, [isOpen]);
@@ -174,6 +185,26 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       finalVendorName = customPayeeName.trim();
     }
 
+    let uploadedReceiptUrl: string | null = null;
+    let uploadedReceiptFileName: string | null = null;
+
+    if (selectedFile) {
+      try {
+        setIsUploading(true);
+        const uploadRes = await uploadExpenseBillToStorage(selectedFile, 'expense_bills');
+        uploadedReceiptUrl = uploadRes.publicUrl;
+        uploadedReceiptFileName = uploadRes.fileName;
+      } catch (uploadErr: any) {
+        console.error('Failed to upload expense bill:', uploadErr);
+        setErrorMessage(`Failed to upload attached bill: ${uploadErr?.message || 'Storage error'}`);
+        setIsSubmitting(false);
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
     const payload: CreateExpensePayload = {
       project_id: projectId || null,
       title: title.trim(),
@@ -186,6 +217,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       vendor_name: finalVendorName,
       paid_by: paidBy.trim() || null,
       bill_number: billNumber.trim() || null,
+      receipt_url: uploadedReceiptUrl,
+      receipt_file_name: uploadedReceiptFileName,
       notes: notes.trim() || null,
     };
 
@@ -542,6 +575,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
 
+          {/* Section 5: Attached Physical Bill / Invoice Copy (Optional) */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2 shadow-2xs">
+            <ExpenseBillUploader
+              file={selectedFile}
+              onFileChange={setSelectedFile}
+              disabled={isSubmitting || isUploading}
+              label="Attach Physical Bill / Cash Memo / Receipt Copy (Optional)"
+              hint="Supports all image formats (JPG, PNG, iOS HEIC/HEIF) or PDF (up to 25MB)"
+            />
+          </div>
+
           <div className="h-4" />
         </form>
 
@@ -550,22 +594,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold transition-colors cursor-pointer"
+            disabled={isSubmitting || isUploading}
+            className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+            disabled={isSubmitting || isUploading}
+            className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
           >
-            {isSubmitting ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            {isSubmitting || isUploading ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Uploading Bill & Saving...</span>
+              </>
             ) : (
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <>
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Save & Record Expense</span>
+              </>
             )}
-            <span>Save & Record Expense</span>
           </button>
         </div>
       </div>

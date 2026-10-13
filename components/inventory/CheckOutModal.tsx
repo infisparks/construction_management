@@ -12,7 +12,9 @@ import {
   Calendar,
   AlertTriangle,
   CheckCircle2,
-  FileText
+  FileText,
+  Loader2,
+  Paperclip
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -20,6 +22,8 @@ import {
   InventorySubcontractor
 } from '@/lib/inventory/inventory-types';
 import { ConstructionTask } from '@/lib/construction-planning/types';
+import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
+import { InventoryBillUploader } from './InventoryBillUploader';
 
 interface CheckOutModalProps {
   isOpen: boolean;
@@ -58,6 +62,8 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState<string>('11:45 AM');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // Reset fields to clean empty defaults when modal opens
   React.useEffect(() => {
@@ -72,6 +78,8 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
       setAuthorizedBy('');
       setIssuedBy('');
       setNotes('');
+      setSelectedFile(null);
+      setIsUploading(false);
     }
   }, [isOpen, selectedMaterialId, materials]);
 
@@ -98,15 +106,34 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
   const qtyNum = typeof quantity === 'number' ? quantity : 0;
   const isOverStock = currentMat ? qtyNum > currentMat.currentStock : false;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentMat || qtyNum <= 0) return;
+    if (!currentMat || qtyNum <= 0 || isUploading) return;
 
     if (isOverStock) {
       const proceed = confirm(
         `Warning: Requested quantity (${qtyNum} ${currentMat.unit}) exceeds current available store stock (${currentMat.currentStock} ${currentMat.unit}). Do you still wish to proceed?`
       );
       if (!proceed) return;
+    }
+
+    let uploadedFileUrl: string | undefined = undefined;
+    let uploadedFileName: string | undefined = undefined;
+
+    if (selectedFile) {
+      try {
+        setIsUploading(true);
+        const res = await uploadInventoryBillToStorage(selectedFile, 'check_out_bills');
+        uploadedFileUrl = res.publicUrl;
+        uploadedFileName = res.fileName;
+      } catch (uploadErr: any) {
+        console.error('Failed to upload bill in CheckOutModal:', uploadErr);
+        alert(`Failed to upload bill: ${uploadErr?.message || 'Storage error'}`);
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
     }
 
     const voucherNum = `MIN-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -136,6 +163,8 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
         receivedOrIssuedBy: issuedBy,
         isReturnable,
         notes,
+        fileUrl: uploadedFileUrl,
+        fileName: uploadedFileName,
       },
       {
         materialId: currentMat.id,
@@ -439,6 +468,17 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
                 />
               </div>
+
+              {/* Optional Issue Slip / Requisition Document Upload */}
+              <div className="pt-2 border-t border-slate-100">
+                <InventoryBillUploader
+                  file={selectedFile}
+                  onFileChange={setSelectedFile}
+                  disabled={isUploading}
+                  label="Attach Requisition Slip / Gate Pass / Issue Note (Optional)"
+                  hint="Attach signed requisition slip in PNG, JPG, or PDF (up to 25MB)"
+                />
+              </div>
             </div>
           </div>
 
@@ -447,16 +487,27 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+              disabled={isUploading}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition-colors cursor-pointer"
+              disabled={isUploading}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Confirm Site Issue (Check-Out)</span>
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Uploading Bill & Saving...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm Site Issue (Check-Out)</span>
+                </>
+              )}
             </button>
           </div>
         </form>
