@@ -9,8 +9,6 @@ import {
   ShieldCheck, 
   AlertCircle, 
   CheckCircle2, 
-  HardHat, 
-  KeyRound,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -21,7 +19,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
-  const { signIn, signUp, loginAsDemo } = useAuth();
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,11 +62,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleQuickAdmin = () => {
-    setEmail('admin@gmail.com');
-    setPassword('Admin@123456');
   };
 
   return (
@@ -157,7 +150,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               <input
                 type="email"
                 required
-                placeholder="Enter email (e.g. admin@gmail.com)"
+                placeholder="Enter email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm text-[#111827] bg-[#F5F6F8] hover:bg-white border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
@@ -208,32 +201,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               </>
             )}
           </button>
-
-          {/* Quick Demo Credentials Assistant */}
-          <div className="pt-2 border-t border-[#E5E7EB] space-y-2">
-            <button
-              type="button"
-              onClick={() => {
-                loginAsDemo();
-                onSuccess?.();
-              }}
-              className="w-full py-2 px-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <HardHat className="w-3.5 h-3.5" />
-              <span>Explore Static App (Demo Mode)</span>
-            </button>
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={handleQuickAdmin}
-                className="text-[11px] text-purple-600 hover:text-purple-700 font-semibold inline-flex items-center gap-1 hover:underline"
-              >
-                <KeyRound className="w-3 h-3" />
-                <span>Fill Admin Email (`admin@gmail.com`)</span>
-              </button>
-            </div>
-          </div>
-
         </form>
 
         {/* Footer info */}
