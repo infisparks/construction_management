@@ -81,14 +81,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-start animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="bg-white w-full max-w-lg h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right duration-250"
+        className="bg-white w-full max-w-md sm:max-w-lg h-full shadow-2xl border-r border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-left duration-250"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drawer Header */}
+        {/* Drawer Header (Left Side) */}
         <div className="px-5 py-4 border-b border-slate-200 bg-emerald-50/50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
