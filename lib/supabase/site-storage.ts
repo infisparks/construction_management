@@ -19,6 +19,19 @@ export function getStoredActiveSiteId(): string | null {
 }
 
 /**
+ * Get active site data object from localStorage (SSR-safe)
+ */
+export function getStoredActiveSite(): DbProject | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(ACTIVE_SITE_DATA_KEY);
+    return raw ? (JSON.parse(raw) as DbProject) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Store active site in localStorage
  */
 export function setStoredActiveSite(project: DbProject): void {

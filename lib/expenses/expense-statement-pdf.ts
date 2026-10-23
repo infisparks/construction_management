@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { SiteExpense } from '@/lib/supabase/types';
 import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
 import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
+import { getStoredActiveSite } from '@/lib/supabase/site-storage';
 
 export function formatINR(val: number): string {
   const num = Math.round(Number(val) || 0);
@@ -593,9 +594,17 @@ export function generateSingleExpenseVoucherPdf(
   const sigWidth = (contentWidth - sigGap * 2) / 3;
   const sigHeight = 25;
 
+  // Resolve site project engineer / person from active site
+  const activeSite = getStoredActiveSite();
+  const verifiedByName = activeSite?.project_person
+    ? `${activeSite.project_person} (Site Incharge)`
+    : activeSite?.principal_contractor
+    ? `${activeSite.principal_contractor} (Project Engineer)`
+    : 'Site Project Engineer';
+
   const signatures = [
     { title: 'PREPARED / PAID BY', sub: expense.paid_by || 'Site Supervisor' },
-    { title: 'CHECKED & VERIFIED BY', sub: 'Site Project Engineer' },
+    { title: 'CHECKED & VERIFIED BY', sub: verifiedByName },
     { title: 'AUTHORIZED / RECEIVER', sub: expense.vendor_name || 'Receiver Sign' },
   ];
 
