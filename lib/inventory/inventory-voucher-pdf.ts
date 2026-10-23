@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { InventoryTransaction } from './inventory-types';
 import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
+import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
 
 /**
  * Formats a monetary value safely without using the unicode rupee symbol (₹),
@@ -51,6 +52,8 @@ export function generateInventoryVoucherPdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -390,15 +393,15 @@ export function getInventoryVoucherPdfBlobUrl(
 }
 
 /**
- * Downloads the voucher PDF directly
+ * Opens the voucher PDF directly in a new window/tab via blob URL
  */
 export function downloadInventoryVoucherPdf(
   transaction: InventoryTransaction,
   projectName?: string
-): void {
-  const doc = generateInventoryVoucherPdf(transaction, projectName);
-  const fileName = `Material_Voucher_${(transaction.voucherNumber || transaction.id).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-  doc.save(fileName);
+): string {
+  const { blobUrl } = getInventoryVoucherPdfBlobUrl(transaction, projectName);
+  window.open(blobUrl, '_blank');
+  return blobUrl;
 }
 
 /**
@@ -437,6 +440,8 @@ export function generateMaterialCheckoutHistoryPdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -698,10 +703,10 @@ export function downloadMaterialCheckoutHistoryPdf(
   },
   checkouts: InventoryTransaction[],
   projectName?: string
-): void {
-  const doc = generateMaterialCheckoutHistoryPdf(material, checkouts, projectName);
-  const fileName = `Checkout_Bill_${material.code.replace(/[^a-zA-Z0-9_-]/g, '_')}_Total_Issues.pdf`;
-  doc.save(fileName);
+): string {
+  const { blobUrl } = getMaterialCheckoutHistoryPdfBlobUrl(material, checkouts, projectName);
+  window.open(blobUrl, '_blank');
+  return blobUrl;
 }
 
 /**

@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ConstructionMaterial } from './inventory-types';
 import { formatINR, getCleanItemCode } from './inventory-voucher-pdf';
+import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
 
 export interface StockSummaryPdfOptions {
   projectName?: string;
@@ -29,6 +30,8 @@ export function generateInventoryStockSummaryPdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth(); // 297mm
   const pageHeight = doc.internal.pageSize.getHeight(); // 210mm
@@ -277,15 +280,17 @@ export function getInventoryStockSummaryPdfBlobUrl(
 }
 
 /**
- * Directly downloads the stock statement PDF file.
+ * Opens the stock statement PDF directly in a new window/tab via Blob URL.
  */
 export function downloadInventoryStockSummaryPdf(
   materials: ConstructionMaterial[],
   projectName: string = 'Noori Crest Tower'
-): void {
-  const doc = generateInventoryStockSummaryPdf(materials, { projectName });
-  const dateStr = new Date().toISOString().split('T')[0];
-  doc.save(`Site_Inventory_Stock_Report_${dateStr}.pdf`);
+): string {
+  const { blobUrl } = getInventoryStockSummaryPdfBlobUrl(materials, projectName);
+  if (typeof window !== 'undefined') {
+    window.open(blobUrl, '_blank');
+  }
+  return blobUrl;
 }
 
 /**

@@ -81,7 +81,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[60] overflow-hidden bg-slate-900/40 backdrop-blur-xs flex justify-start animate-in fade-in duration-200"
+      className="fixed inset-0 z-[70] overflow-hidden bg-slate-900/25 flex justify-start animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 

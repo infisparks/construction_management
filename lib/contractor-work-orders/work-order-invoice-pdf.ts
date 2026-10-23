@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ContractorWorkOrder, WorkOrderPayment } from './types';
 import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
+import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
 
 export function formatINR(val: number): string {
   if (val === undefined || val === null || isNaN(val)) return 'Rs. 0.00';
@@ -43,6 +44,8 @@ export function generateWorkOrderInvoicePdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -255,6 +258,7 @@ export function generateWorkOrderInvoicePdf(
     body: revisionRows,
     theme: 'grid',
     styles: {
+      font: 'Poppins',
       fontSize: 7.5,
       cellPadding: 2,
       textColor: [31, 41, 55],
@@ -262,6 +266,7 @@ export function generateWorkOrderInvoicePdf(
       lineWidth: 0.1,
     },
     headStyles: {
+      font: 'Poppins',
       fillColor: [243, 244, 246],
       textColor: [17, 24, 39],
       fontStyle: 'bold',
@@ -315,6 +320,7 @@ export function generateWorkOrderInvoicePdf(
     body: paymentRows,
     theme: 'grid',
     styles: {
+      font: 'Poppins',
       fontSize: 7.5,
       cellPadding: 2,
       textColor: [31, 41, 55],
@@ -322,6 +328,7 @@ export function generateWorkOrderInvoicePdf(
       lineWidth: 0.1,
     },
     headStyles: {
+      font: 'Poppins',
       fillColor: [243, 244, 246],
       textColor: [17, 24, 39],
       fontStyle: 'bold',
@@ -425,15 +432,18 @@ export function generateWorkOrderInvoicePdf(
   return doc;
 }
 
-export function downloadWorkOrderPdf(order: ContractorWorkOrder, options?: WorkOrderPdfOptions): void {
-  const doc = generateWorkOrderInvoicePdf(order, options);
-  const filename = `${order.workOrderNumber}_${order.vendorName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-  doc.save(filename);
-}
-
-export function viewWorkOrderPdfInNewTab(order: ContractorWorkOrder, options?: WorkOrderPdfOptions): void {
+export function downloadWorkOrderPdf(order: ContractorWorkOrder, options?: WorkOrderPdfOptions): string {
   const doc = generateWorkOrderInvoicePdf(order, options);
   const blob = doc.output('blob');
   const url = URL.createObjectURL(blob);
   window.open(url, '_blank');
+  return url;
+}
+
+export function viewWorkOrderPdfInNewTab(order: ContractorWorkOrder, options?: WorkOrderPdfOptions): string {
+  const doc = generateWorkOrderInvoicePdf(order, options);
+  const blob = doc.output('blob');
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  return url;
 }

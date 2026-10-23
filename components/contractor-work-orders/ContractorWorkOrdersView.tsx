@@ -699,16 +699,16 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                             <HandCoins className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Print / Download PDF Invoice with Barcode */}
+                          {/* Print / Download PDF Invoice with Barcode (Opens Blob URL in new tab) */}
                           <button
                             type="button"
                             onClick={() =>
-                              downloadWorkOrderPdf(order, {
+                              viewWorkOrderPdfInNewTab(order, {
                                 projectName: effectiveProjectName,
                                 projectCode: effectiveProjectCode,
                               })
                             }
-                            title="Download Certified PDF Invoice (with Barcode)"
+                            title="Open Certified PDF Invoice (Blob URL with Barcode)"
                             className="p-1.5 text-purple-700 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer border border-purple-200"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -747,26 +747,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
         />
       )}
 
-      {selectedOrderForExtra && (
-        <AddExtraWorkModal
-          isOpen={Boolean(selectedOrderForExtra)}
-          onClose={() => setSelectedOrderForExtra(null)}
-          workOrder={selectedOrderForExtra}
-          onSaveRevision={handleAddExtraSave}
-          showToast={showToast}
-        />
-      )}
-
-      {selectedOrderForPayment && (
-        <RecordPaymentModal
-          isOpen={Boolean(selectedOrderForPayment)}
-          onClose={() => setSelectedOrderForPayment(null)}
-          workOrder={selectedOrderForPayment}
-          onSavePayment={handleRecordPaymentSave}
-          showToast={showToast}
-        />
-      )}
-
+      {/* Right-side Detail Drawer */}
       {drawerOrder && (
         <WorkOrderDetailDrawer
           isOpen={Boolean(drawerOrder)}
@@ -780,6 +761,28 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
           onOpenRecordPayment={(o: ContractorWorkOrder) => {
             setSelectedOrderForPayment(o);
           }}
+        />
+      )}
+
+      {/* Left-side Add Extra Work Variation Drawer */}
+      {selectedOrderForExtra && (
+        <AddExtraWorkModal
+          isOpen={Boolean(selectedOrderForExtra)}
+          onClose={() => setSelectedOrderForExtra(null)}
+          workOrder={selectedOrderForExtra}
+          onSaveRevision={handleAddExtraSave}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Left-side Give Payment / Payout Drawer */}
+      {selectedOrderForPayment && (
+        <RecordPaymentModal
+          isOpen={Boolean(selectedOrderForPayment)}
+          onClose={() => setSelectedOrderForPayment(null)}
+          workOrder={selectedOrderForPayment}
+          onSavePayment={handleRecordPaymentSave}
+          showToast={showToast}
         />
       )}
     </div>

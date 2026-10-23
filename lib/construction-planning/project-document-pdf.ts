@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ProjectFile } from './types';
 import { resolveFileUrl } from '@/lib/supabase/project-files';
+import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
 
 /**
  * Generate an authentic certified construction PDF document for in-app preview.
@@ -14,6 +15,8 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

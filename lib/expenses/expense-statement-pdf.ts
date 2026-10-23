@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SiteExpense } from '@/lib/supabase/types';
 import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
+import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
 
 export function formatINR(val: number): string {
   const num = Math.round(Number(val) || 0);
@@ -90,6 +91,8 @@ export function generateSiteExpensesPdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth(); // 297mm
   const pageHeight = doc.internal.pageSize.getHeight(); // 210mm
@@ -312,21 +315,18 @@ export function getSiteExpensesPdfBlobUrl(
 }
 
 /**
- * Downloads the full site expenses statement PDF via Blob URL.
+ * Opens the full site expenses statement PDF in a new tab via Blob URL.
  */
 export function downloadSiteExpensesPdf(
   expenses: SiteExpense[],
   projectName: string = 'Noori Crest Tower',
   filterLabel: string = 'All Dates Statement'
-): void {
+): string {
   const { blobUrl } = getSiteExpensesPdfBlobUrl(expenses, projectName, filterLabel);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  const dateStr = new Date().toISOString().split('T')[0];
-  a.download = `Site_Expenses_Statement_${dateStr}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if (typeof window !== 'undefined') {
+    window.open(blobUrl, '_blank');
+  }
+  return blobUrl;
 }
 
 /**
@@ -361,6 +361,8 @@ export function generateSingleExpenseVoucherPdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
   const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
@@ -643,19 +645,17 @@ export function getSingleExpenseVoucherBlobUrl(
 }
 
 /**
- * Directly downloads the single expense bill voucher slip PDF via Blob URL.
+ * Opens the single expense bill voucher slip PDF directly in a new tab via Blob URL.
  */
 export function downloadSingleExpenseVoucherPdf(
   expense: SiteExpense,
   projectName: string = 'Noori Crest Tower'
-): void {
+): string {
   const { blobUrl } = getSingleExpenseVoucherBlobUrl(expense, projectName);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = `Expense_Bill_${expense.expense_code || 'Voucher'}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if (typeof window !== 'undefined') {
+    window.open(blobUrl, '_blank');
+  }
+  return blobUrl;
 }
 
 /**

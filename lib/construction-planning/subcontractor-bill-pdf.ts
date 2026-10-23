@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SubcontractorBill, ProjectInfo } from './types';
 import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
+import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
 
 /**
  * Formats a monetary value safely without using the unicode rupee symbol (₹),
@@ -27,6 +28,8 @@ export function generateSubcontractorBillPdf(
     unit: 'mm',
     format: 'a4',
   });
+
+  registerPoppinsFont(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -192,6 +195,7 @@ export function generateSubcontractorBillPdf(
     body: tableRows,
     theme: 'grid',
     headStyles: {
+      font: 'Poppins',
       fillColor: [4, 47, 56],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
@@ -199,6 +203,7 @@ export function generateSubcontractorBillPdf(
       halign: 'left',
     },
     styles: {
+      font: 'Poppins',
       fontSize: 8,
       cellPadding: 2.5,
       textColor: [31, 41, 55],
@@ -424,15 +429,15 @@ export function generateSubcontractorBillPdf(
 }
 
 /**
- * Downloads the PDF directly to the user's computer.
+ * Opens the PDF directly in a new window/tab via Blob URL.
  */
 export function downloadSubcontractorBillPdf(
   bill: SubcontractorBill,
   project?: Partial<ProjectInfo>
-): void {
-  const doc = generateSubcontractorBillPdf(bill, project);
-  const fileName = `Subcontractor_Bill_${(bill.billNumber || bill.id).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-  doc.save(fileName);
+): string {
+  const { blobUrl } = getSubcontractorBillPdfBlobUrl(bill, project);
+  window.open(blobUrl, '_blank');
+  return blobUrl;
 }
 
 /**
