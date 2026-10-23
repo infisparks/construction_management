@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   ArrowUpRight,
@@ -24,6 +24,7 @@ import {
 import { ConstructionTask } from '@/lib/construction-planning/types';
 import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
 import { InventoryBillUploader } from './InventoryBillUploader';
+import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
 
 interface CheckOutModalProps {
   isOpen: boolean;
@@ -62,6 +63,28 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState<string>('11:45 AM');
+
+  const materialOptions: SearchableOption[] = useMemo(() => {
+    return materials.map((m) => ({
+      value: m.id,
+      label: `${m.code} - ${m.name}`,
+      subtitle: `Location: ${m.storageLocation} | Category: ${m.category}`,
+      badge: `${m.currentStock} ${m.unit}`,
+      badgeColor:
+        m.currentStock <= (m.minimumAlertStock || 0)
+          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+          : 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+    }));
+  }, [materials]);
+
+  const subcontractorOptions: SearchableOption[] = useMemo(() => {
+    return subcontractors.map((s) => ({
+      value: s.id,
+      label: s.name,
+      subtitle: s.trade ? `Trade: ${s.trade}` : undefined,
+      badge: s.trade || undefined,
+    }));
+  }, [subcontractors]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
@@ -218,18 +241,14 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
                   Select Construction Material *
                 </label>
-                <select
+                <SearchableSelect
+                  options={materialOptions}
                   value={materialId}
-                  onChange={(e) => handleMaterialChange(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                  onChange={handleMaterialChange}
+                  placeholder="Search & select material..."
+                  searchPlaceholder="Search material by name or code..."
                   required
-                >
-                  {materials.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.code} - {m.name} [Available: {m.currentStock} {m.unit}]
-                    </option>
-                  ))}
-                </select>
+                />
                 {currentMat && (
                   <div className="mt-1.5 flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">
                     <span className="text-slate-600">Location: <strong className="text-slate-800">{currentMat.storageLocation}</strong></span>
@@ -299,18 +318,14 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
                   Subcontractor Agency (Optional)
                 </label>
-                <select
+                <SearchableSelect
+                  options={subcontractorOptions}
                   value={subcontractorId}
-                  onChange={(e) => handleSubcontractorChange(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
-                >
-                  <option value="">Select Subcontractor / Agency (Optional)</option>
-                  {subcontractors.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.trade})
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleSubcontractorChange}
+                  placeholder="Select Subcontractor / Agency (Optional)"
+                  searchPlaceholder="Search subcontractor or agency..."
+                  allowClear
+                />
               </div>
 
               <div>

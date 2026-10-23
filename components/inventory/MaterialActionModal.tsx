@@ -31,6 +31,7 @@ import {
 import { ConstructionTask } from '@/lib/construction-planning/types';
 import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
 import { InventoryBillUploader } from './InventoryBillUploader';
+import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
 
 interface MaterialActionModalProps {
   isOpen: boolean;
@@ -110,6 +111,37 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
     });
     return Array.from(map.values());
   }, [subcontractors, vendorProfiles]);
+
+  const subcontractorOptions: SearchableOption[] = useMemo(() => {
+    return mergedSubcontractors.map((s) => ({
+      value: s.id,
+      label: s.name,
+      subtitle: s.trade ? `Trade: ${s.trade}` : undefined,
+      badge: s.trade || undefined,
+    }));
+  }, [mergedSubcontractors]);
+
+  const supplierOptions: SearchableOption[] = useMemo(() => {
+    return suppliers.map((s) => ({
+      value: s.id,
+      label: s.name,
+      subtitle: s.trade ? `Trade: ${s.trade}` : (s.city || undefined),
+      badge: s.trade || (s.type === 'vendor' ? 'Vendor' : undefined),
+    }));
+  }, [suppliers]);
+
+  const materialOptions: SearchableOption[] = useMemo(() => {
+    return materials.map((m) => ({
+      value: m.id,
+      label: `${m.code} - ${m.name}`,
+      subtitle: `Stock: ${m.currentStock} ${m.unit} | Category: ${m.category}`,
+      badge: `${m.currentStock} ${m.unit}`,
+      badgeColor:
+        m.currentStock <= (m.minimumAlertStock || 0)
+          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+          : 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    }));
+  }, [materials]);
 
   const [actionType, setActionType] = useState<InventoryTransactionType>(initialAction);
   const [materialId, setMaterialId] = useState<string>('');
@@ -508,18 +540,14 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                   </button>
                 )}
               </div>
-              <select
+              <SearchableSelect
+                options={materialOptions}
                 value={materialId}
-                onChange={(e) => handleMaterialChange(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-hidden focus:border-purple-600"
+                onChange={handleMaterialChange}
+                placeholder="Search & select material profile..."
+                searchPlaceholder="Search material by name or code..."
                 required
-              >
-                {materials.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.code} - {m.name} ({m.currentStock} {m.unit} in store)
-                  </option>
-                ))}
-              </select>
+              />
               {currentMat && (
                 <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
                   <span>Category: <strong className="text-slate-700">{currentMat.category}</strong></span>
@@ -592,18 +620,14 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                       </button>
                     )}
                   </div>
-                  <select
+                  <SearchableSelect
+                    options={supplierOptions}
                     value={supplierId}
-                    onChange={(e) => setSupplierId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  >
-                    <option value="">Select Supplier / Vendor (Optional)</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSupplierId}
+                    placeholder="Select Supplier / Vendor (Optional)"
+                    searchPlaceholder="Search supplier or vendor..."
+                    allowClear
+                  />
                 </div>
 
                 <div>
@@ -679,18 +703,14 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                       </button>
                     )}
                   </div>
-                  <select
+                  <SearchableSelect
+                    options={subcontractorOptions}
                     value={subcontractorId}
-                    onChange={(e) => handleSubChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600 cursor-pointer"
-                  >
-                    <option value="">Select Subcontractor / Agency (Optional)</option>
-                    {mergedSubcontractors.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} {s.trade ? `(${s.trade})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleSubChange}
+                    placeholder="Select Subcontractor / Agency (Optional)"
+                    searchPlaceholder="Search subcontractor or agency..."
+                    allowClear
+                  />
                 </div>
 
                 <div>
@@ -823,18 +843,14 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                       </button>
                     )}
                   </div>
-                  <select
+                  <SearchableSelect
+                    options={supplierOptions}
                     value={supplierId}
-                    onChange={(e) => setSupplierId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
-                  >
-                    <option value="">Select Vendor (Optional)</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSupplierId}
+                    placeholder="Select Vendor (Optional)"
+                    searchPlaceholder="Search vendor to return..."
+                    allowClear
+                  />
                 </div>
 
                 <div>

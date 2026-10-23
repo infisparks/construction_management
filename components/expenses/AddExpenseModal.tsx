@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Receipt,
@@ -32,6 +32,7 @@ import {
 } from '@/lib/supabase/expense-services';
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillUploader } from './ExpenseBillUploader';
+import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
 
 interface ProjectOption {
   id: string;
@@ -191,8 +192,41 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleVendorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const projectOptions: SearchableOption[] = useMemo(() => {
+    return projectsList.map((p) => ({
+      value: p.id,
+      label: p.name,
+      subtitle: p.code ? `Code: ${p.code}` : undefined,
+      badge: p.serial_no ? `#${p.serial_no}` : (p.code || undefined),
+    }));
+  }, [projectsList]);
+
+  const payeeOptions: SearchableOption[] = useMemo(() => {
+    return [
+      {
+        value: '',
+        label: 'Direct Payment / General Site Expense',
+        subtitle: 'Cashier / Supervisor Direct Expense',
+      },
+      ...vendors.map((v) => ({
+        value: v.id,
+        label: v.name,
+        subtitle: [v.type, v.trade, v.phone].filter(Boolean).join(' • ') || undefined,
+        badge: v.type ? (v.type.charAt(0).toUpperCase() + v.type.slice(1)) : undefined,
+        badgeColor:
+          v.type === 'contractor'
+            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+            : 'bg-purple-50 text-purple-700 border border-purple-200',
+      })),
+      {
+        value: '__custom__',
+        label: '+ Other Payee / Local Shop / Cash Recipient...',
+        isAction: true,
+      },
+    ];
+  }, [vendors]);
+
+  const handleVendorSelect = (val: string) => {
     if (val === '__custom__') {
       setIsCustomPayee(true);
       setSelectedVendorId('');
@@ -403,17 +437,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 Default: Current Site
               </span>
             </label>
-            <select
+            <SearchableSelect
+              options={projectOptions}
               value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 shadow-2xs cursor-pointer"
-            >
-              {projectsList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedProjectId}
+              placeholder="Select Construction Site..."
+              searchPlaceholder="Search construction site..."
+            />
             <p className="text-[10px] text-slate-500">
               This bill / expense will be attributed to the selected site. You can switch to another site if needed.
             </p>
@@ -600,23 +630,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </span>
             </div>
 
-            <select
+            <SearchableSelect
+              options={payeeOptions}
               value={isCustomPayee ? '__custom__' : selectedVendorId}
-              onChange={handleVendorChange}
-              className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium cursor-pointer"
-            >
-              <option value="">-- Direct Payment / General Site Expense --</option>
-              <optgroup label="Registered Vendors & Contractors (Supabase)">
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} ({v.type})
-                  </option>
-                ))}
-              </optgroup>
-              <option value="__custom__" className="font-bold text-purple-700 bg-purple-50">
-                + Other Payee / Local Shop / Cash Recipient...
-              </option>
-            </select>
+              onChange={handleVendorSelect}
+              placeholder="Select Payee / Vendor..."
+              searchPlaceholder="Search vendor, contractor or recipient..."
+            />
 
             {isCustomPayee && (
               <div className="animate-in fade-in duration-150 pt-1">

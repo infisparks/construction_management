@@ -41,6 +41,7 @@ import { fetchBillItemCatalog, saveBillItemToCatalog, BillItemTemplate } from '@
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { useAuth } from '@/lib/supabase/auth-context';
 import { isAdminUser } from '@/lib/auth/role-access';
+import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
 
 interface ProjectOption {
   id: string;
@@ -553,6 +554,50 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
     return list;
   }, [dbVendors]);
 
+  const projectOptions: SearchableOption[] = useMemo(() => {
+    return projectsList.map((p) => ({
+      value: p.id,
+      label: p.name,
+      subtitle: p.code ? `Code: ${p.code}` : undefined,
+      badge: p.serial_no ? `#${p.serial_no}` : (p.code || undefined),
+    }));
+  }, [projectsList]);
+
+  const vendorSelectOptions: SearchableOption[] = useMemo(() => {
+    return [
+      ...allAvailableVendors.map((v) => ({
+        value: v.name,
+        label: v.name,
+        subtitle: [v.trade ? `Trade: ${v.trade}` : null, v.phone ? `Ph: ${v.phone}` : null].filter(Boolean).join(' • ') || undefined,
+        badge: v.trade || undefined,
+      })),
+      {
+        value: '__CREATE_NEW__',
+        label: '+ Create New Vendor Profile...',
+        isAction: true,
+      },
+    ];
+  }, [allAvailableVendors]);
+
+  const handleVendorSelect = (val: string) => {
+    if (val === '__CREATE_NEW__') {
+      setIsVendorDrawerOpen(true);
+      return;
+    }
+    const found = allAvailableVendors.find((v) => v.name === val);
+    if (found) {
+      setSelectedVendorName(found.name);
+      setSelectedVendorTrade(found.trade || '');
+      setSelectedVendorPhone(found.phone || '');
+      setSelectedVendorGstin(found.gstin || '');
+      setSelectedVendorPan(found.pan || '');
+      setSelectedVendorBank(found.bank_details || '');
+      setIsEditingVendor(false);
+    } else {
+      setSelectedVendorName(val);
+    }
+  };
+
   // Initialize or Reset Form
   useEffect(() => {
     if (!isOpen) return;
@@ -868,17 +913,13 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
                   Default: Current Site
                 </span>
               </label>
-              <select
+              <SearchableSelect
+                options={projectOptions}
                 value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 shadow-2xs cursor-pointer"
-              >
-                {projectsList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedProjectId}
+                placeholder="Select Construction Site..."
+                searchPlaceholder="Search construction site..."
+              />
               <p className="text-[11px] text-slate-500">
                 This RA bill will be logged under this construction site. You can switch to another site if needed.
               </p>
@@ -1032,38 +1073,13 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
                 </div>
               ) : (
                 <div className="space-y-2 pt-1 animate-in fade-in">
-                  <select
+                  <SearchableSelect
+                    options={vendorSelectOptions}
                     value={selectedVendorName}
-                    onChange={(e) => {
-                      if (e.target.value === '__CREATE_NEW__') {
-                        setIsVendorDrawerOpen(true);
-                        return;
-                      }
-                      const found = allAvailableVendors.find((v) => v.name === e.target.value);
-                      if (found) {
-                        setSelectedVendorName(found.name);
-                        setSelectedVendorTrade(found.trade || '');
-                        setSelectedVendorPhone(found.phone || '');
-                        setSelectedVendorGstin(found.gstin || '');
-                        setSelectedVendorPan(found.pan || '');
-                        setSelectedVendorBank(found.bank_details || '');
-                        setIsEditingVendor(false);
-                      } else {
-                        setSelectedVendorName(e.target.value);
-                      }
-                    }}
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
-                  >
-                    <option value="">-- Select Subcontractor / Vendor --</option>
-                    {allAvailableVendors.map((v) => (
-                      <option key={v.id} value={v.name}>
-                        {v.name} {v.trade ? `(${v.trade})` : ''}
-                      </option>
-                    ))}
-                    <option value="__CREATE_NEW__" className="text-purple-600 font-bold">
-                      + Create New Vendor Profile...
-                    </option>
-                  </select>
+                    onChange={handleVendorSelect}
+                    placeholder="Select Subcontractor / Vendor..."
+                    searchPlaceholder="Search subcontractor or vendor..."
+                  />
 
                   <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
                     <span>Not in the list? Click &ldquo;+ Create Vendor Profile&rdquo; above.</span>
