@@ -86,8 +86,8 @@ interface NavModuleDef {
 const MODULES: NavModuleDef[] = [
   {
     id: 'planning',
-    label: 'Planning & Schedule',
-    shortLabel: 'Plan',
+    label: 'Timeline & Schedule',
+    shortLabel: 'Timeline',
     icon: Calendar,
     description: 'WBS, Gantt timelines & CPM float',
   },
@@ -647,7 +647,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     )}
 
                     <Icon className={`w-4 h-4 ${isCurrent ? 'text-purple-600 stroke-[2.3]' : 'text-slate-500'}`} />
-                    <span className="text-[9px] tracking-tight leading-none block truncate max-w-[38px]">
+                    <span className="text-[9px] tracking-tight leading-none block truncate max-w-[46px]">
                       {mod.shortLabel}
                     </span>
 
