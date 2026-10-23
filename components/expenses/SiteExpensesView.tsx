@@ -28,17 +28,23 @@ import {
   Truck,
   ExternalLink,
   ChevronDown,
-  Paperclip
+  Paperclip,
+  Edit2,
+  ArchiveRestore,
+  RotateCcw
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
 import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
 import { ProjectInfo } from '@/lib/construction-planning/types';
 import {
   fetchSiteExpenses,
+  fetchDeletedSiteExpenses,
   deleteSiteExpense,
+  restoreSiteExpense,
   calculateExpenseSummary,
   ExpenseSummaryStats
 } from '@/lib/supabase/expense-services';
+import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import { 
   DateFilterControl, 
   DateFilterState, 
@@ -100,6 +106,19 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
+  // View Mode: 'active' vs 'bin'
+  const [viewMode, setViewMode] = useState<'active' | 'bin'>('active');
+  const [deletedExpenses, setDeletedExpenses] = useState<SiteExpense[]>([]);
+  const [isLoadingBin, setIsLoadingBin] = useState(false);
+
+  // Edit Expense State
+  const [expenseToEdit, setExpenseToEdit] = useState<SiteExpense | null>(null);
+
+  // Confirm Delete Modal State
+  const [expenseToDelete, setExpenseToDelete] = useState<SiteExpense | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Load expenses from Supabase
   const loadExpenses = async () => {
     setIsLoading(true);
@@ -113,21 +132,47 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
     }
   };
 
+  // Load soft-deleted expenses from Supabase (Recycle Bin)
+  const loadDeletedExpenses = async () => {
+    setIsLoadingBin(true);
+    try {
+      const data = await fetchDeletedSiteExpenses(projectId);
+      setDeletedExpenses(data);
+    } catch (err) {
+      console.error('Failed to load deleted expenses:', err);
+    } finally {
+      setIsLoadingBin(false);
+    }
+  };
+
   useEffect(() => {
     loadExpenses();
+    loadDeletedExpenses();
   }, [projectId]);
 
-  // Handle single expense deletion
-  const handleDeleteExpense = async (id: string, title: string) => {
-    if (!window.confirm(`Are you sure you want to delete the expense "${title}"?`)) {
-      return;
-    }
-    const ok = await deleteSiteExpense(id);
+  // Handle confirmed deletion (Soft Delete -> is_deleted = true in Supabase)
+  const handleConfirmDelete = async () => {
+    if (!expenseToDelete) return;
+    setIsDeleting(true);
+    const ok = await deleteSiteExpense(expenseToDelete.id);
+    setIsDeleting(false);
     if (ok) {
-      setExpenses(prev => prev.filter(e => e.id !== id));
-      showToast?.(`Expense "${title}" deleted`, 'info');
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete.id));
+      showToast?.(`Expense "${expenseToDelete.title}" moved to Recycle Bin`, 'info');
+      await Promise.all([loadExpenses(), loadDeletedExpenses()]);
     } else {
       showToast?.('Failed to delete expense', 'error');
+    }
+  };
+
+  // Handle restore from Recycle Bin -> is_deleted = false in Supabase
+  const handleRestoreExpense = async (exp: SiteExpense) => {
+    const ok = await restoreSiteExpense(exp.id);
+    if (ok) {
+      showToast?.(`Expense "${exp.title}" restored to Active Expenses!`, 'success');
+      await Promise.all([loadExpenses(), loadDeletedExpenses()]);
+    } else {
+      showToast?.('Failed to restore expense', 'error');
     }
   };
 
@@ -353,7 +398,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           {/* Add Expense (Primary Purple) */}
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setExpenseToEdit(null);
+              setIsAddModalOpen(true);
+            }}
             className="h-8 px-3.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -362,8 +410,55 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Top Summary KPI Cards (Highlights Today's Expenses) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 1.5 View Mode Switcher: Active Site Bills vs Recycle Bin */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-1 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode('active')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'active'
+                ? 'bg-purple-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Active Site Bills ({expenses.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('bin');
+              loadDeletedExpenses();
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'bin'
+                ? 'bg-rose-600 text-white shadow-2xs'
+                : 'text-rose-700 hover:bg-rose-50 border border-rose-200'
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Recycle Bin ({deletedExpenses.length})</span>
+          </button>
+        </div>
+
+        {viewMode === 'bin' && (
+          <button
+            type="button"
+            onClick={loadDeletedExpenses}
+            className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+          >
+            <RefreshCw className={`w-3 h-3 ${isLoadingBin ? 'animate-spin' : ''}`} />
+            <span>Refresh Bin</span>
+          </button>
+        )}
+      </div>
+
+      {viewMode === 'active' ? (
+        <>
+          {/* 2. Top Summary KPI Cards (Highlights Today's Expenses) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Card 1: Today's Expenses (Crucial user requirement) */}
         <div className="bg-white rounded-xl border border-purple-200 p-4 shadow-2xs relative overflow-hidden bg-gradient-to-br from-purple-50/50 via-white to-white">
           <div className="flex items-center justify-between">
@@ -775,12 +870,28 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                             <ExternalLink className="w-3.5 h-3.5 text-purple-600" />
                           </button>
 
-                          {/* Delete Expense */}
+                          {/* Edit Expense Details */}
                           <button
                             type="button"
-                            onClick={() => handleDeleteExpense(exp.id, exp.title)}
+                            onClick={() => {
+                              setExpenseToEdit(exp);
+                              setIsAddModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-md hover:bg-purple-50 text-slate-400 hover:text-purple-700 transition-colors cursor-pointer"
+                            title="Edit expense details"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-purple-600" />
+                          </button>
+
+                          {/* Delete Expense (Moves to Recycle Bin via Confirmation Modal) */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpenseToDelete(exp);
+                              setIsDeleteModalOpen(true);
+                            }}
                             className="p-1.5 rounded-md hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                            title="Delete expense entry"
+                            title="Move expense to Recycle Bin"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -809,16 +920,142 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           </table>
         </div>
       </div>
+      </>
+      ) : (
+        /* Recycle Bin View (Soft-deleted expenses) */
+        <div className="space-y-3">
+          <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-700 shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-rose-900 text-sm">Recycle Bin ({deletedExpenses.length} Deleted Expenses)</span>
+                <p className="text-xs text-rose-700">
+                  Expenses deleted here are safely retained with <code className="font-mono bg-rose-100 px-1 py-0.5 rounded text-rose-800">is_deleted = true</code> in Supabase. Your live data is never lost. You can restore them anytime back to active expenses.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={loadDeletedExpenses}
+              className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBin ? 'animate-spin' : ''}`} />
+              <span>Refresh Bin</span>
+            </button>
+          </div>
 
-      {/* Add Expense Modal */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Expense Code & Date</th>
+                    <th className="px-4 py-3">Title & Purpose</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Paid To / Vendor</th>
+                    <th className="px-4 py-3 text-right">Amount (Rs.)</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoadingBin ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-rose-600" />
+                        <p className="font-semibold text-slate-600">Loading deleted expenses from Recycle Bin...</p>
+                      </td>
+                    </tr>
+                  ) : deletedExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        <Trash2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        <p className="font-semibold text-slate-700">Recycle Bin is empty</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">No expenses currently deleted.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    deletedExpenses.map((exp) => (
+                      <tr key={exp.id} className="hover:bg-rose-50/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="font-mono font-bold text-slate-900 block">{exp.expense_code}</span>
+                          <span className="text-[11px] text-slate-400">{exp.expense_date}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-semibold text-slate-900 block">{exp.title}</span>
+                          {exp.paid_by && <span className="text-[10px] text-slate-400">Paid by: {exp.paid_by}</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            {exp.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {exp.vendor_name || 'Direct Site Cash'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900">
+                          {formatINR(exp.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            Deleted (In Bin)
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreExpense(exp)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title="Restore expense back to active statement"
+                          >
+                            <ArchiveRestore className="w-3.5 h-3.5" />
+                            <span>Restore Expense</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Expense Modal */}
       <AddExpenseModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setExpenseToEdit(null);
+        }}
         projectId={projectId}
+        expenseToEdit={expenseToEdit}
         onExpenseAdded={(newExp) => {
           setExpenses(prev => [newExp, ...prev]);
           showToast?.(`Expense "${newExp.title}" recorded successfully!`, 'success');
         }}
+        onExpenseUpdated={(updatedExp) => {
+          setExpenses(prev => prev.map(e => e.id === updatedExp.id ? updatedExp : e));
+          showToast?.(`Expense "${updatedExp.title}" updated successfully!`, 'success');
+        }}
+      />
+
+      {/* Confirm Delete Modal (Requires typing 'DELETE') */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setExpenseToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Move Expense to Recycle Bin"
+        itemName={expenseToDelete ? `${expenseToDelete.expense_code} - ${expenseToDelete.title} (${formatINR(expenseToDelete.amount)})` : ''}
+        warningMessage="This expense will be moved to the Recycle Bin with is_deleted = true in Supabase. Your live data is safely preserved and you can restore it anytime."
+        requireKeyword="DELETE"
+        isLoading={isDeleting}
       />
 
       {/* Expense Bill Voucher Modal (Blob URL Preview & Download) */}

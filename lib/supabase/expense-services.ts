@@ -255,6 +255,114 @@ export async function deleteSiteExpense(id: string): Promise<boolean> {
 }
 
 /**
+ * Update an existing site expense record in Supabase site_expenses table.
+ */
+export async function updateSiteExpense(
+  id: string,
+  payload: Partial<CreateExpensePayload>
+): Promise<{ data: SiteExpense | null; error: string | null }> {
+  try {
+    const updateRecord: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (payload.title !== undefined) updateRecord.title = payload.title.trim();
+    if (payload.category !== undefined) updateRecord.category = payload.category;
+    if (payload.amount !== undefined) updateRecord.amount = Number(payload.amount) || 0;
+    if (payload.expense_date !== undefined) updateRecord.expense_date = payload.expense_date;
+    if (payload.payment_method !== undefined) updateRecord.payment_method = payload.payment_method;
+    if (payload.payment_status !== undefined) updateRecord.payment_status = payload.payment_status;
+    if (payload.vendor_id !== undefined) updateRecord.vendor_id = payload.vendor_id || null;
+    if (payload.vendor_name !== undefined) updateRecord.vendor_name = payload.vendor_name ? payload.vendor_name.trim() : null;
+    if (payload.paid_by !== undefined) updateRecord.paid_by = payload.paid_by ? payload.paid_by.trim() : null;
+    if (payload.bill_number !== undefined) updateRecord.bill_number = payload.bill_number ? payload.bill_number.trim() : null;
+    if (payload.receipt_url !== undefined) updateRecord.receipt_url = payload.receipt_url || null;
+    if (payload.receipt_file_name !== undefined) updateRecord.receipt_file_name = payload.receipt_file_name || null;
+    if (payload.notes !== undefined) updateRecord.notes = payload.notes ? payload.notes.trim() : null;
+    if (payload.project_id !== undefined) updateRecord.project_id = payload.project_id || null;
+
+    const { data, error } = await supabase
+      .from('site_expenses')
+      .update(updateRecord)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[expense-services] Error updating site expense:', error.message);
+      return { data: null, error: error.message };
+    }
+
+    return {
+      data: {
+        ...data,
+        amount: Number(data.amount) || 0,
+        receipt_url: data.receipt_url ? resolveExpenseFileUrl(data.receipt_url) : null,
+        receipt_file_name: data.receipt_file_name || null,
+      } as SiteExpense,
+      error: null,
+    };
+  } catch (err: any) {
+    console.error('[expense-services] Exception in updateSiteExpense:', err);
+    return { data: null, error: err?.message || 'Failed to update expense.' };
+  }
+}
+
+/**
+ * Fetch soft-deleted site expenses (for Recycle Bin).
+ */
+export async function fetchDeletedSiteExpenses(projectId?: string): Promise<SiteExpense[]> {
+  try {
+    let query = supabase
+      .from('site_expenses')
+      .select('*')
+      .eq('is_deleted', true)
+      .order('updated_at', { ascending: false });
+
+    if (projectId && projectId !== 'all') {
+      query = query.eq('project_id', projectId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[expense-services] Error fetching deleted site expenses:', error.message);
+      return [];
+    }
+
+    return (data || []).map((row) => ({
+      ...row,
+      amount: Number(row.amount) || 0,
+      receipt_url: row.receipt_url ? resolveExpenseFileUrl(row.receipt_url) : null,
+      receipt_file_name: row.receipt_file_name || null,
+    })) as SiteExpense[];
+  } catch (err) {
+    console.error('[expense-services] Exception in fetchDeletedSiteExpenses:', err);
+    return [];
+  }
+}
+
+/**
+ * Restore a soft-deleted expense from the Recycle Bin.
+ */
+export async function restoreSiteExpense(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('site_expenses')
+      .update({ is_deleted: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('[expense-services] Error restoring expense:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[expense-services] Exception in restoreSiteExpense:', err);
+    return false;
+  }
+}
+
+/**
  * Computes live summary statistics from expenses list.
  */
 export function calculateExpenseSummary(expenses: SiteExpense[]): ExpenseSummaryStats {

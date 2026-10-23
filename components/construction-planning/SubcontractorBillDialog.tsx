@@ -555,6 +555,8 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
 
   // Initialize or Reset Form
   useEffect(() => {
+    if (!isOpen) return;
+
     if (billToEdit) {
       setBillNumber(billToEdit.billNumber);
       setBillDate(billToEdit.billDate);
@@ -626,7 +628,7 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
         }
       });
     }
-  }, [billToEdit, isOpen, currentProjectId, availableProjects]);
+  }, [billToEdit, isOpen, currentProjectId]);
 
   // Handle vendor creation from drawer
   const handleVendorCreated = (newVendor: ProfileVendor) => {

@@ -23,6 +23,7 @@ import {
 } from '@/lib/supabase/category-services';
 import {
   createSiteExpense,
+  updateSiteExpense,
   CreateExpensePayload,
   uploadExpenseBillToStorage,
 } from '@/lib/supabase/expense-services';
@@ -41,7 +42,9 @@ interface AddExpenseModalProps {
   onClose: () => void;
   projectId?: string;
   availableProjects?: ProjectOption[];
-  onExpenseAdded: (newExpense: SiteExpense) => void;
+  expenseToEdit?: SiteExpense | null;
+  onExpenseAdded?: (newExpense: SiteExpense) => void;
+  onExpenseUpdated?: (updatedExpense: SiteExpense) => void;
 }
 
 const DEFAULT_EXPENSE_CATEGORIES: string[] = [
@@ -62,7 +65,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onClose,
   projectId,
   availableProjects = [],
+  expenseToEdit,
   onExpenseAdded,
+  onExpenseUpdated,
 }) => {
   // Project / Site Selection state
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || '');
@@ -118,20 +123,46 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           setCategories(cats);
         }
       });
-      // Reset form
-      setExpenseDate(new Date().toISOString().split('T')[0]);
-      setTitle('');
-      setAmount('');
-      setSelectedVendorId('');
-      setCustomPayeeName('');
-      setIsCustomPayee(false);
-      setBillNumber('');
-      setNotes('');
+      // Prefill if editing, or reset form if adding new
+      if (expenseToEdit) {
+        setSelectedProjectId(expenseToEdit.project_id || projectId || '');
+        setTitle(expenseToEdit.title || '');
+        setAmount(expenseToEdit.amount ? String(expenseToEdit.amount) : '');
+        setExpenseDate(expenseToEdit.expense_date || new Date().toISOString().split('T')[0]);
+        setSelectedCategory(expenseToEdit.category || DEFAULT_EXPENSE_CATEGORIES[0]);
+        setPaymentMethod(expenseToEdit.payment_method || 'cash');
+        setPaymentStatus(expenseToEdit.payment_status || 'paid');
+        setPaidBy(expenseToEdit.paid_by || 'Site Supervisor');
+        setBillNumber(expenseToEdit.bill_number || '');
+        setNotes(expenseToEdit.notes || '');
+        if (expenseToEdit.vendor_id) {
+          setSelectedVendorId(expenseToEdit.vendor_id);
+          setIsCustomPayee(false);
+          setCustomPayeeName('');
+        } else {
+          setSelectedVendorId('');
+          setIsCustomPayee(true);
+          setCustomPayeeName(expenseToEdit.vendor_name || '');
+        }
+      } else {
+        setExpenseDate(new Date().toISOString().split('T')[0]);
+        setTitle('');
+        setAmount('');
+        setSelectedCategory(DEFAULT_EXPENSE_CATEGORIES[0]);
+        setPaymentMethod('cash');
+        setPaymentStatus('paid');
+        setPaidBy('Site Supervisor');
+        setSelectedVendorId('');
+        setCustomPayeeName('');
+        setIsCustomPayee(false);
+        setBillNumber('');
+        setNotes('');
+      }
       setSelectedFile(null);
       setIsUploading(false);
       setErrorMessage(null);
     }
-  }, [isOpen, projectId, availableProjects]);
+  }, [isOpen, projectId, availableProjects, expenseToEdit]);
 
   // Close on Escape key
   useEffect(() => {
@@ -229,31 +260,63 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     }
 
-    const payload: CreateExpensePayload = {
-      project_id: selectedProjectId || projectId || null,
-      title: title.trim(),
-      category: selectedCategory,
-      amount: numAmount,
-      expense_date: expenseDate,
-      payment_method: paymentMethod,
-      payment_status: paymentStatus,
-      vendor_id: finalVendorId,
-      vendor_name: finalVendorName,
-      paid_by: paidBy.trim() || null,
-      bill_number: billNumber.trim() || null,
-      receipt_url: uploadedReceiptUrl,
-      receipt_file_name: uploadedReceiptFileName,
-      notes: notes.trim() || null,
-    };
+    if (expenseToEdit) {
+      const payload: Partial<CreateExpensePayload> = {
+        project_id: selectedProjectId || projectId || null,
+        title: title.trim(),
+        category: selectedCategory,
+        amount: numAmount,
+        expense_date: expenseDate,
+        payment_method: paymentMethod,
+        payment_status: paymentStatus,
+        vendor_id: finalVendorId,
+        vendor_name: finalVendorName,
+        paid_by: paidBy.trim() || null,
+        bill_number: billNumber.trim() || null,
+        notes: notes.trim() || null,
+      };
 
-    const res = await createSiteExpense(payload);
-    setIsSubmitting(false);
+      if (uploadedReceiptUrl) {
+        payload.receipt_url = uploadedReceiptUrl;
+        payload.receipt_file_name = uploadedReceiptFileName;
+      }
 
-    if (res.error) {
-      setErrorMessage(res.error);
-    } else if (res.data) {
-      onExpenseAdded(res.data);
-      onClose();
+      const res = await updateSiteExpense(expenseToEdit.id, payload);
+      setIsSubmitting(false);
+
+      if (res.error) {
+        setErrorMessage(res.error);
+      } else if (res.data) {
+        onExpenseUpdated?.(res.data);
+        onClose();
+      }
+    } else {
+      const payload: CreateExpensePayload = {
+        project_id: selectedProjectId || projectId || null,
+        title: title.trim(),
+        category: selectedCategory,
+        amount: numAmount,
+        expense_date: expenseDate,
+        payment_method: paymentMethod,
+        payment_status: paymentStatus,
+        vendor_id: finalVendorId,
+        vendor_name: finalVendorName,
+        paid_by: paidBy.trim() || null,
+        bill_number: billNumber.trim() || null,
+        receipt_url: uploadedReceiptUrl,
+        receipt_file_name: uploadedReceiptFileName,
+        notes: notes.trim() || null,
+      };
+
+      const res = await createSiteExpense(payload);
+      setIsSubmitting(false);
+
+      if (res.error) {
+        setErrorMessage(res.error);
+      } else if (res.data) {
+        onExpenseAdded?.(res.data);
+        onClose();
+      }
     }
   };
 
@@ -275,14 +338,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                  Record Site Bill & Expense
+                  {expenseToEdit ? 'Edit Site Bill & Expense' : 'Record Site Bill & Expense'}
                 </h2>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  New Slip
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                  expenseToEdit 
+                    ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}>
+                  {expenseToEdit ? expenseToEdit.expense_code : 'New Slip'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Log daily site payments, lunch, petty cash, or vendor bills
+                {expenseToEdit 
+                  ? 'Update details, vendor, amount, or attached bill for this entry' 
+                  : 'Log daily site payments, lunch, petty cash, or vendor bills'}
               </p>
             </div>
           </div>
@@ -660,12 +729,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             {isSubmitting || isUploading ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Uploading Bill & Saving...</span>
+                <span>{expenseToEdit ? 'Updating Expense...' : 'Uploading Bill & Saving...'}</span>
               </>
             ) : (
               <>
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Save & Record Expense</span>
+                {expenseToEdit ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5 stroke-[2.5]" />}
+                <span>{expenseToEdit ? 'Save Changes' : 'Save & Record Expense'}</span>
               </>
             )}
           </button>
