@@ -13,7 +13,10 @@ import {
   FileText,
   DollarSign,
   Tag,
-  Check
+  Check,
+  Paperclip,
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
 import { ProfileVendor, fetchProfileVendors } from '@/lib/supabase/profile-services';
@@ -99,6 +102,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   // Bill / Receipt Attachment (all images including iOS HEIC/HEIF and PDF)
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
+  const [existingReceiptFileName, setExistingReceiptFileName] = useState<string | null>(null);
+  const [isRemovingReceipt, setIsRemovingReceipt] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,63 +112,71 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   // Load Vendors & Categories on open
   useEffect(() => {
-    if (isOpen) {
-      setSelectedProjectId(projectId || '');
-      if (availableProjects && availableProjects.length > 0) {
-        setProjectsList(availableProjects);
-      } else {
-        fetchAllActiveSites().then((sites) => {
-          if (sites && sites.length > 0) {
-            setProjectsList(sites);
-          }
-        });
+    if (!isOpen) return;
+
+    fetchProfileVendors().then(setVendors);
+    fetchDropdownCategory('expense_category', DEFAULT_EXPENSE_CATEGORIES).then((cats) => {
+      if (cats && cats.length > 0) {
+        setCategories(cats);
       }
-      fetchProfileVendors().then(setVendors);
-      fetchDropdownCategory('expense_category', DEFAULT_EXPENSE_CATEGORIES).then((cats) => {
-        if (cats && cats.length > 0) {
-          setCategories(cats);
+    });
+
+    if (availableProjects && availableProjects.length > 0) {
+      setProjectsList(availableProjects);
+    } else {
+      fetchAllActiveSites().then((sites) => {
+        if (sites && sites.length > 0) {
+          setProjectsList(sites);
         }
       });
-      // Prefill if editing, or reset form if adding new
-      if (expenseToEdit) {
-        setSelectedProjectId(expenseToEdit.project_id || projectId || '');
-        setTitle(expenseToEdit.title || '');
-        setAmount(expenseToEdit.amount ? String(expenseToEdit.amount) : '');
-        setExpenseDate(expenseToEdit.expense_date || new Date().toISOString().split('T')[0]);
-        setSelectedCategory(expenseToEdit.category || DEFAULT_EXPENSE_CATEGORIES[0]);
-        setPaymentMethod(expenseToEdit.payment_method || 'cash');
-        setPaymentStatus(expenseToEdit.payment_status || 'paid');
-        setPaidBy(expenseToEdit.paid_by || 'Site Supervisor');
-        setBillNumber(expenseToEdit.bill_number || '');
-        setNotes(expenseToEdit.notes || '');
-        if (expenseToEdit.vendor_id) {
-          setSelectedVendorId(expenseToEdit.vendor_id);
-          setIsCustomPayee(false);
-          setCustomPayeeName('');
-        } else {
-          setSelectedVendorId('');
-          setIsCustomPayee(true);
-          setCustomPayeeName(expenseToEdit.vendor_name || '');
-        }
-      } else {
-        setExpenseDate(new Date().toISOString().split('T')[0]);
-        setTitle('');
-        setAmount('');
-        setSelectedCategory(DEFAULT_EXPENSE_CATEGORIES[0]);
-        setPaymentMethod('cash');
-        setPaymentStatus('paid');
-        setPaidBy('Site Supervisor');
-        setSelectedVendorId('');
-        setCustomPayeeName('');
-        setIsCustomPayee(false);
-        setBillNumber('');
-        setNotes('');
-      }
-      setSelectedFile(null);
-      setIsUploading(false);
-      setErrorMessage(null);
     }
-  }, [isOpen, projectId, availableProjects, expenseToEdit]);
+
+    // Prefill form if editing, or reset form if adding new
+    if (expenseToEdit) {
+      setSelectedProjectId(expenseToEdit.project_id || projectId || '');
+      setTitle(expenseToEdit.title || '');
+      setAmount(expenseToEdit.amount ? String(expenseToEdit.amount) : '');
+      setExpenseDate(expenseToEdit.expense_date || new Date().toISOString().split('T')[0]);
+      setSelectedCategory(expenseToEdit.category || DEFAULT_EXPENSE_CATEGORIES[0]);
+      setPaymentMethod(expenseToEdit.payment_method || 'cash');
+      setPaymentStatus(expenseToEdit.payment_status || 'paid');
+      setPaidBy(expenseToEdit.paid_by || 'Site Supervisor');
+      setBillNumber(expenseToEdit.bill_number || '');
+      setNotes(expenseToEdit.notes || '');
+      setExistingReceiptUrl(expenseToEdit.receipt_url || null);
+      setExistingReceiptFileName(expenseToEdit.receipt_file_name || null);
+      setIsRemovingReceipt(false);
+      if (expenseToEdit.vendor_id) {
+        setSelectedVendorId(expenseToEdit.vendor_id);
+        setIsCustomPayee(false);
+        setCustomPayeeName('');
+      } else {
+        setSelectedVendorId('');
+        setIsCustomPayee(true);
+        setCustomPayeeName(expenseToEdit.vendor_name || '');
+      }
+    } else {
+      setSelectedProjectId(projectId || '');
+      setExpenseDate(new Date().toISOString().split('T')[0]);
+      setTitle('');
+      setAmount('');
+      setSelectedCategory(DEFAULT_EXPENSE_CATEGORIES[0]);
+      setPaymentMethod('cash');
+      setPaymentStatus('paid');
+      setPaidBy('Site Supervisor');
+      setSelectedVendorId('');
+      setCustomPayeeName('');
+      setIsCustomPayee(false);
+      setBillNumber('');
+      setNotes('');
+      setExistingReceiptUrl(null);
+      setExistingReceiptFileName(null);
+      setIsRemovingReceipt(false);
+    }
+    setSelectedFile(null);
+    setIsUploading(false);
+    setErrorMessage(null);
+  }, [isOpen, expenseToEdit?.id]);
 
   // Close on Escape key
   useEffect(() => {
@@ -279,6 +293,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       if (uploadedReceiptUrl) {
         payload.receipt_url = uploadedReceiptUrl;
         payload.receipt_file_name = uploadedReceiptFileName;
+      } else if (isRemovingReceipt) {
+        payload.receipt_url = null;
+        payload.receipt_file_name = null;
       }
 
       const res = await updateSiteExpense(expenseToEdit.id, payload);
@@ -696,13 +713,83 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* Section 5: Attached Physical Bill / Invoice Copy (Optional) */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2 shadow-2xs">
+          {/* Section 5: Attached Physical Bill / Invoice Copy */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3 shadow-2xs">
+            {/* Show Currently Attached Bill (when editing) */}
+            {existingReceiptUrl && !isRemovingReceipt && (
+              <div className="p-3 rounded-lg border border-purple-200 bg-purple-50/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-purple-900 flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Currently Attached Bill Document</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Saved on Cloud
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-slate-200 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-purple-600 shrink-0" />
+                    <span className="truncate font-medium text-slate-800">
+                      {existingReceiptFileName || 'Attached_Bill_Document'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={existingReceiptUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>View</span>
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsRemovingReceipt(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold border border-rose-200 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3 text-rose-600" />
+                      <span>Remove Bill</span>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  You can keep this bill, remove it, or upload a new file below to replace it.
+                </p>
+              </div>
+            )}
+
+            {/* If user clicked remove receipt, show notice with undo option */}
+            {existingReceiptUrl && isRemovingReceipt && !selectedFile && (
+              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/60 flex items-center justify-between gap-2 text-xs">
+                <span className="text-amber-800 font-medium text-[11px]">
+                  ⚠️ Attached bill will be removed on saving.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsRemovingReceipt(false)}
+                  className="px-2.5 py-1 rounded bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold border border-slate-200 transition-colors cursor-pointer"
+                >
+                  Undo (Keep Bill)
+                </button>
+              </div>
+            )}
+
             <ExpenseBillUploader
               file={selectedFile}
-              onFileChange={setSelectedFile}
+              onFileChange={(f) => {
+                setSelectedFile(f);
+                if (f) {
+                  // User chose a new file to replace or add
+                  setIsRemovingReceipt(false);
+                }
+              }}
               disabled={isSubmitting || isUploading}
-              label="Attach Physical Bill / Cash Memo / Receipt Copy (Optional)"
+              label={existingReceiptUrl && !isRemovingReceipt ? "Replace With New Bill / Receipt (Optional)" : "Attach Physical Bill / Cash Memo / Receipt Copy (Optional)"}
               hint="Supports all image formats (JPG, PNG, iOS HEIC/HEIF) or PDF (up to 25MB)"
             />
           </div>
