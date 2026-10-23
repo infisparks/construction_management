@@ -14,11 +14,65 @@ export function generateWorkOrderNumber(existingCount: number = 0): string {
   return `WO-${currentYear}-${seq}`;
 }
 
+// Asynchronously determine next unique work order number across DB (including soft-deleted)
+export async function getNextWorkOrderNumber(projectId?: string): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const prefix = `WO-${currentYear}-`;
+  try {
+    const { data } = await supabase
+      .from('contractor_work_orders')
+      .select('work_order_number');
+
+    let maxSeq = 0;
+    if (data && data.length > 0) {
+      for (const row of data) {
+        if (row.work_order_number && row.work_order_number.startsWith(prefix)) {
+          const numPart = parseInt(row.work_order_number.slice(prefix.length), 10);
+          if (!isNaN(numPart) && numPart > maxSeq) {
+            maxSeq = numPart;
+          }
+        }
+      }
+    }
+    const nextSeq = String(maxSeq + 1).padStart(3, '0');
+    return `${prefix}${nextSeq}`;
+  } catch (err) {
+    return generateWorkOrderNumber(0);
+  }
+}
+
 // Generate payment voucher number
 export function generatePaymentVoucherNumber(existingCount: number = 0): string {
   const currentYear = new Date().getFullYear();
   const seq = String(existingCount + 1).padStart(4, '0');
   return `PV-${currentYear}-${seq}`;
+}
+
+// Asynchronously determine next unique payment voucher number across DB
+export async function getNextPaymentVoucherNumber(projectId?: string): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const prefix = `PV-${currentYear}-`;
+  try {
+    const { data } = await supabase
+      .from('work_order_payments')
+      .select('payment_voucher_no');
+
+    let maxSeq = 0;
+    if (data && data.length > 0) {
+      for (const row of data) {
+        if (row.payment_voucher_no && row.payment_voucher_no.startsWith(prefix)) {
+          const numPart = parseInt(row.payment_voucher_no.slice(prefix.length), 10);
+          if (!isNaN(numPart) && numPart > maxSeq) {
+            maxSeq = numPart;
+          }
+        }
+      }
+    }
+    const nextSeq = String(maxSeq + 1).padStart(4, '0');
+    return `${prefix}${nextSeq}`;
+  } catch (err) {
+    return generatePaymentVoucherNumber(0);
+  }
 }
 
 // Local storage fallback helpers
@@ -294,15 +348,24 @@ export async function createWorkOrder(
 
   // 1. Try Supabase
   try {
-    const payload = {
+    let payload = {
       id: newId,
       ...mapUiWorkOrderToDb(fullOrder, projectId),
       created_at: now,
     };
 
-    const { error: insertError } = await supabase
+    let { error: insertError } = await supabase
       .from('contractor_work_orders')
       .insert([payload]);
+
+    if (insertError && (insertError.code === '23505' || insertError.message?.includes('duplicate key') || insertError.message?.includes('unique constraint'))) {
+      console.warn('Duplicate work order number collision in Supabase. Generating next available sequence and retrying...');
+      const freshNumber = await getNextWorkOrderNumber(projectId);
+      fullOrder.workOrderNumber = freshNumber;
+      payload.work_order_number = freshNumber;
+      const retry = await supabase.from('contractor_work_orders').insert([payload]);
+      insertError = retry.error;
+    }
 
     if (!insertError) {
       // Also insert initial revision record
@@ -322,7 +385,7 @@ export async function createWorkOrder(
         },
       ]);
     } else {
-      console.warn('Supabase work order insert failed, using local storage:', insertError.message);
+      console.error('Supabase work order insert failed:', insertError.message);
     }
   } catch (err) {
     console.warn('Supabase work order insert exception, fallback to local:', err);

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, Plus, Sparkles, User, Phone, MapPin, Receipt, Calendar, Wrench } from 'lucide-react';
 import { ContractorWorkOrder, WORK_TRADE_CATEGORIES } from '@/lib/contractor-work-orders/types';
-import { generateWorkOrderNumber } from '@/lib/contractor-work-orders/work-order-services';
+import { generateWorkOrderNumber, getNextWorkOrderNumber } from '@/lib/contractor-work-orders/work-order-services';
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { DbProject } from '@/lib/supabase/types';
 
@@ -59,10 +59,13 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync selected project with active site on open
+  // Sync selected project with active site and fetch next safe work order number
   useEffect(() => {
     if (isOpen) {
       setSelectedProjectId(projectId);
+      getNextWorkOrderNumber(projectId).then((nextNo) => {
+        setWorkOrderNumber(nextNo);
+      });
       if (availableProjects && availableProjects.length > 0) {
         setProjectsList(availableProjects);
       } else {
