@@ -13,17 +13,28 @@ import {
   ShieldCheck,
   HelpCircle,
   Info,
-  Sparkles 
+  Sparkles,
+  Building2 
 } from 'lucide-react';
 import { ConstructionTask, TaskType, DependencyType, TaskDependency } from '@/lib/construction-planning/types';
 import { calculateDaysBetween, addDaysToDate } from '@/lib/construction-planning/schedule-utils';
+import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { FIELD_GUIDES, FieldGuideCard } from './TaskFieldGuides';
+
+interface ProjectOption {
+  id: string;
+  name: string;
+  code?: string | null;
+  serial_no?: number;
+}
 
 interface AddEditTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (taskData: Partial<ConstructionTask>, initialDependency?: { predecessorId: string; type: DependencyType; lagDays: number }) => void;
+  onSave: (taskData: Partial<ConstructionTask>, initialDependency?: { predecessorId: string; type: DependencyType; lagDays: number }, targetProjectId?: string) => void;
   editingTask: ConstructionTask | null;
+  currentProjectId?: string;
+  availableProjects?: ProjectOption[];
   defaultParentId?: string | null;
   defaultType?: TaskType;
   allTasks: ConstructionTask[];
@@ -35,11 +46,16 @@ export const AddEditTaskDialog: React.FC<AddEditTaskDialogProps> = ({
   onClose,
   onSave,
   editingTask,
+  currentProjectId,
+  availableProjects = [],
   defaultParentId = null,
   defaultType = 'task',
   allTasks,
   dependencies = [],
 }) => {
+  // Project / Site Selection State
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(currentProjectId || '');
+  const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
   // Interactive Field Guidance state
   const [isInfoGuideEnabled, setIsInfoGuideEnabled] = useState(false);
   const [hoveredGuideId, setHoveredGuideId] = useState<string | null>(null);
@@ -150,7 +166,19 @@ export const AddEditTaskDialog: React.FC<AddEditTaskDialogProps> = ({
       setTotalFloatDays(0);
     }
     setError(null);
-  }, [editingTask, defaultParentId, defaultType, allTasks.length, isOpen, dependencies]);
+
+    // Sync selected project
+    setSelectedProjectId(currentProjectId || '');
+    if (availableProjects && availableProjects.length > 0) {
+      setProjectsList(availableProjects);
+    } else {
+      fetchAllActiveSites().then((sites) => {
+        if (sites && sites.length > 0) {
+          setProjectsList(sites);
+        }
+      });
+    }
+  }, [editingTask, defaultParentId, defaultType, allTasks.length, isOpen, dependencies, currentProjectId, availableProjects]);
 
   // Handle start date change and auto-adjust end date by duration
   const handleStartDateChange = (newStart: string) => {
@@ -230,7 +258,7 @@ export const AddEditTaskDialog: React.FC<AddEditTaskDialogProps> = ({
       };
     }
 
-    onSave(taskPayload, initialDep);
+    onSave(taskPayload, initialDep, selectedProjectId || currentProjectId);
     onClose();
   };
 
@@ -332,6 +360,34 @@ export const AddEditTaskDialog: React.FC<AddEditTaskDialogProps> = ({
               <span>{error}</span>
             </div>
           )}
+
+          {/* Top Card: Construction Site Selection */}
+          <div className="bg-purple-50/70 p-3 rounded-xl border border-purple-100 space-y-1.5 shadow-2xs">
+            <label className="block text-[11px] font-bold text-slate-800 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-purple-900">
+                <Building2 className="w-4 h-4 text-purple-600" />
+                <span>Site / Construction Project</span>
+                <span className="text-red-500">*</span>
+              </span>
+              <span className="text-[10px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                Default: Current Site
+              </span>
+            </label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 shadow-2xs cursor-pointer"
+            >
+              {projectsList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-500">
+              Activity will be created under this construction site.
+            </p>
+          </div>
 
           {/* Section 1: Basic Info */}
           <div className="space-y-3">

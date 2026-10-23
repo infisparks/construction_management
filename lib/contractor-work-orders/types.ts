@@ -27,6 +27,7 @@ export interface WorkOrderRevision {
   addedBy?: string;
   revisionDate: string; // YYYY-MM-DD
   createdAt: string;
+  isDeleted?: boolean;
 }
 
 export interface WorkOrderPayment {
@@ -42,6 +43,7 @@ export interface WorkOrderPayment {
   paidBy?: string; // Supervisor / Cashier
   notes?: string; // e.g. "Part payment for 1st floor plaster completion"
   createdAt: string;
+  isDeleted?: boolean;
 }
 
 export interface ContractorWorkOrder {

@@ -78,6 +78,7 @@ import {
   matchesDateFilter, 
   isDateFilterActive 
 } from '@/components/common/DateFilterControl';
+import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import {
   fetchPlanTasks,
   createPlanTask,
@@ -103,6 +104,7 @@ export default function ConstructionPlanningPage() {
   // Sites & Projects Management State (Supabase public.projects)
   const [isSitesManagerOpen, setIsSitesManagerOpen] = useState(false);
   const [activeDbProject, setActiveDbProject] = useState<DbProject | null>(null);
+  const [allDbProjects, setAllDbProjects] = useState<DbProject[]>([]);
 
   // Sidebar State: Default to collapsed to maximize workspace space, persisted via localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
@@ -162,6 +164,7 @@ export default function ConstructionPlanningPage() {
         }
 
         setActiveDbProject(activeProject);
+        setAllDbProjects(allProjects);
         setProject((prev) => ({
           ...prev,
           name: activeProject.name,
@@ -253,6 +256,12 @@ export default function ConstructionPlanningPage() {
           setTasks(loadedTasks);
           if (loadedTasks.length > 0) {
             setProject((prev) => calculateProjectRollup(loadedTasks, prev));
+          } else {
+            setProject((prev) => ({
+              ...prev,
+              progress: 0,
+              varianceDays: 0,
+            }));
           }
           setDependencies(dbDeps || []);
           setProgressEntries(dbProgress || []);
@@ -550,7 +559,15 @@ export default function ConstructionPlanningPage() {
   const refreshTasksWithRollups = (updatedTasks: ConstructionTask[]) => {
     const rolledUp = recalculateParentRollups(updatedTasks);
     setTasks(rolledUp);
-    setProject((prev) => calculateProjectRollup(rolledUp, prev));
+    if (rolledUp.length > 0) {
+      setProject((prev) => calculateProjectRollup(rolledUp, prev));
+    } else {
+      setProject((prev) => ({
+        ...prev,
+        progress: 0,
+        varianceDays: 0,
+      }));
+    }
   };
 
   // Metrics
@@ -1100,8 +1117,10 @@ export default function ConstructionPlanningPage() {
 
   const handleSaveTask = async (
     taskData: Partial<ConstructionTask>,
-    initialDependency?: { predecessorId: string; type: DependencyType; lagDays: number }
+    initialDependency?: { predecessorId: string; type: DependencyType; lagDays: number },
+    targetProjectId?: string
   ) => {
+    const effectiveProjectId = targetProjectId || activeProjectId;
     if (taskToEdit) {
       const updated = tasks.map((t) => {
         if (t.id === taskToEdit.id) {
@@ -1113,13 +1132,13 @@ export default function ConstructionPlanningPage() {
       showToast(`Updated activity "${taskData.name}".`);
 
       // Persist to Supabase
-      await updatePlanTask(taskToEdit.id, taskData, activeProjectId);
+      await updatePlanTask(taskToEdit.id, taskData, effectiveProjectId);
       await logPlanActivity(
         taskToEdit.id,
         'Task Updated',
         `Details updated for task ${taskData.name || taskToEdit.name}`,
         user?.email?.split('@')[0] || 'Site Engineer',
-        activeProjectId
+        effectiveProjectId
       );
     } else {
       const tempId = `t-user-${Date.now()}`;
@@ -1161,7 +1180,7 @@ export default function ConstructionPlanningPage() {
       showToast(`Added new activity "${newTask.name}" to WBS.`);
 
       // Persist to Supabase
-      const dbTask = await createPlanTask(newTask, activeProjectId);
+      const dbTask = await createPlanTask(newTask, effectiveProjectId);
       const finalTaskId = dbTask ? dbTask.id : tempId;
       if (dbTask) {
         setTasks((prev) => prev.map((t) => (t.id === tempId ? dbTask : t)));
@@ -1193,14 +1212,9 @@ export default function ConstructionPlanningPage() {
     }
   };
 
-  // Task Deletion
+  // Task Deletion with Confirmation Modal
   const handleDeleteTask = (task: ConstructionTask) => {
-    const hasChildren = tasks.some((t) => t.parentTaskId === task.id);
-    if (hasChildren) {
-      setDeleteConfirmTask(task);
-    } else {
-      executeDeleteTask(task.id);
-    }
+    setDeleteConfirmTask(task);
   };
 
   const executeDeleteTask = async (taskId: string) => {
@@ -1227,9 +1241,9 @@ export default function ConstructionPlanningPage() {
       setSelectedTaskForDrawer(null);
     }
 
-    showToast(`Removed activity and subtasks from WBS.`);
+    showToast(`Activity marked as deleted and ignored in schedule.`);
 
-    // Persist delete to Supabase plan_*
+    // Persist soft-delete to Supabase plan_tasks (is_deleted: true)
     const deletePromises = Array.from(idsToDelete).map((id) => deletePlanTask(id));
     await Promise.all(deletePromises);
   };
@@ -1430,46 +1444,30 @@ export default function ConstructionPlanningPage() {
           isSidebarCollapsed ? 'lg:pl-14' : 'lg:pl-[260px]'
         }`}
       >
-        {/* Page Top Header: Rendered ONLY on Construction Planning Schedule pages */}
-        {isPlanningView ? (
-          <PlanningHeader
-            project={project}
-            onAddTask={handleAddTask}
-            onAddWorkPackage={handleAddWorkPackage}
-            onRecordProgress={() => handleOpenDailyProgress()}
-            onViewCriticalPath={() => handleViewChange('critical')}
-            onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
-            onOpenSettings={() => setIsProjectSettingsOpen(true)}
-            onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            onOpenMaterialStore={() => handleOpenMaterialDrawer('materials')}
-            onOpenBilling={() => handleOpenMaterialDrawer('billing')}
-            onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
-            onOpenSitesManager={() => setIsSitesManagerOpen(true)}
-            userEmail={user.email || undefined}
-            userRole={userRole?.role}
-            userPage={userRole?.page}
-            onSignOut={signOut}
-          />
-        ) : (
-          /* Mobile-only compact menu bar on non-planning views (Hidden on desktop) */
-          <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Toggle Navigation Menu"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-              <span className="truncate max-w-[180px]">{project.name}</span>
-            </div>
-            <div className="text-[10px] font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-semibold">
-              {project.code || 'SITE'}
-            </div>
-          </div>
-        )}
+        {/* Global Page Top Header with Interactive Site Switcher */}
+        <PlanningHeader
+          project={project}
+          currentView={currentView}
+          allProjects={allDbProjects}
+          activeProjectId={activeProjectId}
+          onSelectProject={handleSelectDbProject}
+          isPlanningView={isPlanningView}
+          onAddTask={handleAddTask}
+          onAddWorkPackage={handleAddWorkPackage}
+          onRecordProgress={() => handleOpenDailyProgress()}
+          onViewCriticalPath={() => handleViewChange('critical')}
+          onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
+          onOpenSettings={() => setIsProjectSettingsOpen(true)}
+          onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          onOpenMaterialStore={() => handleOpenMaterialDrawer('materials')}
+          onOpenBilling={() => handleOpenMaterialDrawer('billing')}
+          onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
+          onOpenSitesManager={() => setIsSitesManagerOpen(true)}
+          userEmail={user.email || undefined}
+          userRole={userRole?.role}
+          userPage={userRole?.page}
+          onSignOut={signOut}
+        />
 
         {/* Full-width Responsive Dashboard Body */}
         <main className="w-full px-3.5 sm:px-6 lg:px-8 py-5 space-y-4 sm:space-y-5 flex-1">
@@ -1677,6 +1675,7 @@ export default function ConstructionPlanningPage() {
         onAddDependency={handleAddDependency}
         onRemoveDependency={handleRemoveDependency}
         onAddIssue={handleAddIssue}
+        onDeleteTask={handleDeleteTask}
       />
 
       {/* Add / Edit Task Form Modal */}
@@ -1685,6 +1684,8 @@ export default function ConstructionPlanningPage() {
         onClose={() => setIsAddTaskDialogOpen(false)}
         onSave={handleSaveTask}
         editingTask={taskToEdit}
+        currentProjectId={activeProjectId}
+        availableProjects={allDbProjects}
         defaultParentId={addTaskDefaultParent}
         defaultType={addTaskDefaultType}
         allTasks={tasks}
@@ -1779,48 +1780,38 @@ export default function ConstructionPlanningPage() {
         onSave={handleSaveProjectSettings}
       />
 
-      {/* Delete Confirmation Modal for Parent Tasks */}
-      {deleteConfirmTask && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 text-xs space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Delete Work Package with Subtasks?
-                </h3>
-                <p className="text-slate-500 mt-1">
-                  &ldquo;{deleteConfirmTask.name}&rdquo; contains child activities in the WBS hierarchy. Deleting it will permanently remove all nested child activities and dependencies.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmTask(null)}
-                className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => executeDeleteTask(deleteConfirmTask.id)}
-                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-xs"
-              >
-                Confirm Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Professional Soft-Delete Confirmation Modal (Requires typing DELETE) */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteConfirmTask)}
+        onClose={() => setDeleteConfirmTask(null)}
+        onConfirm={async () => {
+          if (deleteConfirmTask) {
+            await executeDeleteTask(deleteConfirmTask.id);
+          }
+        }}
+        title={
+          deleteConfirmTask?.type === 'milestone'
+            ? 'Delete Milestone'
+            : deleteConfirmTask?.type === 'work_package'
+            ? 'Delete Work Package'
+            : 'Delete Activity Task'
+        }
+        itemName={deleteConfirmTask ? `${deleteConfirmTask.code} - ${deleteConfirmTask.name}` : undefined}
+        warningMessage={
+          deleteConfirmTask && tasks.some((t) => t.parentTaskId === deleteConfirmTask.id)
+            ? `"${deleteConfirmTask.name}" contains nested sub-activities in the WBS hierarchy. Soft-deleting it will mark this package and all nested subtasks as deleted.`
+            : `This activity will be soft-deleted. It will be immediately ignored in Gantt charts, schedule metrics, and progress rollups.`
+        }
+        requireKeyword="DELETE"
+      />
 
       {/* Sites & Construction Projects Management Modal */}
       <SitesManagerModal
         isOpen={isSitesManagerOpen}
-        onClose={() => setIsSitesManagerOpen(false)}
+        onClose={() => {
+          setIsSitesManagerOpen(false);
+          fetchAllActiveSites().then(setAllDbProjects);
+        }}
         activeProjectId={activeDbProject?.id}
         onSelectProject={handleSelectDbProject}
         showToast={showToast}

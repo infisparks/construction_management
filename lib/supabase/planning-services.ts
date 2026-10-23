@@ -40,6 +40,7 @@ export function mapDbToConstructionTask(row: any): ConstructionTask {
     notes: row.notes || undefined,
     blockerReason: row.blocker_reason || undefined,
     sortOrder: Number(row.sort_order ?? 0),
+    isDeleted: Boolean(row.is_deleted),
   };
 }
 
@@ -74,6 +75,7 @@ export function mapConstructionTaskToDb(task: Partial<ConstructionTask>, project
   if (task.notes !== undefined) dbObj.notes = task.notes;
   if (task.blockerReason !== undefined) dbObj.blocker_reason = task.blockerReason;
   if (task.sortOrder !== undefined) dbObj.sort_order = task.sortOrder;
+  if (task.isDeleted !== undefined) dbObj.is_deleted = task.isDeleted;
 
   return dbObj;
 }
@@ -88,7 +90,8 @@ export async function seedInitialPlanningData(projectId: string, _force: boolean
     const { count, error } = await supabase
       .from('plan_tasks')
       .select('*', { count: 'exact', head: true })
-      .eq('project_id', projectId);
+      .eq('project_id', projectId)
+      .eq('is_deleted', false);
 
     if (error) {
       console.error('[PlanningServices] Error checking tasks:', error);
@@ -112,6 +115,7 @@ export async function fetchPlanTasks(projectId: string): Promise<ConstructionTas
       .from('plan_tasks')
       .select('*')
       .eq('project_id', projectId)
+      .eq('is_deleted', false)
       .order('sort_order', { ascending: true })
       .order('plan_code', { ascending: true });
 
@@ -124,11 +128,11 @@ export async function fetchPlanTasks(projectId: string): Promise<ConstructionTas
       return [];
     }
 
-    // Deduplicate by ID and plan_code
+    // Deduplicate by ID and plan_code, ensuring soft-deleted tasks are ignored
     const seenIds = new Set<string>();
     const seenCodes = new Set<string>();
     const deduplicated = data.filter((row: any) => {
-      if (!row || !row.id) return false;
+      if (!row || !row.id || row.is_deleted) return false;
       if (seenIds.has(row.id)) return false;
       seenIds.add(row.id);
       if (row.plan_code && seenCodes.has(row.plan_code)) return false;
@@ -193,15 +197,18 @@ export async function updatePlanTask(
   }
 }
 
+/**
+ * Soft Delete a Plan Task (sets is_deleted = true in Supabase)
+ */
 export async function deletePlanTask(id: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('plan_tasks')
-      .delete()
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting plan task:', error);
+      console.error('Error soft-deleting plan task:', error);
       return false;
     }
     return true;

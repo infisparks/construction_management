@@ -754,6 +754,7 @@ export const SubcontractorBillsView: React.FC<SubcontractorBillsViewProps> = ({
         }}
         onSave={handleSaveBillComplete}
         billToEdit={billToEdit}
+        currentProjectId={project.id}
         parties={parties}
         allTasks={tasks}
         isAdmin={isAdmin}

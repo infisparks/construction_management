@@ -1,9 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Building2, Plus, Sparkles, User, Phone, MapPin, Receipt, Calendar, Wrench } from 'lucide-react';
 import { ContractorWorkOrder, WORK_TRADE_CATEGORIES } from '@/lib/contractor-work-orders/types';
 import { generateWorkOrderNumber } from '@/lib/contractor-work-orders/work-order-services';
+import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
+import { DbProject } from '@/lib/supabase/types';
+
+interface ProjectOption {
+  id: string;
+  name: string;
+  code?: string | null;
+  serial_no?: number;
+}
 
 interface CreateWorkOrderModalProps {
   isOpen: boolean;
@@ -11,6 +20,7 @@ interface CreateWorkOrderModalProps {
   projectName: string;
   projectId: string;
   existingCount: number;
+  availableProjects?: ProjectOption[];
   onSave: (order: Omit<ContractorWorkOrder, 'id' | 'createdAt' | 'updatedAt' | 'extraAmount' | 'totalRevisedAmount' | 'totalPaid' | 'balanceRemaining'>) => Promise<void>;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
 }
@@ -21,9 +31,13 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
   projectName,
   projectId,
   existingCount,
+  availableProjects = [],
   onSave,
   showToast,
 }) => {
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId);
+  const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
+
   const [workOrderNumber, setWorkOrderNumber] = useState(() => generateWorkOrderNumber(existingCount));
   const [title, setTitle] = useState('');
   const [tradeCategory, setTradeCategory] = useState<string>('Plastering Work');
@@ -44,6 +58,22 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
   const [notes, setNotes] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync selected project with active site on open
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedProjectId(projectId);
+      if (availableProjects && availableProjects.length > 0) {
+        setProjectsList(availableProjects);
+      } else {
+        fetchAllActiveSites().then((sites) => {
+          if (sites && sites.length > 0) {
+            setProjectsList(sites);
+          }
+        });
+      }
+    }
+  }, [isOpen, projectId, availableProjects]);
 
   if (!isOpen) return null;
 
@@ -66,7 +96,7 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
     try {
       setIsSubmitting(true);
       await onSave({
-        projectId,
+        projectId: selectedProjectId || projectId,
         workOrderNumber,
         title: title.trim(),
         tradeCategory,
@@ -93,6 +123,8 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
     }
   };
 
+  const selectedProjObj = projectsList.find((p) => p.id === selectedProjectId);
+
   return (
     <div 
       className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
@@ -111,7 +143,7 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900">New Contractor Work Order</h2>
               <p className="text-xs text-slate-500">
-                Site: <span className="font-semibold text-purple-700">{projectName}</span> • Agreement & Payout Contract
+                Site: <span className="font-semibold text-purple-700">{selectedProjObj ? selectedProjObj.name : projectName}</span> • Agreement & Payout Contract
               </p>
             </div>
           </div>
@@ -126,6 +158,34 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
 
         {/* Modal Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Top Card: Construction Site Selection */}
+          <div className="bg-purple-50/70 p-3.5 rounded-xl border border-purple-100 space-y-1.5">
+            <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-purple-900">
+                <Building2 className="w-4 h-4 text-purple-600" />
+                <span>Site / Project</span>
+                <span className="text-red-500">*</span>
+              </span>
+              <span className="text-[10px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                Default: Current Site
+              </span>
+            </label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 shadow-2xs cursor-pointer"
+            >
+              {projectsList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-500">
+              Work order will be created under this site. You can switch to another site if needed.
+            </p>
+          </div>
+
           {/* Section 1: Work Order Details */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-3 flex items-center gap-1.5">

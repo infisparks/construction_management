@@ -17,10 +17,16 @@ import {
   Clock, 
   Barcode as BarcodeIcon,
   ChevronRight,
-  Plus
+  Plus,
+  Trash2,
 } from 'lucide-react';
-import { ContractorWorkOrder } from '@/lib/contractor-work-orders/types';
+import { 
+  ContractorWorkOrder, 
+  WorkOrderRevision, 
+  WorkOrderPayment 
+} from '@/lib/contractor-work-orders/types';
 import { formatINR, downloadWorkOrderPdf, viewWorkOrderPdfInNewTab } from '@/lib/contractor-work-orders/work-order-invoice-pdf';
+import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 
 interface WorkOrderDetailDrawerProps {
   isOpen: boolean;
@@ -30,6 +36,9 @@ interface WorkOrderDetailDrawerProps {
   projectCode?: string;
   onOpenAddExtra: (order: ContractorWorkOrder) => void;
   onOpenRecordPayment: (order: ContractorWorkOrder) => void;
+  onDeleteWorkOrder?: (order: ContractorWorkOrder) => Promise<void> | void;
+  onDeleteRevision?: (revision: WorkOrderRevision, order: ContractorWorkOrder) => Promise<void> | void;
+  onDeletePayment?: (payment: WorkOrderPayment, order: ContractorWorkOrder) => Promise<void> | void;
 }
 
 export const WorkOrderDetailDrawer: React.FC<WorkOrderDetailDrawerProps> = ({
@@ -40,8 +49,14 @@ export const WorkOrderDetailDrawer: React.FC<WorkOrderDetailDrawerProps> = ({
   projectCode = 'NC-2026',
   onOpenAddExtra,
   onOpenRecordPayment,
+  onDeleteWorkOrder,
+  onDeleteRevision,
+  onDeletePayment,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'revisions' | 'payments'>('overview');
+  const [revisionToDelete, setRevisionToDelete] = useState<WorkOrderRevision | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<WorkOrderPayment | null>(null);
+  const [isDeleteWorkOrderOpen, setIsDeleteWorkOrderOpen] = useState(false);
 
   if (!isOpen || !workOrder) return null;
 
@@ -90,6 +105,16 @@ export const WorkOrderDetailDrawer: React.FC<WorkOrderDetailDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {onDeleteWorkOrder && (
+              <button
+                type="button"
+                onClick={() => setIsDeleteWorkOrderOpen(true)}
+                title="Delete this Work Order"
+                className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border border-slate-200 hover:border-rose-200"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={handleViewPdf}
@@ -323,9 +348,21 @@ export const WorkOrderDetailDrawer: React.FC<WorkOrderDetailDrawerProps> = ({
                             {rev.revisionType === 'initial_agreement' ? 'Base Agreement' : 'Extra Work (+)'}
                           </span>
                         </div>
-                        <strong className="text-amber-800 font-bold">
-                          {rev.additionalAmount >= 0 ? '+' : ''}{formatINR(rev.additionalAmount)}
-                        </strong>
+                        <div className="flex items-center gap-2">
+                          <strong className="text-amber-800 font-bold">
+                            {rev.additionalAmount >= 0 ? '+' : ''}{formatINR(rev.additionalAmount)}
+                          </strong>
+                          {onDeleteRevision && rev.revisionType !== 'initial_agreement' && (
+                            <button
+                              type="button"
+                              onClick={() => setRevisionToDelete(rev)}
+                              title="Delete this extra work variation"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <p className="text-xs text-slate-800 font-medium">{rev.reason}</p>
@@ -381,9 +418,21 @@ export const WorkOrderDetailDrawer: React.FC<WorkOrderDetailDrawerProps> = ({
                             {pay.paymentMode}
                           </span>
                         </div>
-                        <strong className="text-emerald-700 font-extrabold text-sm">
-                          {formatINR(pay.amountPaid)}
-                        </strong>
+                        <div className="flex items-center gap-2">
+                          <strong className="text-emerald-700 font-extrabold text-sm">
+                            {formatINR(pay.amountPaid)}
+                          </strong>
+                          {onDeletePayment && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentToDelete(pay)}
+                              title="Delete this payment voucher"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="text-xs text-slate-700">
@@ -430,6 +479,59 @@ export const WorkOrderDetailDrawer: React.FC<WorkOrderDetailDrawerProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Soft-Delete Work Order Modal */}
+        {onDeleteWorkOrder && (
+          <ConfirmDeleteModal
+            isOpen={isDeleteWorkOrderOpen}
+            onClose={() => setIsDeleteWorkOrderOpen(false)}
+            onConfirm={async () => {
+              await onDeleteWorkOrder(workOrder);
+              setIsDeleteWorkOrderOpen(false);
+              onClose();
+            }}
+            title="Delete Contractor Work Order"
+            itemName={`${workOrder.workOrderNumber} - ${workOrder.title}`}
+            warningMessage="This work order and its contract agreements will be marked as deleted (is_deleted = true) and ignored in all project totals."
+            requireKeyword="DELETE"
+          />
+        )}
+
+        {/* Soft-Delete Extra Work Variation Modal */}
+        {onDeleteRevision && (
+          <ConfirmDeleteModal
+            isOpen={Boolean(revisionToDelete)}
+            onClose={() => setRevisionToDelete(null)}
+            onConfirm={async () => {
+              if (revisionToDelete) {
+                await onDeleteRevision(revisionToDelete, workOrder);
+                setRevisionToDelete(null);
+              }
+            }}
+            title="Delete Extra Work Variation"
+            itemName={revisionToDelete ? `${revisionToDelete.reason} (+${formatINR(revisionToDelete.additionalAmount)})` : undefined}
+            warningMessage="This extra work amount will be deducted from the revised total contract and balance. It will be marked as deleted."
+            requireKeyword="DELETE"
+          />
+        )}
+
+        {/* Soft-Delete Payment Voucher Modal */}
+        {onDeletePayment && (
+          <ConfirmDeleteModal
+            isOpen={Boolean(paymentToDelete)}
+            onClose={() => setPaymentToDelete(null)}
+            onConfirm={async () => {
+              if (paymentToDelete) {
+                await onDeletePayment(paymentToDelete, workOrder);
+                setPaymentToDelete(null);
+              }
+            }}
+            title="Delete Payment Voucher"
+            itemName={paymentToDelete ? `${paymentToDelete.paymentVoucherNo} - ${formatINR(paymentToDelete.amountPaid)} (${paymentToDelete.paidTo})` : undefined}
+            warningMessage="This payment will be marked as deleted and removed from the total disbursed amount, restoring the balance pending."
+            requireKeyword="DELETE"
+          />
+        )}
       </div>
     </div>
   );

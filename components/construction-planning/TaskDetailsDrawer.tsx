@@ -51,6 +51,7 @@ interface TaskDetailsDrawerProps {
   onAddDependency: (predecessorId: string, successorId: string, type: DependencyType, lagDays: number) => void;
   onRemoveDependency: (dependencyId: string) => void;
   onAddIssue: (taskId: string, title: string, description: string, severity: TaskIssue['severity']) => void;
+  onDeleteTask?: (task: ConstructionTask) => void;
 }
 
 export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
@@ -70,6 +71,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
   onAddDependency,
   onRemoveDependency,
   onAddIssue,
+  onDeleteTask,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'dependencies' | 'progress' | 'materials' | 'issues' | 'history'>('overview');
   
@@ -159,9 +161,19 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onDeleteTask && (
+              <button
+                type="button"
+                onClick={() => onDeleteTask(task)}
+                title="Delete this activity"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors border border-transparent hover:border-rose-200 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

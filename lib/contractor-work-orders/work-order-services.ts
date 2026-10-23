@@ -30,7 +30,30 @@ function readLocalOrders(projectId: string): ContractorWorkOrder[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(getLocalKey(projectId));
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: ContractorWorkOrder[] = JSON.parse(raw);
+    return parsed
+      .filter((o) => !o.isDeleted)
+      .map((o) => {
+        const activeRevisions = (o.revisions || []).filter((r) => !r.isDeleted);
+        const activePayments = (o.payments || []).filter((p) => !p.isDeleted);
+        const extraAmount = activeRevisions
+          .filter((r) => r.revisionType !== 'initial_agreement')
+          .reduce((sum, r) => sum + (Number(r.additionalAmount) || 0), 0);
+        const totalRevisedAmount = (Number(o.initialAmount) || 0) + extraAmount;
+        const totalPaid = activePayments.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+        const balanceRemaining = totalRevisedAmount - totalPaid;
+
+        return {
+          ...o,
+          extraAmount,
+          totalRevisedAmount,
+          totalPaid,
+          balanceRemaining,
+          revisions: activeRevisions,
+          payments: activePayments,
+        };
+      });
   } catch (err) {
     console.warn('Failed to read local work orders:', err);
     return [];
@@ -144,16 +167,19 @@ export async function fetchProjectWorkOrders(projectId: string): Promise<Contrac
           .from('work_order_revisions')
           .select('*')
           .in('work_order_id', orderIds)
+          .eq('is_deleted', false)
           .order('revision_date', { ascending: true }),
         supabase
           .from('work_order_payments')
           .select('*')
           .in('work_order_id', orderIds)
+          .eq('is_deleted', false)
           .order('payment_date', { ascending: true }),
       ]);
 
       if (revisionsData) {
         for (const rev of revisionsData) {
+          if (rev.is_deleted) continue;
           if (!revisionsMap[rev.work_order_id]) revisionsMap[rev.work_order_id] = [];
           revisionsMap[rev.work_order_id].push({
             id: rev.id,
@@ -174,6 +200,7 @@ export async function fetchProjectWorkOrders(projectId: string): Promise<Contrac
 
       if (paymentsData) {
         for (const pay of paymentsData) {
+          if (pay.is_deleted) continue;
           if (!paymentsMap[pay.work_order_id]) paymentsMap[pay.work_order_id] = [];
           paymentsMap[pay.work_order_id].push({
             id: pay.id,
@@ -193,13 +220,26 @@ export async function fetchProjectWorkOrders(projectId: string): Promise<Contrac
       }
     }
 
-    const merged = orders.map((dbOrder) =>
-      mapDbWorkOrderToUi(
-        dbOrder,
-        revisionsMap[dbOrder.id] || [],
-        paymentsMap[dbOrder.id] || []
-      )
-    );
+    const merged = orders.map((dbOrder) => {
+      const activeRevs = revisionsMap[dbOrder.id] || [];
+      const activePays = paymentsMap[dbOrder.id] || [];
+      const initialAmt = Number(dbOrder.initial_amount) || 0;
+      const extraAmt = activeRevs
+        .filter((r) => r.revisionType !== 'initial_agreement')
+        .reduce((sum, r) => sum + (Number(r.additionalAmount) || 0), 0);
+      const totalRevisedAmt = initialAmt + extraAmt;
+      const totalPaidAmt = activePays.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+      const balRemaining = totalRevisedAmt - totalPaidAmt;
+
+      const orderUi = mapDbWorkOrderToUi(dbOrder, activeRevs, activePays);
+      return {
+        ...orderUi,
+        extraAmount: extraAmt,
+        totalRevisedAmount: totalRevisedAmt,
+        totalPaid: totalPaidAmt,
+        balanceRemaining: balRemaining,
+      };
+    });
 
     // Save to local storage for fast cached startup
     saveLocalOrders(projectId, merged);
@@ -545,3 +585,135 @@ export async function deleteWorkOrder(workOrderId: string, projectId: string): P
   saveLocalOrders(projectId, updated);
   return true;
 }
+
+/**
+ * Soft Delete an Extra Work Revision / Amendment
+ * Sets is_deleted = true in database, recalculates parent extra_amount, total_revised_amount, balance_remaining
+ */
+export async function deleteWorkOrderRevision(
+  revisionId: string,
+  workOrderId: string,
+  projectId: string
+): Promise<{ order: ContractorWorkOrder; deletedRevisionId: string }> {
+  // 1. Soft delete in DB
+  try {
+    await supabase
+      .from('work_order_revisions')
+      .update({ is_deleted: true })
+      .eq('id', revisionId);
+  } catch (err) {
+    console.warn('Supabase revision delete warning:', err);
+  }
+
+  // 2. Filter out deleted revision locally and recalculate
+  const currentOrders = readLocalOrders(projectId);
+  const orderIndex = currentOrders.findIndex((o) => o.id === workOrderId);
+  const existingOrder = currentOrders[orderIndex];
+
+  let updatedOrder: ContractorWorkOrder;
+  if (existingOrder) {
+    const remainingRevisions = (existingOrder.revisions || []).filter(
+      (r) => r.id !== revisionId && !r.isDeleted
+    );
+    const newExtra = remainingRevisions
+      .filter((r) => r.revisionType !== 'initial_agreement')
+      .reduce((sum, r) => sum + (Number(r.additionalAmount) || 0), 0);
+    const newRevised = (Number(existingOrder.initialAmount) || 0) + newExtra;
+    const newRemaining = newRevised - (Number(existingOrder.totalPaid) || 0);
+
+    updatedOrder = {
+      ...existingOrder,
+      extraAmount: newExtra,
+      totalRevisedAmount: newRevised,
+      balanceRemaining: newRemaining,
+      revisions: remainingRevisions,
+      updatedAt: new Date().toISOString(),
+    };
+
+    currentOrders[orderIndex] = updatedOrder;
+    saveLocalOrders(projectId, currentOrders);
+
+    // Update parent order totals in DB
+    try {
+      await supabase
+        .from('contractor_work_orders')
+        .update({
+          extra_amount: newExtra,
+          total_revised_amount: newRevised,
+          balance_remaining: newRemaining,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', workOrderId);
+    } catch (err) {
+      console.warn('Failed to update parent work order totals after revision deletion:', err);
+    }
+  } else {
+    throw new Error('Work order not found');
+  }
+
+  return { order: updatedOrder, deletedRevisionId: revisionId };
+}
+
+/**
+ * Soft Delete a Payment Voucher / Disbursal
+ * Sets is_deleted = true in database, recalculates parent total_paid and balance_remaining
+ */
+export async function deleteWorkOrderPayment(
+  paymentId: string,
+  workOrderId: string,
+  projectId: string
+): Promise<{ order: ContractorWorkOrder; deletedPaymentId: string }> {
+  // 1. Soft delete in DB
+  try {
+    await supabase
+      .from('work_order_payments')
+      .update({ is_deleted: true })
+      .eq('id', paymentId);
+  } catch (err) {
+    console.warn('Supabase payment delete warning:', err);
+  }
+
+  // 2. Filter out deleted payment locally and recalculate
+  const currentOrders = readLocalOrders(projectId);
+  const orderIndex = currentOrders.findIndex((o) => o.id === workOrderId);
+  const existingOrder = currentOrders[orderIndex];
+
+  let updatedOrder: ContractorWorkOrder;
+  if (existingOrder) {
+    const remainingPayments = (existingOrder.payments || []).filter(
+      (p) => p.id !== paymentId && !p.isDeleted
+    );
+    const newPaid = remainingPayments.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+    const newRemaining = (Number(existingOrder.totalRevisedAmount) || 0) - newPaid;
+
+    updatedOrder = {
+      ...existingOrder,
+      totalPaid: newPaid,
+      balanceRemaining: newRemaining,
+      payments: remainingPayments,
+      updatedAt: new Date().toISOString(),
+    };
+
+    currentOrders[orderIndex] = updatedOrder;
+    saveLocalOrders(projectId, currentOrders);
+
+    // Update parent order totals in DB
+    try {
+      await supabase
+        .from('contractor_work_orders')
+        .update({
+          total_paid: newPaid,
+          balance_remaining: newRemaining,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', workOrderId);
+    } catch (err) {
+      console.warn('Failed to update parent work order totals after payment deletion:', err);
+    }
+  } else {
+    throw new Error('Work order not found');
+  }
+
+  return { order: updatedOrder, deletedPaymentId: paymentId };
+}
+

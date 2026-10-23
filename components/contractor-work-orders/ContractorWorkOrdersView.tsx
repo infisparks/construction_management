@@ -24,17 +24,27 @@ import {
   ChevronRight,
   ArrowUpRight,
   SlidersHorizontal,
-  X
+  X,
+  Trash2,
 } from 'lucide-react';
-import { ContractorWorkOrder, WorkDateFilterPreset, WORK_TRADE_CATEGORIES } from '@/lib/contractor-work-orders/types';
+import { 
+  ContractorWorkOrder, 
+  WorkDateFilterPreset, 
+  WORK_TRADE_CATEGORIES,
+  WorkOrderRevision,
+  WorkOrderPayment 
+} from '@/lib/contractor-work-orders/types';
 import {
   fetchProjectWorkOrders,
   createWorkOrder,
   addExtraWorkRevision,
   recordWorkOrderPayment,
   deleteWorkOrder,
+  deleteWorkOrderRevision,
+  deleteWorkOrderPayment,
 } from '@/lib/contractor-work-orders/work-order-services';
 import { formatINR, downloadWorkOrderPdf, viewWorkOrderPdfInNewTab } from '@/lib/contractor-work-orders/work-order-invoice-pdf';
+import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 import { AddExtraWorkModal } from './AddExtraWorkModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
@@ -84,6 +94,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
   const [selectedOrderForExtra, setSelectedOrderForExtra] = useState<ContractorWorkOrder | null>(null);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<ContractorWorkOrder | null>(null);
   const [drawerOrder, setDrawerOrder] = useState<ContractorWorkOrder | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<ContractorWorkOrder | null>(null);
 
   // Load project context if not passed
   useEffect(() => {
@@ -102,6 +113,16 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
     }
     loadSites();
   }, [initialProject]);
+
+  // Sync active project when parent changes active site (e.g. from top header)
+  useEffect(() => {
+    if (initialProject) {
+      setActiveProject(initialProject);
+    } else if (initialProjectId && availableProjects.length > 0) {
+      const match = availableProjects.find((p) => p.id === initialProjectId);
+      if (match) setActiveProject(match);
+    }
+  }, [initialProject, initialProjectId, availableProjects]);
 
   // Load Work Orders from Supabase / Local storage
   const loadOrders = async () => {
@@ -279,6 +300,39 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
     setWorkOrders((prev) => prev.map((o) => (o.id === workOrderId ? updated : o)));
     if (drawerOrder?.id === workOrderId) {
       setDrawerOrder(updated);
+    }
+  };
+
+  const handleDeleteWorkOrder = async (order: ContractorWorkOrder) => {
+    await deleteWorkOrder(order.id, effectiveProjectId);
+    setWorkOrders((prev) => prev.filter((o) => o.id !== order.id));
+    if (drawerOrder?.id === order.id) {
+      setDrawerOrder(null);
+    }
+    if (showToast) {
+      showToast(`Work Order ${order.workOrderNumber} marked as deleted.`, 'info');
+    }
+  };
+
+  const handleDeleteRevision = async (revision: WorkOrderRevision, order: ContractorWorkOrder) => {
+    const { order: updated } = await deleteWorkOrderRevision(revision.id, order.id, effectiveProjectId);
+    setWorkOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+    if (drawerOrder?.id === order.id) {
+      setDrawerOrder(updated);
+    }
+    if (showToast) {
+      showToast(`Extra work variation removed and totals updated.`, 'info');
+    }
+  };
+
+  const handleDeletePayment = async (payment: WorkOrderPayment, order: ContractorWorkOrder) => {
+    const { order: updated } = await deleteWorkOrderPayment(payment.id, order.id, effectiveProjectId);
+    setWorkOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+    if (drawerOrder?.id === order.id) {
+      setDrawerOrder(updated);
+    }
+    if (showToast) {
+      showToast(`Payment voucher removed and pending balance restored.`, 'info');
     }
   };
 
@@ -714,6 +768,16 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                             <Download className="w-3.5 h-3.5" />
                           </button>
 
+                          {/* Soft-Delete Work Order Button */}
+                          <button
+                            type="button"
+                            onClick={() => setOrderToDelete(order)}
+                            title="Delete this Work Order"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-200"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Detail Drawer */}
                           <button
                             type="button"
@@ -741,6 +805,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
           onClose={() => setIsCreateOpen(false)}
           projectName={effectiveProjectName}
           projectId={effectiveProjectId}
+          availableProjects={availableProjects}
           existingCount={workOrders.length}
           onSave={handleCreateSave}
           showToast={showToast}
@@ -761,6 +826,9 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
           onOpenRecordPayment={(o: ContractorWorkOrder) => {
             setSelectedOrderForPayment(o);
           }}
+          onDeleteWorkOrder={handleDeleteWorkOrder}
+          onDeleteRevision={handleDeleteRevision}
+          onDeletePayment={handleDeletePayment}
         />
       )}
 
@@ -783,6 +851,24 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
           workOrder={selectedOrderForPayment}
           onSavePayment={handleRecordPaymentSave}
           showToast={showToast}
+        />
+      )}
+
+      {/* Soft-Delete Work Order Modal from Table */}
+      {orderToDelete && (
+        <ConfirmDeleteModal
+          isOpen={Boolean(orderToDelete)}
+          onClose={() => setOrderToDelete(null)}
+          onConfirm={async () => {
+            if (orderToDelete) {
+              await handleDeleteWorkOrder(orderToDelete);
+              setOrderToDelete(null);
+            }
+          }}
+          title="Delete Contractor Work Order"
+          itemName={`${orderToDelete.workOrderNumber} - ${orderToDelete.title}`}
+          warningMessage="This work order and its contract agreements will be marked as deleted (is_deleted = true) and ignored in all project totals."
+          requireKeyword="DELETE"
         />
       )}
     </div>

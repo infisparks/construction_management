@@ -38,14 +38,24 @@ import { SubcontractorDeductionModal } from './SubcontractorDeductionModal';
 import { VendorProfileDrawer } from './VendorProfileDrawer';
 import { fetchProfileVendors, fetchProfileProducts, ProfileVendor, ProfileProduct } from '@/lib/supabase/profile-services';
 import { fetchBillItemCatalog, saveBillItemToCatalog, BillItemTemplate } from '@/lib/supabase/category-services';
+import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { useAuth } from '@/lib/supabase/auth-context';
 import { isAdminUser } from '@/lib/auth/role-access';
+
+interface ProjectOption {
+  id: string;
+  name: string;
+  code?: string | null;
+  serial_no?: number;
+}
 
 interface SubcontractorBillDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (bill: SubcontractorBill) => void;
   billToEdit?: SubcontractorBill | null;
+  currentProjectId?: string;
+  availableProjects?: ProjectOption[];
   parties?: Party[];
   allTasks?: ConstructionTask[];
   isAdmin?: boolean;
@@ -404,12 +414,18 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
   onClose,
   onSave,
   billToEdit,
+  currentProjectId,
+  availableProjects = [],
   parties = [],
   allTasks = [],
   isAdmin: propIsAdmin,
 }) => {
   const auth = useAuth();
   const isUserAdmin = propIsAdmin !== undefined ? propIsAdmin : isAdminUser(auth.userRole?.role, auth.user?.email);
+
+  // Project / Site Selection State
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(billToEdit?.projectId || currentProjectId || '');
+  const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
 
   // Remote Database Data States
   const [dbVendors, setDbVendors] = useState<ProfileVendor[]>([]);
@@ -598,7 +614,19 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
       setNotes('');
       setAttachments([]);
     }
-  }, [billToEdit, isOpen]);
+
+    // Sync selected project
+    setSelectedProjectId(billToEdit?.projectId || currentProjectId || '');
+    if (availableProjects && availableProjects.length > 0) {
+      setProjectsList(availableProjects);
+    } else {
+      fetchAllActiveSites().then((sites) => {
+        if (sites && sites.length > 0) {
+          setProjectsList(sites);
+        }
+      });
+    }
+  }, [billToEdit, isOpen, currentProjectId, availableProjects]);
 
   // Handle vendor creation from drawer
   const handleVendorCreated = (newVendor: ProfileVendor) => {
@@ -735,6 +763,7 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
 
     const savedBill: SubcontractorBill = {
       id: billToEdit?.id || `sb-${Date.now()}`,
+      projectId: selectedProjectId || billToEdit?.projectId || currentProjectId || undefined,
       billNumber: billNumber.trim() || `SB-${Date.now()}`,
       billDate: billDate || new Date().toISOString().split('T')[0],
       dueDate: dueDate || undefined,
@@ -825,6 +854,34 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
           {/* Scrollable Form Body */}
           <form onSubmit={handleSaveBill} id="subcontractor-bill-form" className="flex-1 overflow-y-auto p-3 sm:p-4 pb-24 space-y-3.5">
             
+            {/* Top Card: Construction Site Selection */}
+            <div className="bg-purple-50/70 rounded-xl p-3.5 border border-purple-100 shadow-2xs space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-purple-900">
+                  <Building2 className="w-4 h-4 text-purple-600" />
+                  <span>Site / Construction Project</span>
+                  <span className="text-red-500">*</span>
+                </span>
+                <span className="text-[10px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                  Default: Current Site
+                </span>
+              </label>
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 shadow-2xs cursor-pointer"
+              >
+                {projectsList.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-500">
+                This RA bill will be logged under this construction site. You can switch to another site if needed.
+              </p>
+            </div>
+
             {/* Card 1: Sub-Contractor Bill Details & Date */}
             <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between">

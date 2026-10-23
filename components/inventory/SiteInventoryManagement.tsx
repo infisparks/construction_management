@@ -35,7 +35,9 @@ import {
   PlusCircle,
   Phone,
   Tag,
-  Paperclip
+  Paperclip,
+  Trash2,
+  ArchiveRestore
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -80,6 +82,10 @@ import {
   fetchProfileVendors,
   createProfileProduct,
   createProfileVendor,
+  deleteProfileProduct,
+  restoreProfileProduct,
+  fetchDeletedProfileProducts,
+  ProfileProduct,
 } from '@/lib/supabase/profile-services';
 import { 
   DateFilterControl, 
@@ -92,7 +98,7 @@ import {
 interface SiteInventoryManagementProps {
   allTasks?: ConstructionTask[];
   project?: ProjectInfo;
-  initialTab?: 'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock';
+  initialTab?: 'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin';
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
   externalActionTrigger?: { action: InventoryTransactionType; timestamp: number } | null;
 }
@@ -248,9 +254,49 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     }
   };
 
+  // Recycle Bin State
+  const [deletedProducts, setDeletedProducts] = useState<ProfileProduct[]>([]);
+  const [isLoadingBin, setIsLoadingBin] = useState(false);
+
+  const loadDeletedProducts = async () => {
+    setIsLoadingBin(true);
+    try {
+      const data = await fetchDeletedProfileProducts();
+      setDeletedProducts(data || []);
+    } catch (err) {
+      console.error('Error fetching deleted products:', err);
+    } finally {
+      setIsLoadingBin(false);
+    }
+  };
+
   useEffect(() => {
     loadDataFromSupabase();
+    loadDeletedProducts();
   }, []);
+
+  const handleDeleteMaterial = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"? It will be moved to the Recycle Bin and can be restored anytime.`)) {
+      return;
+    }
+    const { error } = await deleteProfileProduct(id);
+    if (!error) {
+      showToast?.(`Product "${name}" moved to Recycle Bin.`, 'info');
+      await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
+    } else {
+      showToast?.('Failed to delete product', 'error');
+    }
+  };
+
+  const handleRestoreMaterial = async (id: string, name: string) => {
+    const { error } = await restoreProfileProduct(id);
+    if (!error) {
+      showToast?.(`Product "${name}" restored to Active Inventory!`, 'success');
+      await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
+    } else {
+      showToast?.('Failed to restore product', 'error');
+    }
+  };
 
   // Profile Drawers State
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
@@ -262,7 +308,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   const [isStockPdfModalOpen, setIsStockPdfModalOpen] = useState(false);
 
   // Active View Tab
-  const [activeTab, setActiveTab] = useState<'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin'>(initialTab);
 
   // Sync initialTab when changed externally
   useEffect(() => {
@@ -766,9 +812,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live Sync
               </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                <Building2 className="w-3 h-3 text-purple-600" />
+                Common for All Sites
+              </span>
             </div>
             <p className="text-xs text-slate-500">
-              Real-time stock balance, inward receipts, dispatches & alert monitoring
+              Centralized inventory & stock ledger shared across all construction sites
             </p>
           </div>
         </div>
@@ -1101,10 +1151,28 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <AlertTriangle className={`w-3.5 h-3.5 ${metrics.lowStockCount > 0 ? 'text-amber-500' : ''}`} />
           <span>Low Stock ({metrics.lowStockCount})</span>
         </button>
+
+        <div className="h-4 w-[1px] bg-slate-200 mx-1 shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('bin');
+            loadDeletedProducts();
+          }}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+            activeTab === 'bin'
+              ? 'bg-rose-600 text-white shadow-2xs'
+              : 'text-rose-700 hover:bg-rose-50 border border-rose-200'
+          }`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Recycle Bin ({deletedProducts.length})</span>
+        </button>
       </div>
 
       {/* 4. Filter & Search Toolbar (Compact Single Bar) */}
-      {!['products', 'vendors'].includes(activeTab) && (
+      {!['products', 'vendors', 'bin'].includes(activeTab) && (
       <div className="bg-white rounded-xl border border-slate-200/80 p-2 sm:p-2.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
         {/* Search */}
         <div className="relative flex-1">
@@ -1417,6 +1485,17 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             >
                               <History className="w-2.5 h-2.5" />
                               <span>History</span>
+                            </button>
+
+                            {/* Delete Material (Soft Delete to Recycle Bin) */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMaterial(m.id, m.name)}
+                              className="px-1.5 py-1 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer ml-0.5"
+                              title="Move product to Recycle Bin"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" />
+                              <span>DEL</span>
                             </button>
                           </div>
                         </td>
@@ -2095,6 +2174,109 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       {/* TAB 7: VENDORS & PARTIES DIRECTORY (profile_vendor) */}
       {activeTab === 'vendors' && (
         <VendorProfileView showToast={showToast} />
+      )}
+
+      {/* TAB 8: RECYCLE BIN (is_deleted = true in profile_product) */}
+      {activeTab === 'bin' && (
+        <div className="space-y-3">
+          <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-700 shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-rose-900 text-sm">Recycle Bin ({deletedProducts.length} Deleted Items)</span>
+                <p className="text-xs text-rose-700">
+                  Products deleted from the store are safely retained with <code className="font-mono bg-rose-100 px-1 py-0.5 rounded text-rose-800">is_deleted = true</code> in Supabase. You can restore them anytime back to the active catalog.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={loadDeletedProducts}
+              className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBin ? 'animate-spin' : ''}`} />
+              <span>Refresh Bin</span>
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Product Code & Name</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Unit</th>
+                    <th className="px-4 py-3">Storage Location</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoadingBin ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-rose-600" />
+                        <p className="font-semibold text-slate-600">Loading deleted products...</p>
+                      </td>
+                    </tr>
+                  ) : deletedProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <Trash2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        <p className="font-semibold text-slate-700">Recycle Bin is empty</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">No products currently deleted.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    deletedProducts.map((p) => (
+                      <tr key={p.id} className="hover:bg-rose-50/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-slate-900">{p.name}</div>
+                          <div className="text-[11px] font-mono text-purple-700 mt-0.5 flex items-center gap-1.5">
+                            <span>{p.code}</span>
+                            {p.brand && <span className="text-slate-400 font-sans">• {p.brand}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
+                            {p.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[11px] font-semibold border border-purple-100">
+                            {p.unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {p.storage_location || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            Deleted (In Bin)
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreMaterial(p.id, p.name)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title="Restore product back to active catalog"
+                          >
+                            <ArchiveRestore className="w-3.5 h-3.5" />
+                            <span>Restore Product</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Unified Material Action Sidebar Drawer */}

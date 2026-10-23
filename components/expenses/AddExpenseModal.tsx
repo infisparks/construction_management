@@ -26,12 +26,21 @@ import {
   CreateExpensePayload,
   uploadExpenseBillToStorage,
 } from '@/lib/supabase/expense-services';
+import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillUploader } from './ExpenseBillUploader';
+
+interface ProjectOption {
+  id: string;
+  name: string;
+  code?: string | null;
+  serial_no?: number;
+}
 
 interface AddExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId?: string;
+  availableProjects?: ProjectOption[];
   onExpenseAdded: (newExpense: SiteExpense) => void;
 }
 
@@ -52,8 +61,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   isOpen,
   onClose,
   projectId,
+  availableProjects = [],
   onExpenseAdded,
 }) => {
+  // Project / Site Selection state
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || '');
+  const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
+
   // Vendors from Supabase profile_vendor
   const [vendors, setVendors] = useState<ProfileVendor[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
@@ -88,6 +102,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   // Load Vendors & Categories on open
   useEffect(() => {
     if (isOpen) {
+      setSelectedProjectId(projectId || '');
+      if (availableProjects && availableProjects.length > 0) {
+        setProjectsList(availableProjects);
+      } else {
+        fetchAllActiveSites().then((sites) => {
+          if (sites && sites.length > 0) {
+            setProjectsList(sites);
+          }
+        });
+      }
       fetchProfileVendors().then(setVendors);
       fetchDropdownCategory('expense_category', DEFAULT_EXPENSE_CATEGORIES).then((cats) => {
         if (cats && cats.length > 0) {
@@ -107,7 +131,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setIsUploading(false);
       setErrorMessage(null);
     }
-  }, [isOpen]);
+  }, [isOpen, projectId, availableProjects]);
 
   // Close on Escape key
   useEffect(() => {
@@ -206,7 +230,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
 
     const payload: CreateExpensePayload = {
-      project_id: projectId || null,
+      project_id: selectedProjectId || projectId || null,
       title: title.trim(),
       category: selectedCategory,
       amount: numAmount,
@@ -280,6 +304,34 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <span>{errorMessage}</span>
             </div>
           )}
+
+          {/* Top Card: Construction Site Selection */}
+          <div className="p-3.5 rounded-xl border border-purple-100 bg-purple-50/70 space-y-1.5 shadow-2xs">
+            <label className="block text-[11px] font-bold text-slate-800 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-purple-900">
+                <Building2 className="w-4 h-4 text-purple-600" />
+                <span>Site / Construction Project</span>
+                <span className="text-rose-500">*</span>
+              </span>
+              <span className="text-[10px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                Default: Current Site
+              </span>
+            </label>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 shadow-2xs cursor-pointer"
+            >
+              {projectsList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-500">
+              This bill / expense will be attributed to the selected site. You can switch to another site if needed.
+            </p>
+          </div>
 
           {/* Section 1: Basic Expense Information */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3.5 shadow-2xs">

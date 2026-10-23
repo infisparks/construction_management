@@ -57,6 +57,7 @@ export interface ConstructionTask {
   notes?: string;
   blockerReason?: string;
   sortOrder: number;
+  isDeleted?: boolean;
 }
 
 export interface DailyProgressEntry {

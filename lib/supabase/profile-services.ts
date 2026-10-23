@@ -133,6 +133,40 @@ export async function deleteProfileProduct(id: string): Promise<{ error: any }> 
   }
 }
 
+export async function fetchDeletedProfileProducts(): Promise<ProfileProduct[]> {
+  try {
+    const { data, error } = await supabase
+      .from('profile_product')
+      .select('*')
+      .eq('is_deleted', true)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching deleted profile_product from Supabase:', error);
+      return [];
+    }
+    return (data || []) as ProfileProduct[];
+  } catch (err) {
+    console.error('Failed to fetch deleted profile_product:', err);
+    return [];
+  }
+}
+
+export async function restoreProfileProduct(id: string): Promise<{ error: any }> {
+  try {
+    // Restore soft-deleted product
+    const { error } = await supabase
+      .from('profile_product')
+      .update({ is_deleted: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    return { error };
+  } catch (err) {
+    console.error('Failed to restore profile_product:', err);
+    return { error: err };
+  }
+}
+
 // ==========================================
 // Vendor Profiles Service (profile_vendor)
 // ==========================================
