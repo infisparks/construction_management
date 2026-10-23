@@ -2286,6 +2286,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         materials={materials}
         suppliers={suppliers}
         subcontractors={subcontractors}
+        vendorProfiles={vendorProfiles}
         tasks={allTasks}
         transactions={transactions}
         selectedMaterialId={selectedMaterialForAction}

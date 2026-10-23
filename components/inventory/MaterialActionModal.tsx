@@ -25,7 +25,8 @@ import {
   InventoryTransaction,
   InventoryTransactionType,
   InventorySupplier,
-  InventorySubcontractor
+  InventorySubcontractor,
+  VendorProfile
 } from '@/lib/inventory/inventory-types';
 import { ConstructionTask } from '@/lib/construction-planning/types';
 import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
@@ -37,6 +38,7 @@ interface MaterialActionModalProps {
   materials: ConstructionMaterial[];
   suppliers: InventorySupplier[];
   subcontractors: InventorySubcontractor[];
+  vendorProfiles?: VendorProfile[];
   tasks?: ConstructionTask[];
   transactions?: InventoryTransaction[];
   selectedMaterialId?: string | null;
@@ -72,6 +74,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
   materials,
   suppliers,
   subcontractors,
+  vendorProfiles = [],
   tasks = [],
   transactions = [],
   selectedMaterialId,
@@ -84,6 +87,29 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
   onOpenProductDrawer,
 }) => {
   const allLocations = Array.from(new Set([...BASE_STORAGE_LOCATIONS, ...existingStorageLocations]));
+
+  // Combine contractor agencies from subcontractors array and vendorProfiles so all added parties are always selectable
+  const mergedSubcontractors = useMemo(() => {
+    const map = new Map<string, InventorySubcontractor>();
+    subcontractors.forEach((s) => map.set(s.id, s));
+    vendorProfiles.forEach((vp) => {
+      if (!map.has(vp.id)) {
+        map.set(vp.id, {
+          id: vp.id,
+          name: vp.name,
+          type: vp.type,
+          trade: vp.trade || (vp.type === 'contractor' ? 'Subcontractor' : vp.type === 'vendor' ? 'Material Vendor' : 'Party'),
+          foremanName: vp.contactPerson || '',
+          phone: vp.phone || '',
+          address: vp.address || '',
+          location: vp.location || '',
+          activeWorkers: 0,
+          notes: vp.notes || '',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [subcontractors, vendorProfiles]);
 
   const [actionType, setActionType] = useState<InventoryTransactionType>(initialAction);
   const [materialId, setMaterialId] = useState<string>('');
@@ -180,7 +206,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
   if (!isOpen) return null;
 
   const selectedSupplier = suppliers.find((s) => s.id === supplierId);
-  const selectedSub = subcontractors.find((s) => s.id === subcontractorId);
+  const selectedSub = mergedSubcontractors.find((s) => s.id === subcontractorId);
 
   const handleMaterialChange = (newId: string) => {
     setMaterialId(newId);
@@ -656,12 +682,12 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                   <select
                     value={subcontractorId}
                     onChange={(e) => handleSubChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-indigo-600 cursor-pointer"
                   >
                     <option value="">Select Subcontractor / Agency (Optional)</option>
-                    {subcontractors.map((s) => (
+                    {mergedSubcontractors.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({s.trade})
+                        {s.name} {s.trade ? `(${s.trade})` : ''}
                       </option>
                     ))}
                   </select>
