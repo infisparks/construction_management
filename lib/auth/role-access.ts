@@ -93,6 +93,13 @@ export function isViewAllowed(
     }
 
     if (
+      (allowed === 'contractor-work-orders' || allowed === 'work-orders' || allowed === 'commercial' || allowed === 'bills' || allowed === 'subcontractor-bills') &&
+      target === 'contractor-work-orders'
+    ) {
+      return true;
+    }
+
+    if (
       (allowed === 'progress' || allowed === 'execution' || allowed === 'site') &&
       target === 'progress'
     ) {

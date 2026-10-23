@@ -50,8 +50,14 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150">
+    <div 
+      className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white w-full max-w-md sm:max-w-lg h-full shadow-2xl border-l border-slate-200 overflow-hidden flex flex-col animate-in slide-in-from-right duration-250"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Top Header / Success Banner */}
         <div className="p-6 bg-gradient-to-br from-purple-50 via-indigo-50/50 to-white border-b border-purple-100 flex items-start justify-between relative">

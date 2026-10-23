@@ -3,6 +3,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SiteExpense } from '@/lib/supabase/types';
+import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
 
 export function formatINR(val: number): string {
   const num = Math.round(Number(val) || 0);
@@ -129,17 +130,26 @@ export function generateSiteExpensesPdf(
 
   // Right Header Badge
   doc.setFillColor(219, 238, 242); // Light Teal 100
-  doc.roundedRect(pageWidth - margin - 58, currentY + 6, 52, 16, 3, 3, 'F');
+  doc.roundedRect(pageWidth - margin - 62, currentY + 4, 56, 20, 3, 3, 'F');
   doc.setDrawColor(184, 223, 229); // Border 200
-  doc.roundedRect(pageWidth - margin - 58, currentY + 6, 52, 16, 3, 3, 'S');
+  doc.roundedRect(pageWidth - margin - 62, currentY + 4, 56, 20, 3, 3, 'S');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(4, 47, 56); // Deep Spruce / Teal
-  doc.text('SITE EXPENSE LEDGER', pageWidth - margin - 53, currentY + 12);
+  doc.text('SITE EXPENSE LEDGER', pageWidth - margin - 58, currentY + 9.5);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.text(`Total Records: ${expenses.length}`, pageWidth - margin - 53, currentY + 18);
+  doc.setFontSize(7);
+  doc.text(`Total Records: ${expenses.length}`, pageWidth - margin - 58, currentY + 14);
+
+  // Draw barcode for project reference
+  drawBarcodeOnPdf(doc, projectCode || 'EXP-SITE', {
+    x: pageWidth - margin - 58,
+    y: currentY + 15.5,
+    height: 5,
+    narrowBarWidth: 0.18,
+    includeText: false,
+  });
 
   currentY += 32;
 

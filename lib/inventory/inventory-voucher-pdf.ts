@@ -3,6 +3,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { InventoryTransaction } from './inventory-types';
+import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
 
 /**
  * Formats a monetary value safely without using the unicode rupee symbol (₹),
@@ -111,7 +112,16 @@ export function generateInventoryVoucherPdf(
   doc.setTextColor(107, 114, 128);
   doc.text(`DATE: ${transaction.date} | ${transaction.time}`, pageWidth - margin, currentY + 9, { align: 'right' });
 
-  currentY += 15;
+  // Draw Code 39 Barcode for the voucher number
+  drawBarcodeOnPdf(doc, transaction.voucherNumber, {
+    x: pageWidth - margin - 46,
+    y: currentY + 11.5,
+    height: 6,
+    narrowBarWidth: 0.22,
+    includeText: false,
+  });
+
+  currentY += 21;
 
   // --- 3. Summary Metadata Box ---
   doc.setFillColor(248, 250, 252); // slate-50

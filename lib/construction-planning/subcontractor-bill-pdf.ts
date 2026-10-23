@@ -3,6 +3,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SubcontractorBill, ProjectInfo } from './types';
+import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
 
 /**
  * Formats a monetary value safely without using the unicode rupee symbol (₹),
@@ -68,7 +69,16 @@ export function generateSubcontractorBillPdf(
     doc.text(`Due: ${bill.dueDate}`, pageWidth - margin, currentY + 13, { align: 'right' });
   }
 
-  currentY += 18;
+  // Draw Code 39 Barcode for the bill number
+  drawBarcodeOnPdf(doc, bill.billNumber || 'SB-DRAFT', {
+    x: pageWidth - margin - 46,
+    y: currentY + (bill.dueDate ? 15 : 12),
+    height: 6.5,
+    narrowBarWidth: 0.22,
+    includeText: false,
+  });
+
+  currentY += bill.dueDate ? 26 : 23;
 
   // Divider
   doc.setDrawColor(229, 231, 235);

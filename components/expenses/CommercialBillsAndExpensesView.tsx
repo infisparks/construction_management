@@ -7,13 +7,15 @@ import {
   Building2, 
   Sparkles, 
   Layers,
-  ArrowRight
+  ArrowRight,
+  Wrench
 } from 'lucide-react';
 import { ProjectInfo, Party, ConstructionTask, SubcontractorBill } from '@/lib/construction-planning/types';
 import { SiteExpensesView } from './SiteExpensesView';
 import { SubcontractorBillsView } from '@/components/construction-planning/SubcontractorBillsView';
+import { ContractorWorkOrdersView } from '@/components/contractor-work-orders/ContractorWorkOrdersView';
 
-export type CommercialTab = 'expenses' | 'subcontractor-bills';
+export type CommercialTab = 'expenses' | 'subcontractor-bills' | 'contractor-work-orders';
 
 interface CommercialBillsAndExpensesViewProps {
   initialTab?: CommercialTab;
@@ -107,6 +109,27 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
               RA Invoicing
             </span>
           </button>
+
+          {/* Tab 3: Contractor Work Orders & Khata */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('contractor-work-orders')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'contractor-work-orders'
+                ? 'bg-white text-purple-700 shadow-2xs border border-purple-200 font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
+          >
+            <Wrench className={`w-4 h-4 ${activeTab === 'contractor-work-orders' ? 'text-purple-600 stroke-[2.3]' : 'text-slate-400'}`} />
+            <span>Work Orders & Khata</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+              activeTab === 'contractor-work-orders' 
+                ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              Extra Work & Payouts
+            </span>
+          </button>
         </div>
 
         {/* Project Context & Meta */}
@@ -125,6 +148,12 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
           userEmail={userEmail}
           showToast={showToast}
           externalActionTrigger={externalActionTrigger}
+        />
+      ) : activeTab === 'contractor-work-orders' ? (
+        <ContractorWorkOrdersView
+          project={project}
+          projectId={projectId}
+          showToast={showToast}
         />
       ) : (
         <SubcontractorBillsView

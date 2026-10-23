@@ -38,7 +38,8 @@ import {
   Printer,
   Download,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Wrench
 } from 'lucide-react';
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
 import { isModuleAllowed, isViewAllowed, isOnlyAllowRole } from '@/lib/auth/role-access';
@@ -164,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Determine active module based on current view or user selection
   const [activeModule, setActiveModule] = useState<NavModuleId>(() => {
     if (currentView === 'files-archive') return 'archive';
-    if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing') return 'commercial';
+    if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders') return 'commercial';
     if (currentView === 'materials') return 'materials';
     if (currentView === 'progress') return 'planning';
     return 'planning';
@@ -177,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     if (currentView === 'files-archive' && isModuleAllowed('archive', userRole, userPage)) {
       setActiveModule('archive');
-    } else if ((currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing') && isModuleAllowed('commercial', userRole, userPage)) {
+    } else if ((currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders') && isModuleAllowed('commercial', userRole, userPage)) {
       setActiveModule('commercial');
     } else if (currentView === 'materials' && isModuleAllowed('materials', userRole, userPage)) {
       setActiveModule('materials');
@@ -405,6 +406,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Commercial & Bills
               </div>
               <div className="space-y-1">
+                {/* Item 1: Contractor Work Orders & Khata */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onViewChange('contractor-work-orders');
+                    closeAllPanels();
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    currentView === 'contractor-work-orders'
+                      ? 'bg-purple-50 text-purple-700 border border-purple-200 font-bold shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Wrench className={`w-4 h-4 shrink-0 ${currentView === 'contractor-work-orders' ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className="truncate">Contractor Work Orders</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
+                    Khata
+                  </span>
+                </button>
+
+                {/* Item 2: Commercial Bills & Expenses */}
                 <button
                   type="button"
                   onClick={() => {

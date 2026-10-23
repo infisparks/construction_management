@@ -70,7 +70,7 @@ import {
   getStoredActiveSiteId,
   fetchAllActiveSites 
 } from '@/lib/supabase/site-storage';
-import { CheckCircle2, AlertTriangle, X, Building2, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, X, Building2, ShieldAlert, Menu } from 'lucide-react';
 import { isViewAllowed, isOnlyAllowRole, getFirstAllowedView } from '@/lib/auth/role-access';
 import { 
   DateFilterState, 
@@ -1371,6 +1371,14 @@ export default function ConstructionPlanningPage() {
     return <LoginPage />;
   }
 
+  // Determine whether current view is one of the Planning Schedule views
+  const isPlanningView = 
+    currentView === 'list' || 
+    currentView === 'gantt' || 
+    currentView === 'critical' || 
+    currentView === 'milestones' || 
+    currentView === 'progress';
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900 flex">
       
@@ -1422,25 +1430,46 @@ export default function ConstructionPlanningPage() {
           isSidebarCollapsed ? 'lg:pl-14' : 'lg:pl-[260px]'
         }`}
       >
-        {/* Page Top Header with Mobile Sidebar Toggle */}
-        <PlanningHeader
-          project={project}
-          onAddTask={handleAddTask}
-          onAddWorkPackage={handleAddWorkPackage}
-          onRecordProgress={() => handleOpenDailyProgress()}
-          onViewCriticalPath={() => handleViewChange('critical')}
-          onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
-          onOpenSettings={() => setIsProjectSettingsOpen(true)}
-          onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          onOpenMaterialStore={() => handleOpenMaterialDrawer('materials')}
-          onOpenBilling={() => handleOpenMaterialDrawer('billing')}
-          onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
-          onOpenSitesManager={() => setIsSitesManagerOpen(true)}
-          userEmail={user.email || undefined}
-          userRole={userRole?.role}
-          userPage={userRole?.page}
-          onSignOut={signOut}
-        />
+        {/* Page Top Header: Rendered ONLY on Construction Planning Schedule pages */}
+        {isPlanningView ? (
+          <PlanningHeader
+            project={project}
+            onAddTask={handleAddTask}
+            onAddWorkPackage={handleAddWorkPackage}
+            onRecordProgress={() => handleOpenDailyProgress()}
+            onViewCriticalPath={() => handleViewChange('critical')}
+            onOpenRecoveryPlan={() => setIsRecoveryPlanDrawerOpen(true)}
+            onOpenSettings={() => setIsProjectSettingsOpen(true)}
+            onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            onOpenMaterialStore={() => handleOpenMaterialDrawer('materials')}
+            onOpenBilling={() => handleOpenMaterialDrawer('billing')}
+            onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
+            onOpenSitesManager={() => setIsSitesManagerOpen(true)}
+            userEmail={user.email || undefined}
+            userRole={userRole?.role}
+            userPage={userRole?.page}
+            onSignOut={signOut}
+          />
+        ) : (
+          /* Mobile-only compact menu bar on non-planning views (Hidden on desktop) */
+          <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Toggle Navigation Menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span className="truncate max-w-[180px]">{project.name}</span>
+            </div>
+            <div className="text-[10px] font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-semibold">
+              {project.code || 'SITE'}
+            </div>
+          </div>
+        )}
 
         {/* Full-width Responsive Dashboard Body */}
         <main className="w-full px-3.5 sm:px-6 lg:px-8 py-5 space-y-4 sm:space-y-5 flex-1">
@@ -1461,7 +1490,7 @@ export default function ConstructionPlanningPage() {
           )}
 
           {/* Project Summary Cards (KPIs) - Full Width Grid (Only on schedule planning views) */}
-          {currentView !== 'files-archive' && currentView !== 'subcontractor-bills' && currentView !== 'materials' && currentView !== 'expenses' && (
+          {isPlanningView && (
             <>
               <ProjectSummaryCards
                 metrics={metrics}
@@ -1577,9 +1606,15 @@ export default function ConstructionPlanningPage() {
                   />
                 )}
 
-                {(currentView === 'expenses' || currentView === 'subcontractor-bills') && (
+                {(currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'contractor-work-orders') && (
                   <CommercialBillsAndExpensesView
-                    initialTab={currentView === 'subcontractor-bills' ? 'subcontractor-bills' : 'expenses'}
+                    initialTab={
+                      currentView === 'contractor-work-orders'
+                        ? 'contractor-work-orders'
+                        : currentView === 'subcontractor-bills'
+                        ? 'subcontractor-bills'
+                        : 'expenses'
+                    }
                     project={project}
                     projectId={activeProjectId}
                     userEmail={user.email || undefined}
