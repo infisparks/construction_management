@@ -122,6 +122,7 @@ export interface InventoryTransactionRecord {
   file_name?: string;
   transaction_date: string;
   transaction_time?: string;
+  is_deleted?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -485,10 +486,114 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
     foremanName: isCheckOut ? row.person_name : undefined,
     authorizedBy: isCheckOut ? row.person_name : undefined,
     receivedOrIssuedBy: row.person_name || 'Storekeeper',
-    notes: row.notes,
-    remarks: row.notes,
+    notes: row.notes ? row.notes.replace(/^\[DELETED\]\s*/, '') : undefined,
+    remarks: row.notes ? row.notes.replace(/^\[DELETED\]\s*/, '') : undefined,
     fileUrl: row.file_url ? resolveInventoryFileUrl(row.file_url) : undefined,
     fileName: row.file_name || undefined,
+    isDeleted: Boolean(
+      row.is_deleted === true ||
+      (row.notes && row.notes.startsWith('[DELETED]')) ||
+      (row.reason && row.reason.startsWith('[DELETED]'))
+    ),
+    deletedAt: (row.is_deleted || (row.notes && row.notes.startsWith('[DELETED]')))
+      ? (row.updated_at || row.created_at || new Date().toISOString())
+      : undefined,
   };
+}
+
+/**
+ * Soft delete an inventory transaction record (moves it to the Bin).
+ * Gracefully tries is_deleted column first, then falls back to [DELETED] notes tag if column is pending.
+ */
+export async function softDeleteInventoryTransaction(
+  id: string,
+  currentNotes?: string
+): Promise<{ success: boolean; error?: any }> {
+  try {
+    const now = new Date().toISOString();
+    // 1. Try modern is_deleted column
+    const { error: colErr } = await supabase
+      .from('inventory_transactions')
+      .update({ is_deleted: true, updated_at: now })
+      .eq('id', id);
+
+    if (!colErr) {
+      return { success: true };
+    }
+
+    // 2. Fallback if is_deleted column doesn't exist yet in remote schema
+    console.warn('softDeleteInventoryTransaction: is_deleted column update fallback:', colErr.message);
+    const taggedNote = currentNotes ? `[DELETED] ${currentNotes}` : '[DELETED]';
+    const { error: noteErr } = await supabase
+      .from('inventory_transactions')
+      .update({ notes: taggedNote, updated_at: now })
+      .eq('id', id);
+
+    if (noteErr) {
+      return { success: false, error: noteErr };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception in softDeleteInventoryTransaction:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Restore a soft-deleted inventory transaction record from the Bin.
+ */
+export async function restoreInventoryTransaction(
+  id: string,
+  currentNotes?: string
+): Promise<{ success: boolean; error?: any }> {
+  try {
+    const now = new Date().toISOString();
+    // 1. Try modern is_deleted column
+    const { error: colErr } = await supabase
+      .from('inventory_transactions')
+      .update({ is_deleted: false, updated_at: now })
+      .eq('id', id);
+
+    // 2. Also strip [DELETED] from notes if present
+    const cleanNote = currentNotes ? currentNotes.replace(/^\[DELETED\]\s*/, '') : '';
+    await supabase
+      .from('inventory_transactions')
+      .update({ notes: cleanNote, updated_at: now })
+      .eq('id', id);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception in restoreInventoryTransaction:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Update an inventory transaction record's metadata (purpose, foreman, notes, location, etc.).
+ */
+export async function updateInventoryTransactionRecord(
+  id: string,
+  updates: Partial<InventoryTransactionRecord>
+): Promise<{ success: boolean; error?: any }> {
+  try {
+    const payload = {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('inventory_transactions')
+      .update(payload)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating inventory transaction:', error);
+      return { success: false, error };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception in updateInventoryTransactionRecord:', err);
+    return { success: false, error: err };
+  }
 }
 

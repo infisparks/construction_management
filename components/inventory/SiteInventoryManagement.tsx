@@ -75,6 +75,9 @@ import {
   createInventoryTransaction,
   fetchQuickStockSummary,
   mapDbToInventoryTransaction,
+  softDeleteInventoryTransaction,
+  restoreInventoryTransaction,
+  updateInventoryTransactionRecord,
   InventoryQuickSummary,
 } from '@/lib/supabase/inventory-services';
 import {
@@ -142,7 +145,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
         // Calculate live stock balance directly from inventory_transactions ledger
         // Inward (+), Outward / Defect / Return (-)
-        const productTxs = (txList || []).filter((t) => t.product_id === p.id);
+        const productTxs = (txList || []).filter(
+          (t) => t.product_id === p.id && !t.is_deleted && !(t.notes && t.notes.startsWith('[DELETED]'))
+        );
         let liveStockBalance = 0;
         for (const t of productTxs) {
           const type = (t.type || '').toLowerCase();
@@ -309,6 +314,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
   // Active View Tab
   const [activeTab, setActiveTab] = useState<'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin'>(initialTab);
+  const [binViewMode, setBinViewMode] = useState<'products' | 'movements'>('products');
 
   // Sync initialTab when changed externally
   useEffect(() => {
@@ -354,10 +360,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     const totalCurrentStock = materials.reduce((sum, m) => sum + (Number(m.currentStock) || 0), 0);
     const totalValuation = materials.reduce((sum, m) => sum + m.currentStock * m.averageUnitRate, 0);
     const lowStockItems = materials.filter((m) => m.currentStock <= m.minimumAlertStock);
-    const inwardTxs = transactions.filter((t) => t.type === 'check_in');
-    const outwardTxs = transactions.filter((t) => t.type === 'check_out');
-    const returnTxs = transactions.filter((t) => t.type === 'return');
-    const damageTxs = transactions.filter((t) => t.type === 'damage');
+    const activeTransactions = transactions.filter((t) => !t.isDeleted);
+    const inwardTxs = activeTransactions.filter((t) => t.type === 'check_in');
+    const outwardTxs = activeTransactions.filter((t) => t.type === 'check_out');
+    const returnTxs = activeTransactions.filter((t) => t.type === 'return');
+    const damageTxs = activeTransactions.filter((t) => t.type === 'damage');
 
     return {
       totalItems: dbSummary ? dbSummary.total_products : totalItems,
@@ -412,6 +419,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // Filtered Inward Transactions
   const inwardTransactions = useMemo(() => {
     return transactions.filter((t) => {
+      if (t.isDeleted) return false;
       if (t.type !== 'check_in') return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       if (searchQuery) {
@@ -430,6 +438,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // Filtered Outward Transactions
   const outwardTransactions = useMemo(() => {
     return transactions.filter((t) => {
+      if (t.isDeleted) return false;
       if (t.type !== 'check_out') return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       if (searchQuery) {
@@ -448,6 +457,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // Filtered Returns & Damages
   const returnsAndDamagesTransactions = useMemo(() => {
     return transactions.filter((t) => {
+      if (t.isDeleted) return false;
       if (t.type !== 'return' && t.type !== 'damage') return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       if (searchQuery) {
@@ -466,6 +476,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // Filtered Ledger Transactions
   const filteredLedger = useMemo(() => {
     return transactions.filter((t) => {
+      if (t.isDeleted) return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       const matchesSearch =
         searchQuery === '' ||
@@ -483,6 +494,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       return matchesSearch && matchesType;
     });
   }, [transactions, searchQuery, ledgerTypeFilter, dateFilter]);
+
+  // Soft-deleted transactions list for Bin
+  const deletedTransactions = useMemo(() => {
+    return transactions.filter((t) => t.isDeleted);
+  }, [transactions]);
 
   // Low Stock Items
   const lowStockMaterials = useMemo(() => {
@@ -706,6 +722,118 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     }
     if (showToast) {
       showToast(`Product profile "${newProduct.name}" created (Code: ${newProduct.code})!`, 'success');
+    }
+  };
+
+  // Soft Delete a Movement Voucher (sets is_deleted = true, adjusts stock)
+  const handleDeleteTransaction = async (tx: InventoryTransaction) => {
+    // 1. Optimistic update
+    setTransactions((prev) =>
+      prev.map((t) =>
+        t.id === tx.id
+          ? { ...t, isDeleted: true, deletedAt: new Date().toISOString() }
+          : t
+      )
+    );
+
+    // 2. Adjust material stock:
+    const isAddition = tx.type === 'check_in' || (tx.type as any) === 'in';
+    const delta = isAddition ? -tx.quantity : tx.quantity;
+
+    setMaterials((prev) =>
+      prev.map((m) =>
+        m.id === tx.materialId
+          ? { ...m, currentStock: Math.max(0, m.currentStock + delta) }
+          : m
+      )
+    );
+
+    if (historyDrawerMaterial && historyDrawerMaterial.id === tx.materialId) {
+      setHistoryDrawerMaterial((prev) =>
+        prev ? { ...prev, currentStock: Math.max(0, prev.currentStock + delta) } : null
+      );
+    }
+
+    // 3. Persist to Supabase
+    try {
+      await softDeleteInventoryTransaction(tx.id, tx.notes);
+      fetchQuickStockSummary().then((s) => s && setDbSummary(s));
+      if (showToast) {
+        showToast(`Voucher ${tx.voucherNumber} moved to Bin (is_deleted: true). Stock adjusted.`, 'info');
+      }
+    } catch (err) {
+      console.error('Failed to soft delete transaction in Supabase:', err);
+    }
+  };
+
+  // Restore a Soft-Deleted Movement Voucher from Bin
+  const handleRestoreTransaction = async (tx: InventoryTransaction) => {
+    // 1. Optimistic update
+    setTransactions((prev) =>
+      prev.map((t) =>
+        t.id === tx.id
+          ? { ...t, isDeleted: false, deletedAt: undefined }
+          : t
+      )
+    );
+
+    // 2. Adjust material stock back:
+    const isAddition = tx.type === 'check_in' || (tx.type as any) === 'in';
+    const delta = isAddition ? tx.quantity : -tx.quantity;
+
+    setMaterials((prev) =>
+      prev.map((m) =>
+        m.id === tx.materialId
+          ? { ...m, currentStock: Math.max(0, m.currentStock + delta) }
+          : m
+      )
+    );
+
+    if (historyDrawerMaterial && historyDrawerMaterial.id === tx.materialId) {
+      setHistoryDrawerMaterial((prev) =>
+        prev ? { ...prev, currentStock: Math.max(0, prev.currentStock + delta) } : null
+      );
+    }
+
+    // 3. Persist to Supabase
+    try {
+      await restoreInventoryTransaction(tx.id, tx.notes);
+      fetchQuickStockSummary().then((s) => s && setDbSummary(s));
+      if (showToast) {
+        showToast(`Voucher ${tx.voucherNumber} restored to active ledger.`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to restore transaction in Supabase:', err);
+    }
+  };
+
+  // Update a Movement Voucher's metadata
+  const handleUpdateTransaction = async (updatedTx: InventoryTransaction) => {
+    // 1. Optimistic update
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === updatedTx.id ? updatedTx : t))
+    );
+
+    // 2. Persist to Supabase
+    try {
+      await updateInventoryTransactionRecord(updatedTx.id, {
+        vendor_name: updatedTx.subcontractorName || updatedTx.supplierName,
+        vendor_id: updatedTx.subcontractorId || updatedTx.supplierId,
+        person_name: updatedTx.foremanName || updatedTx.authorizedBy || updatedTx.receivedOrIssuedBy,
+        location: updatedTx.floorZone || updatedTx.unloadingLocation || updatedTx.storageLocation,
+        reason: updatedTx.purpose || updatedTx.returnReason || updatedTx.damageReason,
+        reference_no: updatedTx.challanNumber || updatedTx.vehicleNumber,
+        notes: updatedTx.notes,
+        transaction_date: updatedTx.date,
+        transaction_time: updatedTx.time,
+        file_url: updatedTx.fileUrl,
+        file_name: updatedTx.fileName,
+      });
+      if (showToast) {
+        showToast(`Voucher ${updatedTx.voucherNumber} updated successfully.`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to persist transaction update to Supabase:', err);
     }
   };
 
@@ -1167,7 +1295,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           }`}
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span>Recycle Bin ({deletedProducts.length})</span>
+          <span>Recycle Bin ({deletedProducts.length + deletedTransactions.length})</span>
         </button>
       </div>
 
@@ -2179,30 +2307,63 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       {/* TAB 8: RECYCLE BIN (is_deleted = true in profile_product) */}
       {activeTab === 'bin' && (
         <div className="space-y-3">
-          <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
+          <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-700 shrink-0">
                 <Trash2 className="w-4 h-4" />
               </div>
               <div>
-                <span className="font-bold text-rose-900 text-sm">Recycle Bin ({deletedProducts.length} Deleted Items)</span>
+                <span className="font-bold text-rose-900 text-sm">
+                  Recycle Bin ({deletedProducts.length + deletedTransactions.length} Soft-Deleted Items)
+                </span>
                 <p className="text-xs text-rose-700">
-                  Products deleted from the store are safely retained with <code className="font-mono bg-rose-100 px-1 py-0.5 rounded text-rose-800">is_deleted = true</code> in Supabase. You can restore them anytime back to the active catalog.
+                  Items deleted are safely retained with <code className="font-mono bg-rose-100 px-1 py-0.5 rounded text-rose-800">is_deleted = true</code>. They do not affect active store stock balances and can be restored anytime.
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={loadDeletedProducts}
-              className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBin ? 'animate-spin' : ''}`} />
-              <span>Refresh Bin</span>
-            </button>
+
+            <div className="flex items-center gap-2">
+              {/* Bin Sub-Toggle */}
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-white border border-rose-200 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setBinViewMode('products')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    binViewMode === 'products'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  Products ({deletedProducts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBinViewMode('movements')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    binViewMode === 'movements'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  Movements & Vouchers ({deletedTransactions.length})
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={loadDeletedProducts}
+                className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBin ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
+          {/* VIEW A: DELETED PRODUCTS */}
+          {binViewMode === 'products' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
@@ -2276,6 +2437,96 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               </table>
             </div>
           </div>
+          )}
+
+          {/* VIEW B: DELETED MOVEMENTS & VOUCHERS */}
+          {binViewMode === 'movements' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Voucher # & Date</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Material & Quantity</th>
+                      <th className="px-4 py-3">Party (Subcontractor / Supplier)</th>
+                      <th className="px-4 py-3">Reason / Purpose</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {deletedTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          <Trash2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                          <p className="font-semibold text-slate-700">No deleted movement vouchers</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">All transactions in your store are active.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      deletedTransactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-rose-50/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-mono font-bold text-slate-700 line-through">{tx.voucherNumber}</div>
+                            <div className="text-[11px] text-slate-400">{tx.date} • {tx.time}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              tx.type === 'check_in'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            }`}>
+                              {tx.type === 'check_in' ? 'Check-In (+)' : 'Check-Out (-)'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800">{tx.materialName}</div>
+                            <div className="font-bold text-rose-700 text-xs">
+                              {tx.quantity} {tx.unit}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 font-semibold">
+                            {tx.subcontractorName || tx.supplierName || 'Site General'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 text-[11px]">
+                            {tx.purpose || tx.returnReason || tx.damageReason || tx.notes || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              is_deleted = true
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleViewPdfBlob(tx)}
+                                className="px-2 py-1 rounded-md border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                                title="View PDF Voucher"
+                              >
+                                <ExternalLink className="w-3 h-3 text-purple-600" />
+                                <span>PDF</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreTransaction(tx)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                title="Restore voucher and reactivate in ledger"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Restore Voucher</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2316,6 +2567,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         transactions={transactions}
         projectName={project?.name || 'Noori Crest Tower'}
         onOpenVoucherModal={handleOpenVoucher}
+        onDeleteTransaction={handleDeleteTransaction}
+        onRestoreTransaction={handleRestoreTransaction}
+        onUpdateTransaction={handleUpdateTransaction}
       />
 
       {/* Product Profile Sidebar Drawer */}

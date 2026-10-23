@@ -61,6 +61,7 @@ export interface InventoryTransaction {
   driverPhone?: string;
   qcStatus?: 'Passed' | 'Conditional' | 'Rejected';
   unloadingLocation?: string;
+  storageLocation?: string;
 
   // Outward (Check-Out) attributes
   subcontractorId?: string;
@@ -81,6 +82,10 @@ export interface InventoryTransaction {
   // Attached Bill / Document Proof (PNG, PDF, etc.)
   fileUrl?: string;
   fileName?: string;
+
+  // Soft-delete support (Trash / Bin)
+  isDeleted?: boolean;
+  deletedAt?: string;
 }
 
 export type VendorPartyType = 'vendor' | 'contractor' | 'other';
