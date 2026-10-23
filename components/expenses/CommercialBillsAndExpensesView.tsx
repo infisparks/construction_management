@@ -89,26 +89,28 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
             </span>
           </button>
 
-          {/* Tab 2: Sub-Contractor Bills (RA) */}
-          <button
-            type="button"
-            onClick={() => handleSelectTab('subcontractor-bills')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'subcontractor-bills'
-                ? 'bg-white text-purple-700 shadow-2xs border border-purple-200 font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-            }`}
-          >
-            <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'subcontractor-bills' ? 'text-purple-600 stroke-[2.3]' : 'text-slate-400'}`} />
-            <span>Sub-Contractor Bills (RA)</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
-              activeTab === 'subcontractor-bills' 
-                ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                : 'bg-slate-200/80 text-slate-600'
-            }`}>
-              RA Invoicing
-            </span>
-          </button>
+          {/* Tab 2: Sub-Contractor Bills (RA) - Hidden per request; kept preserved in code for future use */}
+          {false && (
+            <button
+              type="button"
+              onClick={() => handleSelectTab('subcontractor-bills')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'subcontractor-bills'
+                  ? 'bg-white text-purple-700 shadow-2xs border border-purple-200 font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'subcontractor-bills' ? 'text-purple-600 stroke-[2.3]' : 'text-slate-400'}`} />
+              <span>Sub-Contractor Bills (RA)</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+                activeTab === 'subcontractor-bills' 
+                  ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                  : 'bg-slate-200/80 text-slate-600'
+              }`}>
+                RA Invoicing
+              </span>
+            </button>
+          )}
 
           {/* Tab 3: Contractor Work Orders & Khata */}
           <button

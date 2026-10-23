@@ -31,7 +31,7 @@ import { DbProject } from '@/lib/supabase/types';
 import { isViewAllowed, isModuleAllowed } from '@/lib/auth/role-access';
 
 const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementType }> = {
-  list: { title: 'Construction Planning', icon: Building2 },
+  list: { title: 'Armee Enterprises', icon: Building2 },
   gantt: { title: 'Gantt Schedule Timeline', icon: Calendar },
   critical: { title: 'Critical Path (CPM)', icon: Route },
   progress: { title: 'Daily Site Progress', icon: ClipboardList },
@@ -122,7 +122,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
 
   const headerMeta = currentView && VIEW_HEADER_CONFIG[currentView]
     ? VIEW_HEADER_CONFIG[currentView]
-    : { title: 'Construction Planning', icon: Building2 };
+    : { title: 'Armee Enterprises', icon: Building2 };
   const HeaderIcon = headerMeta.icon;
 
   return (
@@ -350,7 +350,8 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                         </button>
                       )}
 
-                      {canViewSubBills && (
+                      {/* Preserved for future use: canViewSubBills */}
+                      {false && canViewSubBills && (
                         <button
                           type="button"
                           onClick={() => {

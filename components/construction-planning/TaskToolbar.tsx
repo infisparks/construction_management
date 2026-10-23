@@ -71,7 +71,8 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
     { id: 'critical', label: 'Critical Path', icon: Route },
     { id: 'progress', label: 'Daily Progress', icon: ClipboardList },
     { id: 'milestones', label: 'Milestones', icon: Milestone },
-    { id: 'subcontractor-bills', label: 'Sub-Contractor Bills', icon: FileSpreadsheet },
+    // Preserved for future use:
+    // { id: 'subcontractor-bills', label: 'Sub-Contractor Bills', icon: FileSpreadsheet },
   ];
 
   const hasActiveFilters = 

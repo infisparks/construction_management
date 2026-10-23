@@ -98,7 +98,7 @@ const MODULES: NavModuleDef[] = [
     icon: Receipt,
     badge: 'Live',
     badgeColor: 'bg-purple-100 text-purple-700',
-    description: 'Site expenses, subcontractor bills & Khata',
+    description: 'Site expenses, work orders & Khata',
   },
   {
     id: 'materials',
