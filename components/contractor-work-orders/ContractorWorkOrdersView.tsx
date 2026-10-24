@@ -337,11 +337,11 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
   };
 
   return (
-    <div className="w-full space-y-4 animate-in fade-in duration-150">
+    <div className="w-full space-y-4.5 animate-in fade-in duration-150">
       {/* 1. Top Section Title & Site Header */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shadow-2xs">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4.5 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 flex items-center justify-center font-bold shadow-xs">
             <Wrench className="w-6 h-6" />
           </div>
           <div>
@@ -349,7 +349,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
               <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                 Contractor Work Orders & Khata
               </h1>
-              <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-purple-200">
+              <span className="bg-[#653ef1]/10 text-[#653ef1] text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-[#653ef1]/20">
                 Commercial Ledger
               </span>
             </div>
@@ -362,7 +362,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
         {/* Project Selector & Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Active Site Selector */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 rounded-xl border border-slate-200 text-xs">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
             <Building2 className="w-4 h-4 text-purple-600" />
             <span className="text-slate-500 hidden sm:inline">Project:</span>
             {availableProjects.length > 1 ? (
@@ -386,7 +386,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
             type="button"
             onClick={loadOrders}
             title="Refresh Ledger"
-            className="p-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+            className="p-2 text-slate-600 bg-white border border-slate-200/80 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-purple-600' : ''}`} />
           </button>
@@ -394,53 +394,53 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="px-4 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="h-9 px-4 text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] rounded-xl transition-all shadow-sm shadow-[#653ef1]/25 hover:shadow-md hover:shadow-[#653ef1]/35 flex items-center gap-2 cursor-pointer active:scale-95"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>New Work Order</span>
           </button>
         </div>
       </div>
 
       {/* 2. Key Metrics & Daily Payouts KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* KPI 1: Total Initial Deal */}
-        <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs">
+        <div className="p-4.5 bg-white border border-slate-200/80 rounded-2xl shadow-xs space-y-1.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
             <span>Base Contracts</span>
             <Receipt className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="text-lg font-bold text-slate-900">{formatINR(stats.totalInitial)}</div>
+          <div className="text-lg font-bold text-slate-900 font-numeric">{formatINR(stats.totalInitial)}</div>
           <p className="text-[10px] text-slate-500">{stats.count} Work Contracts</p>
         </div>
 
         {/* KPI 2: Extra Work Added */}
-        <div className="p-4 bg-white border border-amber-200 rounded-2xl shadow-2xs space-y-1 bg-amber-50/20">
-          <div className="flex items-center justify-between text-amber-700 text-xs">
-            <span className="font-semibold">Extra Work Added (+)</span>
+        <div className="p-4.5 bg-white border border-amber-200/80 rounded-2xl shadow-xs space-y-1.5 bg-amber-50/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-center justify-between text-amber-700 text-xs font-semibold">
+            <span>Extra Work Added (+)</span>
             <TrendingUp className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-lg font-bold text-amber-800">+{formatINR(stats.totalExtra)}</div>
+          <div className="text-lg font-bold text-amber-800 font-numeric">+{formatINR(stats.totalExtra)}</div>
           <p className="text-[10px] text-amber-600/80">Variation Orders / Scope Notes</p>
         </div>
 
         {/* KPI 3: Total Revised Contract Deal */}
-        <div className="p-4 bg-white border border-purple-200 rounded-2xl shadow-2xs space-y-1 bg-purple-50/20">
-          <div className="flex items-center justify-between text-purple-700 text-xs">
-            <span className="font-semibold">Total Revised Value</span>
+        <div className="p-4.5 bg-white border border-purple-200/80 rounded-2xl shadow-xs space-y-1.5 bg-purple-50/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-center justify-between text-purple-700 text-xs font-semibold">
+            <span>Total Revised Value</span>
             <Sparkles className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="text-lg font-extrabold text-purple-900">{formatINR(stats.totalRevised)}</div>
+          <div className="text-lg font-extrabold text-purple-900 font-numeric">{formatINR(stats.totalRevised)}</div>
           <p className="text-[10px] text-purple-600">Base Deal + All Extra Work</p>
         </div>
 
         {/* KPI 4: Given / Paid Out (With Today & Yesterday Highlights) */}
-        <div className="p-4 bg-white border border-emerald-200 rounded-2xl shadow-2xs space-y-1 bg-emerald-50/20">
-          <div className="flex items-center justify-between text-emerald-800 text-xs">
-            <span className="font-semibold">Total Amount Given</span>
+        <div className="p-4.5 bg-white border border-emerald-200/80 rounded-2xl shadow-xs space-y-1.5 bg-emerald-50/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-center justify-between text-emerald-800 text-xs font-semibold">
+            <span>Total Amount Given</span>
             <HandCoins className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-lg font-bold text-emerald-800">{formatINR(stats.totalPaidAll)}</div>
+          <div className="text-lg font-bold text-emerald-800 font-numeric">{formatINR(stats.totalPaidAll)}</div>
           <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-700">
             <span>Today: {formatINR(stats.paidToday)}</span>
             <span>•</span>
@@ -449,12 +449,12 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
         </div>
 
         {/* KPI 5: Balance Remaining to Give */}
-        <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs space-y-1 col-span-2 lg:col-span-1">
+        <div className="p-4.5 bg-white border border-slate-200/80 rounded-2xl shadow-xs space-y-1.5 col-span-2 lg:col-span-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex items-center justify-between text-slate-500 text-xs">
             <span className="font-semibold">Remaining to Give</span>
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
-          <div className={`text-lg font-extrabold ${stats.totalRemaining > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>
+          <div className={`text-lg font-extrabold font-numeric ${stats.totalRemaining > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>
             {formatINR(stats.totalRemaining)}
           </div>
           <p className="text-[10px] text-slate-500">
@@ -540,7 +540,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                 onClick={() => setDatePreset(preset.id as WorkDateFilterPreset)}
                 className={`px-3 py-1 rounded-lg font-medium transition-all cursor-pointer ${
                   datePreset === preset.id
-                    ? 'bg-purple-600 text-white font-bold shadow-2xs'
+                    ? 'bg-[#653ef1] text-white font-bold shadow-2xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
@@ -576,17 +576,17 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
         <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
           <div className="text-xs font-bold text-slate-800">
-            Showing <span className="text-purple-700">{filteredOrders.length}</span> of {workOrders.length} Work Orders
+            Showing <span className="text-[#653ef1]">{filteredOrders.length}</span> of {workOrders.length} Work Orders
           </div>
           <div className="text-[11px] text-slate-500 flex items-center gap-1">
-            <BarcodeIcon className="w-3.5 h-3.5 text-purple-600" />
+            <BarcodeIcon className="w-3.5 h-3.5 text-[#653ef1]" />
             <span>All certified invoices generate scannable barcodes</span>
           </div>
         </div>
 
         {filteredOrders.length === 0 ? (
           <div className="p-12 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 mx-auto flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#653ef1] mx-auto flex items-center justify-center">
               <Wrench className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-bold text-slate-800">No Contractor Work Orders Found</h3>
@@ -598,7 +598,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] rounded-xl transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Register First Work Order</span>

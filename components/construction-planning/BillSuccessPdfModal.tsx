@@ -60,13 +60,13 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
       >
         
         {/* Top Header / Success Banner */}
-        <div className="p-6 bg-gradient-to-br from-purple-50 via-indigo-50/50 to-white border-b border-purple-100 flex items-start justify-between relative">
+        <div className="p-6 bg-gradient-to-br from-[#653ef1]/10 via-[#653ef1]/5 to-white border-b border-[#653ef1]/20 flex items-start justify-between relative">
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-200 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center shadow-lg shadow-[#653ef1]/25 shrink-0">
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full inline-block mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#653ef1] bg-[#653ef1]/10 px-2 py-0.5 rounded-full inline-block mb-1">
                 Bill Created Successfully
               </span>
               <h2 className="text-lg font-bold text-slate-900">
@@ -92,10 +92,10 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/80 space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-200 text-xs">
               <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                <Receipt className="w-3.5 h-3.5 text-[#653ef1]" />
                 <span>Bill Number</span>
               </div>
-              <span className="font-bold font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+              <span className="font-bold font-mono text-[#653ef1] bg-[#653ef1]/10 px-2 py-0.5 rounded border border-[#653ef1]/20">
                 {bill.billNumber}
               </span>
             </div>
@@ -135,7 +135,7 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
               <button
                 type="button"
                 onClick={handleViewPdf}
-                className="w-full py-3 px-4 rounded-xl border-2 border-purple-500 hover:border-purple-600 bg-purple-50/60 hover:bg-purple-100/70 text-purple-700 text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer group"
+                className="w-full py-3 px-4 rounded-xl border border-[#653ef1]/30 hover:border-[#653ef1] bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer group"
               >
                 <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
                 <span>View PDF (Blob URL)</span>
@@ -145,7 +145,7 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
               <button
                 type="button"
                 onClick={handleDownload}
-                className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer group"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer group shadow-[#653ef1]/25"
               >
                 <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
                 <span>Download PDF</span>
@@ -162,7 +162,7 @@ export const BillSuccessPdfModal: React.FC<BillSuccessPdfModalProps> = ({
               <button
                 type="button"
                 onClick={onCreateAnother}
-                className="text-purple-600 hover:text-purple-700 font-semibold"
+                className="text-[#653ef1] hover:text-[#5022e3] font-semibold"
               >
                 + Create Another Bill
               </button>

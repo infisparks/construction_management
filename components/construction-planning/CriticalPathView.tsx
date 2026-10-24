@@ -43,7 +43,7 @@ export const CriticalPathView: React.FC<CriticalPathViewProps> = ({
     <div className="space-y-6">
       
       {/* Top Critical Path Health Summary Banner */}
-      <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl p-5 sm:p-6 text-white shadow-md">
+      <div className="bg-gradient-to-r from-[#1c0d45] via-[#2a1361] to-[#140833] border border-[#653ef1]/30 rounded-2xl p-5 sm:p-6 text-white shadow-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">

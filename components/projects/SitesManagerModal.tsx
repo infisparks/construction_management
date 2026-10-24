@@ -218,7 +218,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
         {/* Drawer Header - Sleek Executive Navbar */}
         <div className="px-5 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-purple-100 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center font-bold shadow-md shadow-[#653ef1]/20 shrink-0">
               <Building2 className="w-5 h-5" />
             </div>
             <div className="min-w-0">
@@ -226,7 +226,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
                   Sites & Projects
                 </h2>
-                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25 shrink-0">
                   {projects.filter(p => !p.is_deleted).length} Active
                 </span>
               </div>
@@ -241,9 +241,9 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowCreateForm(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 h-8.5 px-3.5 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-semibold shadow-xs shadow-[#653ef1]/25 transition-all cursor-pointer active:scale-95"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>+ New Site</span>
               </button>
             )}
@@ -260,14 +260,14 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
         </div>
 
         {/* Drawer Scrollable Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 bg-[#F8FAFC]">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 bg-[#F5F6F8]">
           
           {/* Create New Site Form Box */}
           {showCreateForm && (
-            <form onSubmit={handleCreateSite} className="bg-white border-2 border-purple-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-150">
+            <form onSubmit={handleCreateSite} className="bg-white border-2 border-[#653ef1]/25 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-150">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-lg bg-[#653ef1]/10 text-[#653ef1] flex items-center justify-center">
                     <Plus className="w-3.5 h-3.5" />
                   </div>
                   <span className="text-xs font-bold text-slate-900">
@@ -295,7 +295,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. Noori Crust Site, Apex Heights"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400 font-medium"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400 font-medium"
                     autoFocus
                   />
                 </div>
@@ -309,7 +309,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. SITE-1"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400 font-mono"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400 font-mono"
                   />
                 </div>
 
@@ -322,7 +322,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. Plot 12, Industrial Area, Phase 2"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400"
                   />
                 </div>
 
@@ -335,7 +335,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. Noori Developers & Properties Ltd."
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400"
                   />
                 </div>
 
@@ -348,7 +348,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. Mohammad Tariq (+91 98201 55410)"
                     value={principalContractor}
                     onChange={(e) => setPrincipalContractor(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400"
                   />
                 </div>
 
@@ -361,7 +361,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. Er. Amit Verma"
                     value={projectPerson}
                     onChange={(e) => setProjectPerson(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400"
                   />
                 </div>
 
@@ -374,7 +374,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="e.g. +91 98201 55410"
                     value={personNumber}
                     onChange={(e) => setPersonNumber(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400"
                   />
                 </div>
 
@@ -387,7 +387,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     placeholder="Auto-generated if left empty (e.g. NC-SITE-SECURE-88)"
                     value={safetyKey}
                     onChange={(e) => setSafetyKey(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 transition-colors placeholder:text-slate-400 font-mono"
+                    className="w-full text-xs px-3 py-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] transition-colors placeholder:text-slate-400 font-mono"
                   />
                 </div>
               </div>
@@ -396,14 +396,14 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 cursor-pointer transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  className="px-4.5 py-2 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] active:scale-95 text-white text-xs font-semibold shadow-xs shadow-[#653ef1]/25 transition-all cursor-pointer"
                 >
                   {isSaving ? 'Creating...' : 'Save Site to Supabase'}
                 </button>
@@ -420,7 +420,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                 placeholder="Search sites by name, location, or person..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-600 shadow-2xs"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#653ef1] shadow-2xs"
               />
             </div>
 
@@ -440,7 +440,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
           {/* Projects List */}
           {isLoading ? (
             <div className="py-14 text-center text-xs text-slate-400 space-y-2">
-              <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="w-6 h-6 border-2 border-[#653ef1] border-t-transparent rounded-full animate-spin mx-auto" />
               <p>Loading construction sites from Supabase...</p>
             </div>
           ) : filteredProjects.length === 0 ? (
@@ -451,7 +451,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(true)}
-                  className="text-xs text-purple-600 hover:underline font-bold cursor-pointer"
+                  className="text-xs text-[#653ef1] hover:underline font-bold cursor-pointer"
                 >
                   + Create Your Site Now
                 </button>
@@ -466,13 +466,13 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                     key={p.id}
                     className={`p-4 rounded-2xl border transition-all ${
                       isActive
-                        ? 'border-purple-400 bg-white shadow-md ring-2 ring-purple-100'
+                        ? 'border-[#653ef1] bg-white shadow-md ring-2 ring-[#653ef1]/20'
                         : 'border-slate-200 hover:border-slate-300 bg-white shadow-2xs'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        <div className="w-9 h-9 rounded-xl bg-[#653ef1]/10 border border-[#653ef1]/20 text-[#653ef1] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
                           #{p.serial_no}
                         </div>
                         <div className="min-w-0 flex-1 space-y-1">
@@ -513,8 +513,8 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
 
                             {p.safety_key && (
                               <div className="pt-1">
-                                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                                  <KeyRound className="w-3 h-3 text-purple-500" />
+                                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-[#653ef1] bg-[#653ef1]/10 px-2 py-0.5 rounded border border-[#653ef1]/20">
+                                  <KeyRound className="w-3 h-3 text-[#653ef1]" />
                                   <span>Safety Key: {p.safety_key}</span>
                                 </span>
                               </div>
@@ -535,8 +535,8 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                               }}
                               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                 isActive
-                                  ? 'bg-purple-600 text-white shadow-xs'
-                                  : 'bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700'
+                                  ? 'bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white shadow-xs shadow-[#653ef1]/25'
+                                  : 'bg-slate-100 hover:bg-[#653ef1]/15 text-slate-700 hover:text-[#653ef1]'
                               }`}
                               title="Switch to this site"
                             >
@@ -576,7 +576,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
         {/* Drawer Footer Bar */}
         <div className="px-5 py-3 border-t border-slate-200 bg-white flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-purple-600" />
+            <ShieldCheck className="w-4 h-4 text-[#653ef1]" />
             <span>Supabase RLS Protected</span>
           </div>
           <span className="text-[11px] text-slate-400">

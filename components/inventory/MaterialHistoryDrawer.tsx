@@ -25,9 +25,17 @@ import {
   Loader2,
   AlertCircle,
   Undo2,
-  Save
+  Save,
+  UserPlus
 } from 'lucide-react';
-import { ConstructionMaterial, InventoryTransaction } from '@/lib/inventory/inventory-types';
+import {
+  ConstructionMaterial,
+  InventoryTransaction,
+  InventoryTransactionType,
+  InventorySupplier,
+  InventorySubcontractor,
+  VendorProfile
+} from '@/lib/inventory/inventory-types';
 import {
   downloadInventoryVoucherPdf,
   viewInventoryVoucherPdfInNewTab,
@@ -35,6 +43,7 @@ import {
   viewMaterialCheckoutHistoryPdfInNewTab
 } from '@/lib/inventory/inventory-voucher-pdf';
 import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
+import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
 
 interface MaterialHistoryDrawerProps {
   isOpen: boolean;
@@ -47,6 +56,10 @@ interface MaterialHistoryDrawerProps {
   onDeleteTransaction?: (tx: InventoryTransaction) => Promise<void> | void;
   onRestoreTransaction?: (tx: InventoryTransaction) => Promise<void> | void;
   onUpdateTransaction?: (tx: InventoryTransaction) => Promise<void> | void;
+  suppliers?: InventorySupplier[];
+  subcontractors?: InventorySubcontractor[];
+  vendorProfiles?: VendorProfile[];
+  onOpenVendorDrawer?: (defaultType?: 'vendor' | 'contractor' | 'other') => void;
 }
 
 export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
@@ -60,6 +73,10 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
   onDeleteTransaction,
   onRestoreTransaction,
   onUpdateTransaction,
+  suppliers = [],
+  subcontractors = [],
+  vendorProfiles = [],
+  onOpenVendorDrawer,
 }) => {
   const [filterMode, setFilterMode] = useState<'checkouts_only' | 'all' | 'bin'>(defaultFilter);
 
@@ -70,8 +87,10 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
 
   // Modals state: Edit Movement Voucher
   const [editingTx, setEditingTx] = useState<InventoryTransaction | null>(null);
+  const [editType, setEditType] = useState<InventoryTransactionType>('check_out');
   const [editDate, setEditDate] = useState<string>('');
   const [editTime, setEditTime] = useState<string>('');
+  const [editPartyId, setEditPartyId] = useState<string>('');
   const [editPartyName, setEditPartyName] = useState<string>('');
   const [editForeman, setEditForeman] = useState<string>('');
   const [editFloorZone, setEditFloorZone] = useState<string>('');
@@ -82,6 +101,71 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
   const [editFile, setEditFile] = useState<File | null>(null);
   const [isRemovingFile, setIsRemovingFile] = useState<boolean>(false);
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+
+  // Combine contractor agencies from subcontractors array and vendorProfiles so all added parties are always selectable
+  const mergedSubcontractors = useMemo(() => {
+    const map = new Map<string, InventorySubcontractor>();
+    subcontractors.forEach((s) => map.set(s.id, s));
+    vendorProfiles.forEach((vp) => {
+      if (!map.has(vp.id)) {
+        map.set(vp.id, {
+          id: vp.id,
+          name: vp.name,
+          type: vp.type,
+          trade: vp.trade || (vp.type === 'contractor' ? 'Subcontractor' : vp.type === 'vendor' ? 'Material Vendor' : 'Party'),
+          foremanName: vp.contactPerson || '',
+          phone: vp.phone || '',
+          address: vp.address || '',
+          location: vp.location || '',
+          activeWorkers: 0,
+          notes: vp.notes || '',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [subcontractors, vendorProfiles]);
+
+  const subcontractorOptions: SearchableOption[] = useMemo(() => {
+    return mergedSubcontractors.map((s) => ({
+      value: s.id,
+      label: s.name,
+      subtitle: s.trade ? `Trade: ${s.trade}` : undefined,
+      badge: s.trade || (s.type === 'contractor' ? 'Agency' : undefined),
+    }));
+  }, [mergedSubcontractors]);
+
+  // Combine suppliers and vendorProfiles
+  const mergedSuppliers = useMemo(() => {
+    const map = new Map<string, InventorySupplier>();
+    suppliers.forEach((s) => map.set(s.id, s));
+    vendorProfiles.forEach((vp) => {
+      if (!map.has(vp.id)) {
+        map.set(vp.id, {
+          id: vp.id,
+          name: vp.name,
+          type: vp.type,
+          trade: vp.trade || 'Vendor',
+          phone: vp.phone || '',
+          email: vp.email || '',
+          gstin: vp.gstin || '',
+          city: vp.location || '',
+          address: vp.address || '',
+          location: vp.location || '',
+          notes: vp.notes || '',
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [suppliers, vendorProfiles]);
+
+  const supplierOptions: SearchableOption[] = useMemo(() => {
+    return mergedSuppliers.map((s) => ({
+      value: s.id,
+      label: s.name,
+      subtitle: s.trade ? `Trade: ${s.trade}` : (s.city || undefined),
+      badge: s.trade || (s.type === 'vendor' ? 'Vendor' : undefined),
+    }));
+  }, [mergedSuppliers]);
 
   // Active (non-deleted) transactions for this specific material
   const activeItemTransactions = useMemo(() => {
@@ -160,9 +244,13 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
   // Open Edit Modal
   const handleOpenEdit = (tx: InventoryTransaction) => {
     setEditingTx(tx);
+    setEditType(tx.type);
     setEditDate(tx.date || new Date().toISOString().split('T')[0]);
     setEditTime(tx.time || '12:00 PM');
-    setEditPartyName(tx.subcontractorName || tx.supplierName || '');
+    const existingPartyId = tx.subcontractorId || tx.supplierId || '';
+    const existingPartyName = tx.subcontractorName || tx.supplierName || '';
+    setEditPartyId(existingPartyId);
+    setEditPartyName(existingPartyName);
     setEditForeman(tx.foremanName || tx.receivedOrIssuedBy || '');
     setEditFloorZone(tx.floorZone || '');
     setEditPurpose(tx.purpose || tx.returnReason || tx.damageReason || '');
@@ -187,16 +275,19 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
         fileName = uploaded.fileName;
       }
 
-      const isOut = editingTx.type === 'check_out';
-      const isRet = editingTx.type === 'return';
-      const isDmg = editingTx.type === 'damage';
+      const isOut = editType === 'check_out';
+      const isRet = editType === 'return';
+      const isDmg = editType === 'damage';
 
       const updatedTx: InventoryTransaction = {
         ...editingTx,
+        type: editType,
         date: editDate,
         time: editTime,
-        subcontractorName: isOut ? editPartyName : editingTx.subcontractorName,
-        supplierName: !isOut ? editPartyName : editingTx.supplierName,
+        subcontractorId: isOut ? editPartyId || undefined : undefined,
+        subcontractorName: isOut ? editPartyName : undefined,
+        supplierId: !isOut ? editPartyId || undefined : undefined,
+        supplierName: !isOut ? editPartyName : undefined,
         foremanName: editForeman,
         floorZone: editFloorZone,
         purpose: isOut ? editPurpose : editingTx.purpose,
@@ -731,6 +822,94 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
 
             {/* Scrollable Form Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3.5 text-xs">
+              {/* Entry Type */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                  Entry Type *
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditType('check_out')}
+                    className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                      editType === 'check_out'
+                        ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-bold ring-2 ring-indigo-400/40 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      editType === 'check_out' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <ArrowUpRight className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold leading-tight">Check-Out</span>
+                      <span className="block text-[10px] text-slate-500 font-normal">Issue to Site</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditType('check_in')}
+                    className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                      editType === 'check_in'
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold ring-2 ring-emerald-400/40 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      editType === 'check_in' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <ArrowDownLeft className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold leading-tight">Check-In</span>
+                      <span className="block text-[10px] text-slate-500 font-normal">Store Receipt</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditType('return')}
+                    className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                      editType === 'return'
+                        ? 'bg-amber-50 border-amber-400 text-amber-900 font-bold ring-2 ring-amber-400/40 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      editType === 'return' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <RotateCcw className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold leading-tight">Return</span>
+                      <span className="block text-[10px] text-slate-500 font-normal">Site/Vendor</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditType('damage')}
+                    className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                      editType === 'damage'
+                        ? 'bg-rose-50 border-rose-400 text-rose-900 font-bold ring-2 ring-rose-400/40 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      editType === 'damage' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold leading-tight">Damage</span>
+                      <span className="block text-[10px] text-slate-500 font-normal">Scrap/Defect</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Date & Time */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -759,18 +938,65 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Party (Subcontractor / Supplier) */}
+              {/* Party (Subcontractor / Supplier) with Searchable Dropdown */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  {editingTx.type === 'check_out' ? 'Subcontractor / Agency Name' : 'Supplier / Vendor Name'}
-                </label>
-                <input
-                  type="text"
-                  value={editPartyName}
-                  onChange={(e) => setEditPartyName(e.target.value)}
-                  placeholder={editingTx.type === 'check_out' ? 'e.g. Al-Madina Masonry Gang' : 'e.g. Shree Cement Suppliers'}
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs font-medium focus:outline-hidden focus:border-purple-600"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    {editType === 'check_out' ? 'Subcontractor / Agency Name' : 'Supplier / Vendor Name'}
+                  </label>
+                  {onOpenVendorDrawer && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenVendorDrawer(editType === 'check_out' ? 'contractor' : 'vendor')}
+                      className="text-purple-600 hover:text-purple-800 text-[10px] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      <span>{editType === 'check_out' ? '+ New Contractor' : '+ New Vendor'}</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <SearchableSelect
+                    options={editType === 'check_out' ? subcontractorOptions : supplierOptions}
+                    value={editPartyId}
+                    onChange={(selectedId) => {
+                      setEditPartyId(selectedId);
+                      const opt = (editType === 'check_out' ? subcontractorOptions : supplierOptions).find(
+                        (o) => o.value === selectedId
+                      );
+                      if (opt) {
+                        setEditPartyName(opt.label);
+                      }
+                      if (editType === 'check_out') {
+                        const sub = mergedSubcontractors.find((s) => s.id === selectedId);
+                        if (sub?.foremanName && !editForeman) {
+                          setEditForeman(sub.foremanName);
+                        }
+                      }
+                    }}
+                    placeholder={
+                      editType === 'check_out'
+                        ? 'Select Subcontractor / Agency (or type below)'
+                        : 'Select Supplier / Vendor (or type below)'
+                    }
+                    searchPlaceholder={
+                      editType === 'check_out' ? 'Search subcontractor...' : 'Search supplier or vendor...'
+                    }
+                    allowClear
+                  />
+                  <input
+                    type="text"
+                    value={editPartyName}
+                    onChange={(e) => setEditPartyName(e.target.value)}
+                    placeholder={
+                      editType === 'check_out'
+                        ? 'Or enter custom agency name...'
+                        : 'Or enter custom vendor name...'
+                    }
+                    className="w-full h-8 px-2.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-hidden focus:border-purple-600 bg-slate-50/50"
+                  />
+                </div>
               </div>
 
               {/* Receiving Foreman / Person */}
@@ -818,13 +1044,27 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
               {/* Purpose / Work Description */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Purpose / Work Description
+                  {editType === 'check_out'
+                    ? 'Purpose / Work Description'
+                    : editType === 'return'
+                    ? 'Return Reason'
+                    : editType === 'damage'
+                    ? 'Damage / Defect Reason'
+                    : 'Delivery / Receipt Remarks'}
                 </label>
                 <input
                   type="text"
                   value={editPurpose}
                   onChange={(e) => setEditPurpose(e.target.value)}
-                  placeholder="e.g. Internal partition wall masonry"
+                  placeholder={
+                    editType === 'check_out'
+                      ? 'e.g. Internal partition wall masonry'
+                      : editType === 'return'
+                      ? 'e.g. Excess stock returned to godown / supplier'
+                      : editType === 'damage'
+                      ? 'e.g. Broken in transit / water damaged'
+                      : 'e.g. Initial stock receipt from supplier'
+                  }
                   className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs font-medium focus:outline-hidden focus:border-purple-600"
                 />
               </div>

@@ -72,17 +72,17 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
           <button
             type="button"
             onClick={() => handleSelectTab('expenses')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'expenses'
-                ? 'bg-white text-purple-700 shadow-2xs border border-purple-200 font-bold'
+                ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
             }`}
           >
-            <Receipt className={`w-4 h-4 ${activeTab === 'expenses' ? 'text-purple-600 stroke-[2.3]' : 'text-slate-400'}`} />
+            <Receipt className={`w-4 h-4 ${activeTab === 'expenses' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
             <span>Site Daily Bills & Expenses</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
               activeTab === 'expenses' 
-                ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
                 : 'bg-slate-200/80 text-slate-600'
             }`}>
               Daily Burn & Petty Cash
@@ -94,17 +94,17 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
             <button
               type="button"
               onClick={() => handleSelectTab('subcontractor-bills')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'subcontractor-bills'
-                  ? 'bg-white text-purple-700 shadow-2xs border border-purple-200 font-bold'
+                  ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'subcontractor-bills' ? 'text-purple-600 stroke-[2.3]' : 'text-slate-400'}`} />
+              <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'subcontractor-bills' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
               <span>Sub-Contractor Bills (RA)</span>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
                 activeTab === 'subcontractor-bills' 
-                  ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                  ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
                   : 'bg-slate-200/80 text-slate-600'
               }`}>
                 RA Invoicing
@@ -116,17 +116,17 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
           <button
             type="button"
             onClick={() => handleSelectTab('contractor-work-orders')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'contractor-work-orders'
-                ? 'bg-white text-purple-700 shadow-2xs border border-purple-200 font-bold'
+                ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
             }`}
           >
-            <Wrench className={`w-4 h-4 ${activeTab === 'contractor-work-orders' ? 'text-purple-600 stroke-[2.3]' : 'text-slate-400'}`} />
+            <Wrench className={`w-4 h-4 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
             <span>Work Orders & Khata</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
               activeTab === 'contractor-work-orders' 
-                ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
                 : 'bg-slate-200/80 text-slate-600'
             }`}>
               Extra Work & Payouts
@@ -136,7 +136,7 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
 
         {/* Project Context & Meta */}
         <div className="hidden md:flex items-center gap-2 pr-2 text-xs text-slate-500">
-          <Building2 className="w-3.5 h-3.5 text-purple-600" />
+          <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
           <span>Project Commercial:</span>
           <strong className="text-slate-800 font-semibold">{project?.name || 'Noori Crest Tower'}</strong>
         </div>

@@ -414,7 +414,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             <button
               type="button"
               onClick={toastMessage.undoAction}
-              className="px-2 py-0.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold cursor-pointer"
+              className="px-2 py-0.5 rounded bg-[#653ef1] hover:bg-[#592be8] text-white text-[11px] font-bold cursor-pointer"
             >
               Undo
             </button>
@@ -437,14 +437,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
             <div>
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
-                <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#653ef1]" />
+                <span className="text-xs font-bold text-[#653ef1] uppercase tracking-wider">
                   Module 3 • Project Documents Vault
                 </span>
                 
                 {/* Active Filter Project Pill */}
-                <div className="flex items-center gap-1 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                  <Link2 className="w-3 h-3 text-purple-500" />
+                <div className="flex items-center gap-1 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25">
+                  <Link2 className="w-3 h-3 text-[#653ef1]" />
                   <span>
                     {activeProjectDef ? `Site #${activeProjectDef.serial_no} — ${activeProjectDef.name}` : 'All Projects (Multi-Site)'}
                   </span>
@@ -463,47 +463,47 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <button
                 type="button"
                 onClick={loadAllFiles}
-                className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                className="p-2.5 text-slate-500 hover:text-[#653ef1] hover:bg-[#653ef1]/10 rounded-xl border border-slate-200/90 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
                 title="Refresh Documents"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#653ef1]' : ''}`} />
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsUploadModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 hover:shadow-md hover:shadow-[#653ef1]/35 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-4 h-4 stroke-[2.2]" />
                 <span>Upload Document</span>
               </button>
             </div>
           </div>
 
           {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
-              <span className="text-[11px] font-semibold text-slate-500 block">Active Documents</span>
-              <div className="text-lg font-bold text-slate-900 mt-0.5">{activeFiles.length}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Active Documents</span>
+              <div className="text-xl font-bold text-slate-900 mt-1 tabular-nums">{activeFiles.length}</div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
-              <span className="text-[11px] font-semibold text-slate-500 block">Vault Storage</span>
-              <div className="text-lg font-bold text-purple-700 font-mono mt-0.5">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Vault Storage</span>
+              <div className="text-xl font-bold text-[#653ef1] font-mono mt-1 tabular-nums">
                 {formatFileSize(totalStorageBytes)}
               </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
-              <span className="text-[11px] font-semibold text-slate-500 block">Drawings & Technical</span>
-              <div className="text-lg font-bold text-slate-900 mt-0.5">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Drawings & Technical</span>
+              <div className="text-xl font-bold text-slate-900 mt-1 tabular-nums">
                 {activeFiles.filter(f => f.category.includes('drawings')).length}
               </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
-              <span className="text-[11px] font-semibold text-slate-500 block">In Recycle Bin</span>
-              <div className={`text-lg font-bold mt-0.5 ${deletedFiles.length > 0 ? 'text-rose-600 font-mono' : 'text-slate-400'}`}>
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">In Recycle Bin</span>
+              <div className={`text-xl font-bold mt-1 tabular-nums ${deletedFiles.length > 0 ? 'text-rose-600 font-mono' : 'text-slate-400'}`}>
                 {deletedFiles.length} files
               </div>
             </div>
@@ -511,31 +511,33 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
           {/* Vault vs Recycle Bin Tabs Switcher */}
           <div className="flex items-center gap-2 mt-5 pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setActiveTab('vault')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'vault'
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <FolderKanban className="w-3.5 h-3.5" />
-              <span>Active Vault ({activeFiles.length})</span>
-            </button>
+            <div className="flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => setActiveTab('vault')}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'vault'
+                    ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FolderKanban className={`w-3.5 h-3.5 ${activeTab === 'vault' ? 'text-[#653ef1]' : 'text-slate-400'}`} />
+                <span>Active Vault ({activeFiles.length})</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('bin')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'bin'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-rose-600 hover:bg-rose-50'
-              }`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Recycle Bin ({deletedFiles.length})</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('bin')}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'bin'
+                    ? 'bg-white text-rose-600 shadow-2xs border border-rose-200/60 font-bold'
+                    : 'text-slate-600 hover:text-rose-600'
+                }`}
+              >
+                <Trash2 className={`w-3.5 h-3.5 ${activeTab === 'bin' ? 'text-rose-600' : 'text-slate-400'}`} />
+                <span>Recycle Bin ({deletedFiles.length})</span>
+              </button>
+            </div>
           </div>
 
         </div>
@@ -582,18 +584,18 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by file name, doc code, project, tags..."
-              className="w-full text-xs pl-9 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-all placeholder:text-slate-400"
+              className="w-full text-xs pl-9 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all placeholder:text-slate-400"
             />
           </div>
 
           {/* 2. Project Foreign Key Selector Filter */}
           <div className="shrink-0">
-            <div className="flex items-center gap-1.5 border border-purple-200 bg-purple-50/40 rounded-lg px-2.5 py-1">
-              <Building2 className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+            <div className="flex items-center gap-1.5 border border-[#653ef1]/20 bg-[#653ef1]/5 rounded-lg px-2.5 py-1">
+              <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="text-xs bg-transparent font-bold text-purple-900 focus:outline-none cursor-pointer"
+                className="text-xs bg-transparent font-bold text-[#653ef1] focus:outline-none cursor-pointer"
                 title="Filter documents by construction project foreign key"
               >
                 <option value="all">🏢 All Projects (Vault)</option>
@@ -611,7 +613,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             <select
               value={selectedCategory}
               onChange={(e) => handleCategorySelect(e.target.value as FileCategory | 'all')}
-              className="w-full md:w-auto text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+              className="w-full md:w-auto text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] cursor-pointer"
             >
               {categoryOptions.map(c => (
                 <option key={c.value} value={c.value}>
@@ -639,7 +641,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 onClick={() => setSelectedFileType(type)}
                 className={`text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all shrink-0 cursor-pointer ${
                   selectedFileType === type
-                    ? 'bg-purple-100/80 text-purple-700 border border-purple-200'
+                    ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
@@ -670,7 +672,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               type="button"
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === 'grid' ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-400 hover:text-slate-700'
+                viewMode === 'grid' ? 'bg-white text-[#653ef1] shadow-2xs' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Grid Cards View"
             >
@@ -680,7 +682,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               type="button"
               onClick={() => setViewMode('table')}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === 'table' ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-400 hover:text-slate-700'
+                viewMode === 'table' ? 'bg-white text-[#653ef1] shadow-2xs' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Compact Table View"
             >
@@ -693,7 +695,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         {/* Loading State */}
         {isLoading && (
           <div className="p-12 text-center bg-white rounded-xl border border-slate-200">
-            <div className="w-8 h-8 border-3 border-purple-600/30 border-t-purple-600 rounded-full animate-spin mx-auto mb-3" />
+            <div className="w-8 h-8 border-3 border-[#653ef1]/20 border-t-[#653ef1] rounded-full animate-spin mx-auto mb-3" />
             <p className="text-xs font-semibold text-slate-500">Loading files from database...</p>
           </div>
         )}
@@ -702,7 +704,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         {!isLoading && filteredFiles.length === 0 && (
           <div className="p-12 text-center bg-white rounded-xl border border-slate-200 space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
-              {activeTab === 'bin' ? <Trash2 className="w-6 h-6 text-slate-400" /> : <FolderKanban className="w-6 h-6 text-purple-600" />}
+              {activeTab === 'bin' ? <Trash2 className="w-6 h-6 text-slate-400" /> : <FolderKanban className="w-6 h-6 text-[#653ef1]" />}
             </div>
             <h3 className="text-sm font-bold text-slate-800">
               {activeTab === 'bin' ? 'Recycle Bin is Empty' : 'No Documents Found'}
@@ -716,7 +718,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsUploadModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-xs cursor-pointer mt-1"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer mt-1"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Document</span>
@@ -732,7 +734,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <div
                 key={file.id}
                 className={`bg-white rounded-xl border transition-all flex flex-col justify-between overflow-hidden group relative ${
-                  activeTab === 'bin' ? 'border-rose-200 bg-rose-50/20' : 'border-slate-200 hover:border-purple-200 hover:shadow-md'
+                  activeTab === 'bin' ? 'border-rose-200 bg-rose-50/20' : 'border-slate-200 hover:border-[#653ef1]/30 hover:shadow-md'
                 }`}
               >
                 {/* Card Top: Icon, Document No & Actions */}
@@ -743,7 +745,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         {getFileIcon(file.file_type)}
                       </div>
                       <div className="min-w-0">
-                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 block truncate max-w-[130px]">
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 block truncate max-w-[130px]">
                           {file.document_no}
                         </span>
                         <span className="text-[11px] text-slate-400 block truncate font-mono">
@@ -822,7 +824,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRestoreFile(file)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#653ef1]/10 hover:bg-[#653ef1]/20 text-[#653ef1] font-bold text-xs border border-[#653ef1]/20 transition-colors cursor-pointer"
                         title="Restore back to project vault"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -834,7 +836,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                   {/* Relational Foreign Key Project Tag */}
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-full">
-                      <Building2 className="w-3 h-3 text-purple-600 shrink-0" />
+                      <Building2 className="w-3 h-3 text-[#653ef1] shrink-0" />
                       <span className="truncate">
                         {file.project ? `Site #${file.project.serial_no} • ${file.project.name}` : project.name}
                       </span>
@@ -847,13 +849,13 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       setPreviewFile(file);
                       setIsPreviewOpen(true);
                     }}
-                    className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition-colors cursor-pointer line-clamp-1 mb-1"
+                    className="text-xs font-bold text-slate-900 group-hover:text-[#653ef1] transition-colors cursor-pointer line-clamp-1 mb-1"
                     title={file.title}
                   >
                     {file.title}
                   </h4>
 
-                  <span className="inline-block text-[10px] font-semibold text-purple-700 bg-purple-50/70 border border-purple-100 px-2 py-0.5 rounded-md truncate max-w-full">
+                  <span className="inline-block text-[10px] font-semibold text-[#653ef1] bg-[#653ef1]/10 border border-[#653ef1]/20 px-2 py-0.5 rounded-md truncate max-w-full">
                     {file.category}
                   </span>
 
@@ -909,7 +911,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                             setPreviewFile(file);
                             setIsPreviewOpen(true);
                           }}
-                          className="text-xs font-bold text-purple-700 hover:text-purple-800 flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-bold text-[#653ef1] hover:text-[#5022e3] flex items-center gap-1 cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View In-App</span>
@@ -928,7 +930,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRestoreFile(file)}
-                          className="text-xs font-bold text-purple-700 hover:text-purple-800 flex items-center gap-1 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded-md border border-purple-200 cursor-pointer transition-colors"
+                          className="text-xs font-bold text-[#653ef1] hover:text-[#5022e3] flex items-center gap-1 bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-2 py-1 rounded-md border border-[#653ef1]/20 cursor-pointer transition-colors"
                           title="Restore back to project vault"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
@@ -980,14 +982,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       }}
                     >
                       {/* Doc No */}
-                      <td className="py-3 px-4 font-mono font-bold text-purple-700">
+                      <td className="py-3 px-4 font-mono font-bold text-[#653ef1]">
                         {file.document_no}
                       </td>
 
                       {/* Project Foreign Key */}
                       <td className="py-3 px-4 font-semibold text-slate-700">
-                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-mono">
-                          <Building2 className="w-3 h-3 text-purple-500" />
+                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 font-mono">
+                          <Building2 className="w-3 h-3 text-[#653ef1]" />
                           <span>{file.project ? `Site #${file.project.serial_no}` : 'Site #1'}</span>
                         </span>
                       </td>
@@ -999,7 +1001,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                             {getFileIcon(file.file_type)}
                           </div>
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-900 block truncate group-hover:text-purple-700 transition-colors">
+                            <span className="font-bold text-slate-900 block truncate group-hover:text-[#653ef1] transition-colors">
                               {file.title}
                             </span>
                             <span className="text-[11px] text-slate-400 font-mono block truncate">
@@ -1055,7 +1057,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleDownloadFile(file)}
-                              className="p-1.5 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-[#653ef1] hover:bg-[#653ef1]/10 rounded-md transition-colors cursor-pointer"
                               title="Download"
                             >
                               <Download className="w-3.5 h-3.5" />
@@ -1075,7 +1077,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleRestoreFile(file)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-colors cursor-pointer"
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#653ef1]/10 hover:bg-[#653ef1]/20 text-[#653ef1] font-bold text-xs border border-[#653ef1]/20 transition-colors cursor-pointer"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                               <span>Restore</span>

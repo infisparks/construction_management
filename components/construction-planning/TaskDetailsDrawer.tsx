@@ -143,8 +143,8 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
                 {task.type.replace('_', ' ')}
               </span>
               {task.isCritical && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                  <Flame className="w-3 h-3 text-purple-600" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <Flame className="w-3 h-3 text-amber-600" />
                   Critical Path (0d Float)
                 </span>
               )}
@@ -187,14 +187,14 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             <span className="font-semibold text-slate-800 capitalize">{task.status.replace('_', ' ')}</span>
             <span className="text-slate-300">|</span>
             <span className="text-slate-500">Progress:</span>
-            <span className="font-bold text-indigo-600">{task.progress}%</span>
+            <span className="font-bold text-[#653ef1] font-numeric">{task.progress}%</span>
           </div>
 
           <div className="flex items-center gap-2">
             {!task.actualStartDate && task.status !== 'completed' && (
               <button
                 onClick={() => onStartTask(task.id)}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#6e46f2] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white font-semibold shadow-xs shadow-[#653ef1]/25 active:scale-95 transition-all cursor-pointer"
               >
                 <Play className="w-3 h-3 fill-white" />
                 <span>Start Task</span>
@@ -204,7 +204,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             {task.actualStartDate && (
               <button
                 onClick={() => onRecordProgress(task)}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold shadow-xs active:scale-95 transition-all cursor-pointer"
               >
                 <FileText className="w-3 h-3" />
                 <span>Record Progress</span>
@@ -214,7 +214,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             {task.actualStartDate && task.progress < 100 && (
               <button
                 onClick={() => onCompleteTask(task.id)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium border border-slate-200"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium border border-slate-200 transition-all cursor-pointer"
               >
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                 <span>Mark Done</span>
@@ -225,7 +225,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             {task.status === 'completed' && onRevertTaskStatus && (
               <button
                 onClick={() => onRevertTaskStatus(task.id, 'in_progress')}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium border border-amber-200 transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium border border-amber-200 transition-all shadow-xs cursor-pointer"
                 title="Undo completion and resume task as In Progress"
               >
                 <RotateCcw className="w-3 h-3 text-amber-600" />
@@ -237,7 +237,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             {(task.actualStartDate || task.status === 'in_progress' || task.status === 'completed') && onRevertTaskStatus && (
               <button
                 onClick={() => onRevertTaskStatus(task.id, 'not_started')}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 font-medium border border-slate-200 transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 font-medium border border-slate-200 transition-all shadow-xs cursor-pointer"
                 title="Reset actual dates and progress back to Not Started"
               >
                 <RotateCcw className="w-3 h-3 text-slate-500" />
@@ -248,7 +248,7 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center border-b border-slate-200 px-4 bg-slate-50/50 overflow-x-auto text-xs font-medium">
+        <div className="flex items-center border-b border-slate-200 px-4 bg-slate-50/60 overflow-x-auto text-xs font-medium">
           {[
             { id: 'overview', label: 'Overview' },
             { id: 'dependencies', label: `Dependencies (${predecessors.length + successors.length})` },
@@ -260,9 +260,9 @@ export const TaskDetailsDrawer: React.FC<TaskDetailsDrawerProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`py-2.5 px-3 border-b-2 font-semibold whitespace-nowrap transition-colors ${
+              className={`py-2.5 px-3.5 border-b-2 font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                 activeTab === tab.id
-                  ? 'border-indigo-600 text-indigo-600 bg-white'
+                  ? 'border-[#653ef1] text-[#653ef1] bg-white'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >

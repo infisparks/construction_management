@@ -100,21 +100,59 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
   const getStatusBadge = (status: ScheduleStatus) => {
     switch (status) {
       case 'completed':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Completed</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Completed
+          </span>
+        );
       case 'in_progress':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">In Progress</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-[#653ef1] border border-purple-200 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#653ef1] animate-soft-pulse" />
+            In Progress
+          </span>
+        );
       case 'ready_to_start':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">Ready</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+            Ready
+          </span>
+        );
       case 'delayed':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">Delayed</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-soft-pulse" />
+            Delayed
+          </span>
+        );
       case 'at_risk':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">At Risk</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            At Risk
+          </span>
+        );
       case 'blocked':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-900 border border-red-300">Blocked</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-800 border border-red-200 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            Blocked
+          </span>
+        );
       case 'on_hold':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-800 border border-zinc-300">On Hold</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-800 border border-zinc-200">
+            On Hold
+          </span>
+        );
       default:
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-300">Not Started</span>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+            Not Started
+          </span>
+        );
     }
   };
 
@@ -158,7 +196,7 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
       <tr 
         className={`group border-b border-slate-200/80 hover:bg-slate-50/90 transition-colors ${
         isWorkPackage ? 'bg-slate-50/70 font-medium' : 'bg-white'
-      } ${node.isCritical ? 'border-l-4 border-l-purple-600' : 'border-l-4 border-l-transparent'}`}
+      } ${node.isCritical ? 'border-l-4 border-l-amber-500' : 'border-l-4 border-l-transparent'}`}
     >
       {/* 1. Hierarchy & Task Name (STICKY FROZEN LEFT) */}
       <td 
@@ -187,10 +225,10 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
           {/* Critical Path flame indicator */}
           {node.isCritical && (
             <span 
-              className="shrink-0 text-purple-700 bg-purple-100 p-0.5 rounded border border-purple-300" 
+              className="shrink-0 text-amber-800 bg-amber-100 p-0.5 rounded border border-amber-300" 
               title="Critical Path Activity (Zero float)"
             >
-              <Flame className="w-3 h-3 text-purple-600" />
+              <Flame className="w-3 h-3 text-amber-600" />
             </span>
           )}
 
@@ -260,7 +298,7 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
                     ? 'bg-rose-500' 
                     : node.status === 'at_risk'
                       ? 'bg-amber-500'
-                      : 'bg-indigo-600'
+                      : 'bg-gradient-to-r from-[#653ef1] to-[#8b5cf6]'
               }`}
               style={{ width: `${node.progress}%` }}
             />

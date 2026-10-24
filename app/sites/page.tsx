@@ -294,7 +294,7 @@ function SitesPageContent() {
           <div
             className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 text-xs font-semibold ${
               toastMessage.type === 'success'
-                ? 'bg-purple-600 text-white border-purple-700'
+                ? 'bg-[#653ef1] text-white border-[#562ee8]'
                 : toastMessage.type === 'error'
                 ? 'bg-rose-600 text-white border-rose-700'
                 : 'bg-slate-900 text-white border-slate-800'
@@ -307,29 +307,29 @@ function SitesPageContent() {
       )}
 
       {/* Top Application Header */}
-      <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-30 px-4 sm:px-8 py-3 flex items-center justify-between">
+      <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-30 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => router.push('/planstructino?view=list')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors border border-slate-200 cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#653ef1] hover:bg-[#653ef1]/10 rounded-xl transition-all border border-slate-200/90 shadow-2xs hover:border-[#653ef1]/30 cursor-pointer group"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
             <span>Back to Planning & WBS</span>
           </button>
 
           <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold shadow-xs">
-              <Building2 className="w-4.5 h-4.5" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center font-bold shadow-sm shadow-[#653ef1]/25">
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm sm:text-base text-slate-900 leading-tight">
+                <span className="font-bold text-sm sm:text-base text-slate-900 tracking-tight">
                   Armee Enterprises PMS
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20">
                   Site Switcher
                 </span>
               </div>
@@ -343,7 +343,7 @@ function SitesPageContent() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold rounded-xl shadow-sm shadow-[#653ef1]/25 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Create New Site</span>
@@ -351,13 +351,18 @@ function SitesPageContent() {
           )}
 
           {user && (
-            <div className="hidden md:flex items-center gap-2 text-xs text-slate-600 pl-2 border-l border-slate-200">
-              <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center text-xs">
+            <div className="hidden md:flex items-center gap-2 text-xs text-slate-600 pl-3 border-l border-slate-200">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white font-bold flex items-center justify-center text-xs shadow-2xs">
                 {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
               </div>
-              <span className="font-medium text-[11px] text-slate-700 truncate max-w-[140px]">
-                {user.email}
-              </span>
+              <div className="text-left">
+                <div className="font-semibold text-xs text-slate-900 truncate max-w-[140px] leading-tight">
+                  {user.email}
+                </div>
+                <div className="text-[10px] text-[#653ef1] uppercase font-bold tracking-wider">
+                  {userRole?.role || 'Admin'}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -365,15 +370,74 @@ function SitesPageContent() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
+        {/* KPI Stat Cards Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Total Sites
+              </span>
+              <span className="text-xl font-bold text-slate-900 mt-0.5 block tabular-nums">
+                {projects.length}
+              </span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+              <Building2 className="w-4.5 h-4.5" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Active Sites
+              </span>
+              <span className="text-xl font-bold text-[#653ef1] mt-0.5 block tabular-nums">
+                {projects.filter((p) => !p.is_deleted).length}
+              </span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-[#653ef1]/10 flex items-center justify-center text-[#653ef1]">
+              <CheckCircle2 className="w-4.5 h-4.5" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Archived Sites
+              </span>
+              <span className="text-xl font-bold text-slate-600 mt-0.5 block tabular-nums">
+                {projects.filter((p) => p.is_deleted).length}
+              </span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+              <RotateCcw className="w-4.5 h-4.5" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                Selected Active
+              </span>
+              <span className="text-xs font-bold text-emerald-700 mt-1 block truncate max-w-[130px]" title={projects.find(p => p.id === activeSiteId)?.name || 'None'}>
+                {projects.find(p => p.id === activeSiteId)?.name || 'None'}
+              </span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-soft-pulse" />
+            </div>
+          </div>
+        </div>
+
         {/* First Site Welcome Alert (when 0 sites exist) */}
         {!isLoading && activeProjectsCount === 0 && (
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-white border-2 border-purple-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Sparkles className="w-5 h-5" />
+          <div className="p-6 rounded-2xl bg-gradient-to-r from-[#653ef1]/10 via-[#653ef1]/5 to-white border-2 border-[#653ef1]/25 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center shrink-0 shadow-sm shadow-[#653ef1]/25">
+                <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-purple-950">
+                <h2 className="text-base font-bold text-slate-900">
                   Welcome to Armee Enterprises! You don't have any construction sites yet.
                 </h2>
                 <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
@@ -385,7 +449,7 @@ function SitesPageContent() {
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-md transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold rounded-xl shadow-md transition-all shrink-0 cursor-pointer flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] shadow-[#653ef1]/25"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Create Your First Site</span>
@@ -405,24 +469,24 @@ function SitesPageContent() {
           </div>
 
           {/* Search & Tabs */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search sites..."
-                className="pl-9 pr-3 py-1.5 bg-white border border-[#E5E7EB] rounded-lg text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 w-48 sm:w-64"
+                placeholder="Search sites, addresses..."
+                className="pl-9 pr-3 py-2 bg-white border border-[#E5E7EB] rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] w-48 sm:w-64 transition-all shadow-2xs"
               />
             </div>
 
-            <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg text-xs">
+            <div className="flex items-center bg-slate-200/80 p-1 rounded-xl text-xs border border-slate-200">
               <button
                 type="button"
                 onClick={() => setShowArchived(false)}
-                className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer ${
-                  !showArchived ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  !showArchived ? 'bg-white text-[#653ef1] shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Active ({projects.filter((p) => !p.is_deleted).length})
@@ -430,8 +494,8 @@ function SitesPageContent() {
               <button
                 type="button"
                 onClick={() => setShowArchived(true)}
-                className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer ${
-                  showArchived ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  showArchived ? 'bg-white text-[#653ef1] shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Archived ({projects.filter((p) => p.is_deleted).length})
@@ -442,12 +506,12 @@ function SitesPageContent() {
 
         {/* Sites Cards Grid */}
         {isLoading ? (
-          <div className="p-12 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200">
-            <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <div className="p-12 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="w-8 h-8 border-2 border-[#653ef1] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             Loading construction sites from Supabase...
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 space-y-3">
+          <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
             <Building2 className="w-10 h-10 text-slate-300 mx-auto" />
             <h3 className="text-sm font-bold text-slate-700">No sites found</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
@@ -459,7 +523,7 @@ function SitesPageContent() {
               <button
                 type="button"
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold rounded-xl shadow-sm shadow-[#653ef1]/25 hover:shadow-md transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Create Site</span>
@@ -467,43 +531,43 @@ function SitesPageContent() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredProjects.map((proj) => {
               const isActive = activeSiteId === proj.id && !proj.is_deleted;
 
               return (
                 <div
                   key={proj.id}
-                  className={`bg-white rounded-xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative ${
+                  className={`bg-white rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden relative group hover:-translate-y-1 ${
                     isActive
-                      ? 'border-purple-500 ring-2 ring-purple-500/20 shadow-md'
-                      : 'border-[#E5E7EB] hover:border-purple-300 hover:shadow-sm'
+                      ? 'border-[#653ef1] ring-2 ring-[#653ef1]/20 shadow-md shadow-[#653ef1]/10'
+                      : 'border-[#E5E7EB] hover:border-[#653ef1]/30 hover:shadow-md'
                   }`}
                 >
                   {/* Active Site Top Ribbon */}
                   {isActive && (
-                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1 text-[10px] font-bold tracking-wider uppercase flex items-center justify-between">
+                    <div className="bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white px-3.5 py-1.5 text-[10px] font-bold tracking-wider uppercase flex items-center justify-between shadow-xs">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-soft-pulse" />
                         Current Active Site (Saved in Local Storage)
                       </span>
                       <Check className="w-3.5 h-3.5" />
                     </div>
                   )}
 
-                  <div className="p-4 space-y-3">
+                  <div className="p-5 space-y-3.5">
                     {/* Header: Code & Status */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                      <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20">
                         {proj.code || `SITE-#${proj.serial_no}`}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {proj.is_deleted ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                             Archived
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             Active
                           </span>
@@ -513,12 +577,12 @@ function SitesPageContent() {
 
                     {/* Site Title & Location */}
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1" title={proj.name}>
+                      <h3 className="text-base font-bold text-slate-900 leading-snug line-clamp-1 group-hover:text-[#653ef1] transition-colors" title={proj.name}>
                         {proj.name}
                       </h3>
                       {(proj.location || proj.address) ? (
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1 line-clamp-1" title={proj.location || proj.address || ''}>
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 line-clamp-1" title={proj.location || proj.address || ''}>
+                          <MapPin className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
                           <span>{proj.location || proj.address}</span>
                         </p>
                       ) : (
@@ -526,8 +590,8 @@ function SitesPageContent() {
                       )}
                     </div>
 
-                    {/* Key Details */}
-                    <div className="p-2.5 rounded-lg bg-[#F5F6F8] space-y-1.5 text-xs text-slate-600">
+                    {/* Key Details Card */}
+                    <div className="p-3 rounded-xl bg-[#F5F6F8] space-y-2 text-xs text-slate-600 border border-slate-200/60">
                       {proj.client_name && (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] text-slate-500">Client:</span>
@@ -548,7 +612,7 @@ function SitesPageContent() {
 
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <User className="w-3 h-3 text-purple-600" /> Site Incharge:
+                          <User className="w-3.5 h-3.5 text-[#653ef1]" /> Site Incharge:
                         </span>
                         <span className="font-semibold text-slate-800 text-[11px] truncate max-w-[150px]">
                           {proj.project_person || 'Unassigned'}
@@ -558,20 +622,20 @@ function SitesPageContent() {
                       {proj.person_number && (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <Phone className="w-3 h-3 text-purple-600" /> Contact:
+                            <Phone className="w-3.5 h-3.5 text-[#653ef1]" /> Contact:
                           </span>
-                          <span className="font-mono text-slate-700 text-[11px]">
+                          <span className="font-mono text-slate-700 text-[11px] font-semibold">
                             {proj.person_number}
                           </span>
                         </div>
                       )}
 
                       {proj.safety_key && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/70">
+                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/70">
                           <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <KeyRound className="w-3 h-3 text-purple-600" /> Site Key:
+                            <KeyRound className="w-3.5 h-3.5 text-[#653ef1]" /> Site Key:
                           </span>
-                          <span className="font-mono text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                          <span className="font-mono text-[10px] font-bold text-[#653ef1] bg-[#653ef1]/10 px-2 py-0.5 rounded-md border border-[#653ef1]/20">
                             {proj.safety_key}
                           </span>
                         </div>
@@ -580,12 +644,12 @@ function SitesPageContent() {
                   </div>
 
                   {/* Card Actions Footer */}
-                  <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => handleOpenEditModal(proj)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer text-xs"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-[#653ef1] hover:bg-[#653ef1]/10 transition-colors cursor-pointer text-xs font-semibold"
                         title="Edit site details"
                       >
                         Edit
@@ -597,7 +661,7 @@ function SitesPageContent() {
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title={proj.is_deleted ? 'Restore site' : 'Archive site'}
                       >
-                        {proj.is_deleted ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        {proj.is_deleted ? <RotateCcw className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
                       </button>
                     </div>
 
@@ -605,7 +669,7 @@ function SitesPageContent() {
                       <button
                         type="button"
                         onClick={() => handleToggleArchive(proj)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
                       >
                         Restore Site
                       </button>
@@ -613,16 +677,16 @@ function SitesPageContent() {
                       <button
                         type="button"
                         onClick={() => router.push('/planstructino?view=list')}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-100 text-purple-800 border border-purple-300 text-xs font-bold hover:bg-purple-200 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/30 text-xs font-bold hover:bg-[#653ef1]/20 transition-all cursor-pointer shadow-2xs"
                       >
                         <span>Open Workspace</span>
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-3.5 h-3.5" />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => handleSwitchSite(proj, true)}
-                        className="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold shadow-sm shadow-[#653ef1]/25 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                       >
                         Switch to This Site
                       </button>
@@ -646,17 +710,17 @@ function SitesPageContent() {
           }}
         >
           <div
-            className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
+            className="w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                  <Building2 className="w-4.5 h-4.5" />
+            <div className="px-6 py-4.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center font-bold shadow-sm shadow-[#653ef1]/20">
+                  <Building2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
                     {editingProject
                       ? 'Edit Construction Site'
                       : activeProjectsCount === 0
@@ -675,7 +739,7 @@ function SitesPageContent() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -683,9 +747,9 @@ function SitesPageContent() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmitForm} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+            <form onSubmit={handleSubmitForm} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               {formError && (
-                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2.5">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                   <span>{formError}</span>
                 </div>
@@ -694,7 +758,7 @@ function SitesPageContent() {
               {/* Group 1: PROJECT & SITE DETAILS */}
               <div className="space-y-3">
                 <div className="flex items-center gap-1.5 pb-1 border-b border-slate-100">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#653ef1] bg-[#653ef1]/10 px-2 py-0.5 rounded-md border border-[#653ef1]/20">
                     Project & Site Details (Prints on Bills & Vault)
                   </span>
                 </div>
@@ -702,15 +766,15 @@ function SitesPageContent() {
                 {/* Site Name */}
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">
-                    Site / Project Name *
+                    Site / Project Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Noori Crust Site"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-medium"
+                    placeholder="e.g. Noori Crest Tower"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] font-medium transition-all"
                   />
                 </div>
 
@@ -725,7 +789,7 @@ function SitesPageContent() {
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
                       placeholder="e.g. SITE-1"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                     />
                   </div>
 
@@ -738,7 +802,7 @@ function SitesPageContent() {
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="e.g. Plot 12, Industrial Area, Phase 2"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                     />
                   </div>
                 </div>
@@ -753,8 +817,8 @@ function SitesPageContent() {
                       type="text"
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
-                      placeholder="e.g. Noori Developers & Properties Ltd."
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                      placeholder="e.g. Noori Developers Ltd."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                     />
                   </div>
 
@@ -767,7 +831,7 @@ function SitesPageContent() {
                       value={principalContractor}
                       onChange={(e) => setPrincipalContractor(e.target.value)}
                       placeholder="e.g. Mohammad Tariq (+91 98201 55410)"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                     />
                   </div>
                 </div>
@@ -789,7 +853,7 @@ function SitesPageContent() {
                       value={projectPerson}
                       onChange={(e) => setProjectPerson(e.target.value)}
                       placeholder="e.g. Er. Amit Verma"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                     />
                   </div>
 
@@ -802,7 +866,7 @@ function SitesPageContent() {
                       value={personNumber}
                       onChange={(e) => setPersonNumber(e.target.value)}
                       placeholder="+91 98765 43210"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                     />
                   </div>
                 </div>
@@ -816,9 +880,9 @@ function SitesPageContent() {
                     value={safetyKey}
                     onChange={(e) => setSafetyKey(e.target.value)}
                     placeholder="e.g. KEY-HOR-7821"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all"
                   />
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-slate-400 mt-1">
                     Used for engineer verification and subcontractor authorization on site.
                   </p>
                 </div>
@@ -830,7 +894,7 @@ function SitesPageContent() {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -839,7 +903,7 @@ function SitesPageContent() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] disabled:opacity-50 text-white font-bold transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {isSaving ? (
                     <>

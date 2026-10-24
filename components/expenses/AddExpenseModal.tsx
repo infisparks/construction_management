@@ -831,7 +831,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || isUploading}
-            className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-[#653ef1]/25 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
           >
             {isSubmitting || isUploading ? (
               <>

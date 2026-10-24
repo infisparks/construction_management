@@ -37,7 +37,9 @@ import {
   Tag,
   Paperclip,
   Trash2,
-  ArchiveRestore
+  ArchiveRestore,
+  MoreVertical,
+  ChevronDown
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -58,6 +60,7 @@ import {
 import { MaterialActionModal } from './MaterialActionModal';
 import { VoucherSlipModal } from './VoucherSlipModal';
 import { MaterialHistoryDrawer } from './MaterialHistoryDrawer';
+import { MaterialActionDrawer } from './MaterialActionDrawer';
 import { ProductProfileDrawer } from './ProductProfileDrawer';
 import { VendorProfileDrawer } from './VendorProfileDrawer';
 import { StockSummaryPdfModal } from './StockSummaryPdfModal';
@@ -334,6 +337,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [actionModalType, setActionModalType] = useState<InventoryTransactionType>('check_in');
   const [selectedMaterialForAction, setSelectedMaterialForAction] = useState<string | null>(null);
+
+  // Material Action Drawer & Row Actions Popover State
+  const [actionDrawerMaterial, setActionDrawerMaterial] = useState<ConstructionMaterial | null>(null);
+  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
 
   // Voucher Slip Modal
   const [viewingTransaction, setViewingTransaction] = useState<InventoryTransaction | null>(null);
@@ -817,6 +824,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     // 2. Persist to Supabase
     try {
       await updateInventoryTransactionRecord(updatedTx.id, {
+        type: updatedTx.type === 'check_in' ? 'check_in' : updatedTx.type === 'check_out' ? 'check_out' : updatedTx.type === 'damage' ? 'damage' : 'return',
         vendor_name: updatedTx.subcontractorName || updatedTx.supplierName,
         vendor_id: updatedTx.subcontractorId || updatedTx.supplierId,
         person_name: updatedTx.foremanName || updatedTx.authorizedBy || updatedTx.receivedOrIssuedBy,
@@ -952,12 +960,12 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         </div>
 
         {/* Clean, Organized Button Toolbar */}
-        <div className="flex items-center flex-wrap gap-1.5">
+        <div className="flex items-center flex-wrap gap-2">
           {/* Quick Refresh */}
           <button
             type="button"
             onClick={loadDataFromSupabase}
-            className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Refresh stock and ledger"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDb ? 'animate-spin text-purple-600' : 'text-slate-400'}`} />
@@ -968,7 +976,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <button
             type="button"
             onClick={handleExportCSV}
-            className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Export full ledger as CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
@@ -982,7 +990,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               viewInventoryStockSummaryPdfInNewTab(materials, project?.name || 'Noori Crest Tower');
               setIsStockPdfModalOpen(true);
             }}
-            className="h-8 px-2.5 rounded-lg border border-purple-200 bg-white hover:bg-purple-50 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="h-9 px-3 rounded-xl border border-purple-200 bg-purple-50/50 hover:bg-purple-100/70 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Preview all inventory stock as PDF statement (opens Blob URL)"
           >
             <Printer className="w-3.5 h-3.5 text-purple-600" />
@@ -995,7 +1003,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <button
             type="button"
             onClick={() => setIsProductDrawerOpen(true)}
-            className="h-8 px-2.5 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-xl border border-purple-200/80 bg-purple-50/70 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Create new product profile"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -1008,7 +1016,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               setVendorDrawerDefaultType('vendor');
               setIsVendorDrawerOpen(true);
             }}
-            className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Create new vendor / contractor profile"
           >
             <UserPlus className="w-3.5 h-3.5 text-slate-400" />
@@ -1021,20 +1029,20 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <button
             type="button"
             onClick={() => openActionModal('return')}
-            className="h-8 px-2.5 rounded-lg border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-800 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-xl border border-amber-200/80 bg-amber-50/70 hover:bg-amber-100/80 text-amber-800 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Log return of material to supplier"
           >
-            <RotateCcw className="w-3 h-3 text-amber-600" />
+            <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
             <span>Return</span>
           </button>
 
           <button
             type="button"
             onClick={() => openActionModal('damage')}
-            className="h-8 px-2.5 rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-800 text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-xl border border-rose-200/80 bg-rose-50/70 hover:bg-rose-100/80 text-rose-800 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Log damaged / spoiled material"
           >
-            <AlertTriangle className="w-3 h-3 text-rose-600" />
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
             <span>Defect</span>
           </button>
 
@@ -1042,10 +1050,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <button
             type="button"
             onClick={() => openActionModal('check_out')}
-            className="h-8 px-3 rounded-lg border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+            className="h-9 px-3.5 rounded-xl border border-[#653ef1]/25 bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             title="Issue material to site contractor"
           >
-            <ArrowUpRight className="w-3.5 h-3.5 text-indigo-600 stroke-[2.2]" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-[#653ef1] stroke-[2.2]" />
             <span>Issue (MIN)</span>
           </button>
 
@@ -1053,7 +1061,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <button
             type="button"
             onClick={() => openActionModal('check_in')}
-            className="h-8 px-3.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+            className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm shadow-[#653ef1]/25 hover:shadow-md hover:shadow-[#653ef1]/35 cursor-pointer active:scale-95"
             title="Record inward delivery from supplier"
           >
             <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -1063,33 +1071,33 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       </div>
 
       {/* 2. KPI Metrics Ribbon (5 Compact Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3.5">
         {/* Card 1: Total Stock */}
         <div 
           onClick={() => setActiveTab('catalog')}
-          className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs cursor-pointer hover:border-purple-300 transition-all"
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-purple-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Stock</span>
-            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
               {metrics.totalItems} SKUs
             </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900">
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className="text-xl font-bold text-slate-900 font-numeric">
               {metrics.totalCurrentStock.toLocaleString()}
             </span>
             <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
               Units
             </span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-0.5 block truncate">Live store inventory</span>
+          <span className="text-[11px] text-slate-400 mt-1 block truncate">Live store inventory</span>
         </div>
 
         {/* Card 2: Low Stock Alerts */}
         <div 
           onClick={() => setActiveTab('low_stock')}
-          className={`p-3 rounded-xl border shadow-2xs cursor-pointer transition-all ${
+          className={`p-4 rounded-2xl border shadow-xs cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
             metrics.lowStockCount > 0
               ? 'bg-amber-50/50 border-amber-300 hover:bg-amber-50'
               : 'bg-white border-slate-200/80 hover:border-amber-300'
@@ -1097,90 +1105,90 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Low Stock Alerts</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
               metrics.lowStockCount > 0
                 ? 'text-amber-800 bg-amber-100 border-amber-300'
                 : 'text-emerald-700 bg-emerald-50 border-emerald-200'
             }`}>
-              <AlertTriangle className="w-2.5 h-2.5" />
+              <AlertTriangle className="w-3 h-3" />
               {metrics.lowStockCount > 0 ? 'Reorder' : 'Healthy'}
             </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className={`text-xl font-bold ${metrics.lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'}`}>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className={`text-xl font-bold font-numeric ${metrics.lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'}`}>
               {metrics.lowStockCount}
             </span>
             <span className="text-[11px] text-slate-500 font-medium">Items</span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-0.5 block truncate">Below alert buffer</span>
+          <span className="text-[11px] text-slate-400 mt-1 block truncate">Below alert buffer</span>
         </div>
 
         {/* Card 3: Inward Deliveries */}
         <div 
           onClick={() => setActiveTab('inward')}
-          className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs cursor-pointer hover:border-purple-300 transition-all"
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-purple-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Inward Receipts</span>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-0.5">
-              <ArrowDownLeft className="w-2.5 h-2.5" /> (+) GRN
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-0.5">
+              <ArrowDownLeft className="w-3 h-3" /> (+) GRN
             </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900">{metrics.totalInwardCount}</span>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className="text-xl font-bold text-slate-900 font-numeric">{metrics.totalInwardCount}</span>
             <span className="text-[11px] text-slate-500 font-medium">Deliveries</span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-0.5 block truncate">Added to store</span>
+          <span className="text-[11px] text-slate-400 mt-1 block truncate">Added to store</span>
         </div>
 
         {/* Card 4: Site Dispatches */}
         <div 
           onClick={() => setActiveTab('outward')}
-          className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs cursor-pointer hover:border-indigo-300 transition-all"
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-indigo-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Site Dispatches</span>
-            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-0.5">
-              <ArrowUpRight className="w-2.5 h-2.5" /> (-) MIN
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-0.5">
+              <ArrowUpRight className="w-3 h-3" /> (-) MIN
             </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900">{metrics.totalOutwardCount}</span>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className="text-xl font-bold text-slate-900 font-numeric">{metrics.totalOutwardCount}</span>
             <span className="text-[11px] text-slate-500 font-medium">Issues</span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-0.5 block truncate">Issued to site work</span>
+          <span className="text-[11px] text-slate-400 mt-1 block truncate">Issued to site work</span>
         </div>
 
         {/* Card 5: Returns & Defects */}
         <div 
           onClick={() => setActiveTab('returns_damages')}
-          className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs cursor-pointer hover:border-amber-300 transition-all"
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-amber-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Returns & Defects</span>
-            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
               Deductions
             </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900">{metrics.totalReturnsDamagesCount}</span>
+          <div className="mt-1.5 flex items-baseline justify-between">
+            <span className="text-xl font-bold text-slate-900 font-numeric">{metrics.totalReturnsDamagesCount}</span>
             <span className="text-[11px] text-slate-500 font-medium">Logs</span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-0.5 block truncate">
+          <span className="text-[11px] text-slate-400 mt-1 block truncate">
             {metrics.totalReturnCount} Ret • {metrics.totalDefectCount} Defect
           </span>
         </div>
       </div>
 
       {/* 3. Navigation Tabs (Clean & Professional - Current Stock is Tab #1) */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-1 shadow-2xs flex items-center gap-1 overflow-x-auto">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-xs flex items-center gap-1.5 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('catalog')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'catalog'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
@@ -1190,10 +1198,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('products')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'products'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <Package className="w-3.5 h-3.5" />
@@ -1203,10 +1211,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('vendors')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'vendors'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <Building2 className="w-3.5 h-3.5" />
@@ -1218,10 +1226,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('inward')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'inward'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <ArrowDownLeft className="w-3.5 h-3.5" />
@@ -1231,10 +1239,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('outward')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'outward'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <ArrowUpRight className="w-3.5 h-3.5" />
@@ -1244,10 +1252,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('returns_damages')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'returns_damages'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -1257,10 +1265,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('ledger')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'ledger'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <History className="w-3.5 h-3.5" />
@@ -1270,10 +1278,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         <button
           type="button"
           onClick={() => setActiveTab('low_stock')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'low_stock'
-              ? 'bg-purple-600 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
           }`}
         >
           <AlertTriangle className={`w-3.5 h-3.5 ${metrics.lowStockCount > 0 ? 'text-amber-500' : ''}`} />
@@ -1441,7 +1449,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   <th className="px-4 py-3 text-right">Avg Rate (Rs.)</th>
                   <th className="px-4 py-3 text-right">Est. Valuation</th>
                   <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-right">Actions (Movement)</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1554,77 +1562,172 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                           )}
                         </td>
 
-                        {/* Quick 4 Actions */}
+                        {/* 1 Action Button / 3-Dots Menu */}
                         <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {/* Check In */}
+                          <div className="relative inline-flex items-center justify-end">
                             <button
                               type="button"
-                              onClick={() => openActionModal('check_in', m.id)}
-                              className="px-2 py-1 rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
-                              title="Check-In (+) delivery"
-                            >
-                              <ArrowDownLeft className="w-2.5 h-2.5 stroke-[2.5]" />
-                              <span>IN</span>
-                            </button>
-
-                            {/* Check Out */}
-                            <button
-                              type="button"
-                              onClick={() => openActionModal('check_out', m.id)}
-                              className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
-                              title="Check-Out (-) issue to contractor"
-                            >
-                              <ArrowUpRight className="w-2.5 h-2.5 stroke-[2.5]" />
-                              <span>OUT</span>
-                            </button>
-
-                            {/* Return */}
-                            <button
-                              type="button"
-                              onClick={() => openActionModal('return', m.id)}
-                              className="px-1.5 py-1 rounded-md bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
-                              title="Return (-) to supplier with reason"
-                            >
-                              <RotateCcw className="w-2.5 h-2.5 stroke-[2.5]" />
-                              <span>RET</span>
-                            </button>
-
-                            {/* Damage */}
-                            <button
-                              type="button"
-                              onClick={() => openActionModal('damage', m.id)}
-                              className="px-1.5 py-1 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
-                              title="Log Damaged (-) with reason"
-                            >
-                              <AlertTriangle className="w-2.5 h-2.5" />
-                              <span>DMG</span>
-                            </button>
-
-                            {/* View Full History */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setHistoryDrawerMaterial(m);
-                                setIsHistoryDrawerOpen(true);
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveActionMenuId(activeActionMenuId === m.id ? null : m.id);
                               }}
-                              className="px-1.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer ml-0.5"
-                              title="View full checkout & movement history"
+                              className={`h-8 px-2.5 rounded-lg border text-xs font-semibold inline-flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
+                                activeActionMenuId === m.id
+                                  ? 'bg-[#653ef1] text-white border-[#653ef1] shadow-xs'
+                                  : 'bg-white hover:bg-[#653ef1]/10 hover:border-[#653ef1] text-slate-700 hover:text-[#653ef1] border-slate-200'
+                              }`}
+                              title="Material Actions & Drawer"
                             >
-                              <History className="w-2.5 h-2.5" />
-                              <span>History</span>
+                              <span>Actions</span>
+                              <MoreVertical className="w-3.5 h-3.5 shrink-0" />
                             </button>
 
-                            {/* Delete Material (Soft Delete to Recycle Bin) */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMaterial(m.id, m.name)}
-                              className="px-1.5 py-1 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer ml-0.5"
-                              title="Move product to Recycle Bin"
-                            >
-                              <Trash2 className="w-2.5 h-2.5" />
-                              <span>DEL</span>
-                            </button>
+                            {/* Floating Actions Popover Dropdown */}
+                            {activeActionMenuId === m.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-40 bg-transparent"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveActionMenuId(null);
+                                  }}
+                                />
+                                <div
+                                  className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {/* Header Info */}
+                                  <div className="px-3.5 py-2 border-b border-slate-100 mb-1">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                      Material Actions
+                                    </p>
+                                    <p className="text-xs font-bold text-slate-900 truncate mt-0.5">
+                                      {m.name}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 font-medium">
+                                      Current Stock: <strong className="text-slate-800">{m.currentStock} {m.unit}</strong>
+                                    </p>
+                                  </div>
+
+                                  {/* Action Drawer Button (Directly opens full Drawer) */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setActiveActionMenuId(null);
+                                      setTimeout(() => {
+                                        setActionDrawerMaterial(m);
+                                      }, 60);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs font-semibold text-[#653ef1] bg-purple-50/70 hover:bg-purple-100/80 flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                  >
+                                    <span className="w-6 h-6 rounded-lg bg-[#653ef1] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                                    </span>
+                                    <div className="flex-1">
+                                      <div className="font-bold">Open Actions Drawer</div>
+                                      <div className="text-[10px] text-[#653ef1]/80">Manage all movements in panel ↗</div>
+                                    </div>
+                                  </button>
+
+                                  <div className="h-px bg-slate-100 my-1" />
+
+                                  {/* Check In (GRN) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      openActionModal('check_in', m.id);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-[#653ef1]/10 hover:text-[#653ef1] flex items-center gap-2.5 transition-colors cursor-pointer text-left font-medium"
+                                  >
+                                    <span className="w-5 h-5 rounded-md bg-purple-50 text-[#653ef1] flex items-center justify-center shrink-0">
+                                      <ArrowDownLeft className="w-3 h-3 stroke-[2.5]" />
+                                    </span>
+                                    <span>Check In Delivery (+ IN)</span>
+                                  </button>
+
+                                  {/* Check Out (MIN) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      openActionModal('check_out', m.id);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer text-left font-medium"
+                                  >
+                                    <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
+                                      <ArrowUpRight className="w-3 h-3 stroke-[2.5]" />
+                                    </span>
+                                    <span>Issue to Site (- OUT)</span>
+                                  </button>
+
+                                  {/* Return to Supplier */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      openActionModal('return', m.id);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2.5 transition-colors cursor-pointer text-left font-medium"
+                                  >
+                                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-800 flex items-center justify-center shrink-0">
+                                      <RotateCcw className="w-3 h-3 stroke-[2.5]" />
+                                    </span>
+                                    <span>Return to Supplier (⟲ RET)</span>
+                                  </button>
+
+                                  {/* Log Damaged */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      openActionModal('damage', m.id);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-2.5 transition-colors cursor-pointer text-left font-medium"
+                                  >
+                                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center shrink-0">
+                                      <AlertTriangle className="w-3 h-3 stroke-[2.5]" />
+                                    </span>
+                                    <span>Log Damaged (⚠ DMG)</span>
+                                  </button>
+
+                                  <div className="h-px bg-slate-100 my-1" />
+
+                                  {/* Movement History Drawer */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      setHistoryDrawerMaterial(m);
+                                      setIsHistoryDrawerOpen(true);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition-colors cursor-pointer text-left font-medium"
+                                  >
+                                    <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                                      <History className="w-3 h-3" />
+                                    </span>
+                                    <span>Movement History Drawer</span>
+                                  </button>
+
+                                  {/* Delete Material */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      handleDeleteMaterial(m.id, m.name);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer text-left font-medium"
+                                  >
+                                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                                      <Trash2 className="w-3 h-3" />
+                                    </span>
+                                    <span>Delete (Recycle Bin)</span>
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2559,6 +2662,22 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         projectName={project?.name || 'Noori Crest Tower'}
       />
 
+      {/* Material Quick Action Drawer */}
+      <MaterialActionDrawer
+        isOpen={!!actionDrawerMaterial}
+        onClose={() => setActionDrawerMaterial(null)}
+        material={actionDrawerMaterial}
+        onCheckIn={(matId) => openActionModal('check_in', matId)}
+        onCheckOut={(matId) => openActionModal('check_out', matId)}
+        onReturn={(matId) => openActionModal('return', matId)}
+        onDamage={(matId) => openActionModal('damage', matId)}
+        onViewHistory={(mat) => {
+          setHistoryDrawerMaterial(mat);
+          setIsHistoryDrawerOpen(true);
+        }}
+        onDelete={(matId, name) => handleDeleteMaterial(matId, name)}
+      />
+
       {/* Item Checkout & Movement History Drawer */}
       <MaterialHistoryDrawer
         isOpen={isHistoryDrawerOpen}
@@ -2570,6 +2689,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         onDeleteTransaction={handleDeleteTransaction}
         onRestoreTransaction={handleRestoreTransaction}
         onUpdateTransaction={handleUpdateTransaction}
+        suppliers={suppliers}
+        subcontractors={subcontractors}
+        vendorProfiles={vendorProfiles}
+        onOpenVendorDrawer={(defType) => {
+          setVendorDrawerDefaultType(defType || 'vendor');
+          setIsVendorDrawerOpen(true);
+        }}
       />
 
       {/* Product Profile Sidebar Drawer */}

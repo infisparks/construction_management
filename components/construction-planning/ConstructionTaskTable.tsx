@@ -67,9 +67,9 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col w-full">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col w-full">
       {/* Table Subheader Bar */}
-      <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
+      <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Layers className="w-3.5 h-3.5 text-slate-400" />
           <span>
@@ -94,7 +94,7 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
             </button>
           )}
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-purple-500" />
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
             Critical Path Border
           </span>
           <span className="hidden sm:inline-flex items-center gap-1">
@@ -150,7 +150,7 @@ export const ConstructionTaskTable: React.FC<ConstructionTaskTableProps> = ({
               <tr>
                 <td colSpan={8} className="py-14 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
-                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#653ef1] flex items-center justify-center border border-purple-200 shadow-2xs">
                       <Layers className="w-6 h-6" />
                     </div>
                     <div>

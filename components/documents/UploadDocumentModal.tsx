@@ -338,11 +338,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60 shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-600" />
+              <span className="w-2 h-2 rounded-full bg-[#653ef1]" />
               <h2 className="text-base font-bold text-slate-900">Upload Project Document</h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Target Site: <strong className="text-purple-700">{activeProjectName}</strong>
+              Target Site: <strong className="text-[#653ef1]">{activeProjectName}</strong>
             </p>
           </div>
           <button
@@ -367,14 +367,14 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
                 <span>Project Site *</span>
               </label>
 
               <button
                 type="button"
                 onClick={handleOpenCreateSite}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 border border-[#653ef1]/25 rounded-lg transition-colors cursor-pointer"
                 title="Create a new construction site in sidebar"
               >
                 <Plus className="w-3 h-3 stroke-[2.5]" />
@@ -390,7 +390,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                   onClick={() => setIsSiteDropdownOpen(!isSiteDropdownOpen)}
                   className={`w-full flex items-center justify-between text-xs px-3 py-2.5 rounded-lg border bg-white font-semibold text-slate-900 transition-colors cursor-pointer text-left ${
                     isSiteDropdownOpen 
-                      ? 'border-purple-600 ring-2 ring-purple-500/20 shadow-xs' 
+                      ? 'border-[#653ef1] ring-2 ring-[#653ef1]/20 shadow-xs' 
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
@@ -402,7 +402,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                         : (activeProjectName || 'Select a site')}
                     </span>
                   </div>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isSiteDropdownOpen ? 'rotate-180 text-purple-600' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isSiteDropdownOpen ? 'rotate-180 text-[#653ef1]' : ''}`} />
                 </button>
 
                 {/* Dropdown Menu Popover */}
@@ -429,15 +429,15 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                               }}
                               className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${
                                 isSelected
-                                  ? 'bg-purple-50 text-purple-900 font-bold'
+                                  ? 'bg-[#653ef1]/10 text-[#653ef1] font-bold'
                                   : 'text-slate-700 hover:bg-slate-50 font-medium'
                               }`}
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-purple-600' : 'bg-slate-300'}`} />
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#653ef1]' : 'bg-slate-300'}`} />
                                 <span className="truncate">Site #{p.serial_no} — {p.name}</span>
                               </div>
-                              {isSelected && <Check className="w-4 h-4 text-purple-600 shrink-0 ml-2" />}
+                              {isSelected && <Check className="w-4 h-4 text-[#653ef1] shrink-0 ml-2" />}
                             </button>
                           );
                         })
@@ -452,7 +452,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                           setIsSiteDropdownOpen(false);
                           handleOpenCreateSite();
                         }}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] rounded-lg transition-colors cursor-pointer shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>+ Create New Site</span>
@@ -466,7 +466,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               <button
                 type="button"
                 onClick={handleOpenCreateSite}
-                className="h-[38px] px-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                className="h-[38px] px-3 rounded-lg border border-[#653ef1]/25 bg-[#653ef1]/10 hover:bg-[#653ef1]/20 text-[#653ef1] font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs cursor-pointer"
                 title="Open Create Site Sidebar"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -503,10 +503,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
                 dragOver 
-                  ? 'border-purple-500 bg-purple-50/40' 
+                  ? 'border-[#653ef1] bg-[#653ef1]/5' 
                   : selectedFile 
                     ? 'border-emerald-400 bg-emerald-50/20' 
-                    : 'border-slate-200 hover:border-purple-400 hover:bg-slate-50'
+                    : 'border-slate-200 hover:border-[#653ef1] hover:bg-slate-50'
               }`}
             >
               <input
@@ -522,7 +522,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 
               {selectedFile ? (
                 <div className="flex items-center justify-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#653ef1]/10 text-[#653ef1] flex items-center justify-center font-bold shrink-0">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div className="text-left min-w-0">
@@ -536,7 +536,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <Upload className="w-7 h-7 mx-auto text-purple-600 mb-1" />
+                  <Upload className="w-7 h-7 mx-auto text-[#653ef1] mb-1" />
                   <p className="text-xs font-semibold text-slate-700">
                     Click to browse or drop any document, drawing, or site file
                   </p>
@@ -555,7 +555,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 Document Title *
               </label>
               {selectedFile && (
-                <span className="text-[10px] text-purple-600 font-medium flex items-center gap-1">
+                <span className="text-[10px] text-[#653ef1] font-medium flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
                   Auto-picked from file name (Editable)
                 </span>
@@ -567,7 +567,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Ground Floor RCC Layout Plan"
               required
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-all font-medium text-slate-900"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all font-medium text-slate-900"
             />
           </div>
 
@@ -580,7 +580,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddingCustomCategory(!isAddingCustomCategory)}
-                className="px-2 py-0.5 rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-semibold border border-purple-200 transition-colors flex items-center gap-1 cursor-pointer"
+                className="px-2 py-0.5 rounded-md bg-[#653ef1]/10 hover:bg-[#653ef1]/20 text-[#653ef1] text-[11px] font-semibold border border-[#653ef1]/25 transition-colors flex items-center gap-1 cursor-pointer"
                 title="Create a custom category saved to Supabase category table"
               >
                 <Plus className="w-3 h-3" />
@@ -596,12 +596,12 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             )}
 
             {isAddingCustomCategory && (
-              <div className="p-3 mb-2 rounded-xl border border-purple-200 bg-purple-50/70 space-y-2 animate-in fade-in duration-150">
+              <div className="p-3 mb-2 rounded-xl border border-[#653ef1]/25 bg-[#653ef1]/5 space-y-2 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-purple-900">
+                  <span className="text-[11px] font-bold text-[#653ef1]">
                     Create Custom Category
                   </span>
-                  <span className="text-[10px] font-mono text-purple-700 font-semibold px-1.5 py-0.5 rounded bg-purple-100">
+                  <span className="text-[10px] font-mono text-[#653ef1] font-semibold px-1.5 py-0.5 rounded bg-[#653ef1]/10">
                     category table (JSONB)
                   </span>
                 </div>
@@ -612,7 +612,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     onChange={(e) => setNewCustomCategoryInput(e.target.value)}
                     placeholder="e.g. Safety Audit Reports, Elevation Photos"
                     autoFocus
-                    className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-purple-300 bg-white focus:outline-hidden focus:border-purple-600 font-medium text-slate-900"
+                    className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-[#653ef1]/30 bg-white focus:outline-hidden focus:border-[#653ef1] font-medium text-slate-900"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -624,7 +624,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     type="button"
                     disabled={isSavingCategory || !newCustomCategoryInput.trim()}
                     onClick={() => handleCreateCustomCategory()}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                    className="px-3 py-1.5 rounded-lg bg-[#653ef1] hover:bg-[#592be8] disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
                   >
                     {isSavingCategory ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -646,14 +646,14 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                   setCategory(e.target.value as FileCategory);
                 }
               }}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] cursor-pointer"
             >
               {categoriesList.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
-              <option value="__add_new__" className="font-bold text-purple-700 bg-purple-50">
+              <option value="__add_new__" className="font-bold text-[#653ef1] bg-[#653ef1]/10">
                 + Add Custom Category...
               </option>
             </select>
@@ -683,7 +683,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     value={documentNo}
                     onChange={(e) => setDocumentNo(e.target.value)}
                     placeholder="e.g. DOC-ARC-101"
-                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1]"
                   />
                 </div>
 
@@ -698,7 +698,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                       value={buildingFloor}
                       onChange={(e) => setBuildingFloor(e.target.value)}
                       placeholder="e.g. 2nd Floor, Basement 1"
-                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1]"
                     />
                   </div>
 
@@ -711,7 +711,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                       value={contractorName}
                       onChange={(e) => setContractorName(e.target.value)}
                       placeholder="e.g. Al-Buraq Civil Works"
-                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1]"
                     />
                   </div>
                 </div>
@@ -727,7 +727,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                       value={taskCode}
                       onChange={(e) => setTaskCode(e.target.value)}
                       placeholder="e.g. wp-1 (Substructure)"
-                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1]"
                     />
                   </div>
 
@@ -740,7 +740,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                       value={version}
                       onChange={(e) => setVersion(e.target.value)}
                       placeholder="v1.0"
-                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1]"
                     />
                   </div>
                 </div>
@@ -755,7 +755,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     placeholder="slab, rcc, foundation, certified"
-                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1]"
                   />
                 </div>
 
@@ -769,7 +769,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Enter any specific scope notes or details..."
-                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#653ef1] focus:border-[#653ef1] resize-none"
                   />
                 </div>
 
@@ -790,7 +790,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !selectedFile}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] disabled:opacity-50 transition-all shadow-md shadow-[#653ef1]/25 flex items-center gap-2 cursor-pointer"
             >
               {isSubmitting ? (
                 <>

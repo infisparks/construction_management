@@ -328,8 +328,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       {/* 1. Header Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 shadow-2xs">
-            <Receipt className="w-5 h-5 stroke-[2.2]" />
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center shadow-md shadow-[#653ef1]/25 shrink-0">
+            <Receipt className="w-5 h-5 stroke-[2.2] text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
             className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Refresh from Supabase"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-purple-600' : 'text-slate-400'}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#653ef1]' : 'text-slate-400'}`} />
             <span>Sync</span>
           </button>
 
@@ -375,10 +375,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           <button
             type="button"
             onClick={handlePreviewPdf}
-            className="h-8 px-2.5 rounded-lg border border-purple-200 bg-white hover:bg-purple-50 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="h-8 px-2.5 rounded-lg border border-[#653ef1]/30 bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
             title="Preview all expenses in Blob URL PDF statement"
           >
-            <Printer className="w-3.5 h-3.5 text-purple-600" />
+            <Printer className="w-3.5 h-3.5 text-[#653ef1]" />
             <span>Preview PDF</span>
           </button>
 
@@ -386,23 +386,23 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           <button
             type="button"
             onClick={() => viewSiteExpensesPdfInNewTab(filteredExpenses, project?.name || 'Noori Crest Tower', 'Expenses Statement')}
-            className="h-8 px-2.5 rounded-lg border border-purple-200 bg-white hover:bg-purple-50 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="h-8 px-2.5 rounded-lg border border-[#653ef1]/30 bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
             title="Open full expense report in Blob URL tab (No download)"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-purple-600" />
+            <ExternalLink className="w-3.5 h-3.5 text-[#653ef1]" />
             <span>Open Blob URL</span>
           </button>
 
           <div className="h-4 w-[1px] bg-slate-200 mx-0.5 hidden sm:block" />
 
-          {/* Add Expense (Primary Purple) */}
+          {/* Add Expense (Electric Violet #653ef1) */}
           <button
             type="button"
             onClick={() => {
               setExpenseToEdit(null);
               setIsAddModalOpen(true);
             }}
-            className="h-8 px-3.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+            className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-[#653ef1]/35 hover:shadow-md hover:shadow-[#653ef1]/45 transition-all cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>+ Add Expense</span>
@@ -411,15 +411,15 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       </div>
 
       {/* 1.5 View Mode Switcher: Active Site Bills vs Recycle Bin */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-1 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
-        <div className="flex items-center gap-1 shrink-0">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-xs flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => setViewMode('active')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
               viewMode === 'active'
-                ? 'bg-purple-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-[#653ef1] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
             }`}
           >
             <Receipt className="w-3.5 h-3.5" />
@@ -432,9 +432,9 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               setViewMode('bin');
               loadDeletedExpenses();
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
               viewMode === 'bin'
-                ? 'bg-rose-600 text-white shadow-2xs'
+                ? 'bg-rose-600 text-white shadow-xs'
                 : 'text-rose-700 hover:bg-rose-50 border border-rose-200'
             }`}
           >
@@ -447,9 +447,9 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           <button
             type="button"
             onClick={loadDeletedExpenses}
-            className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 transition-all"
           >
-            <RefreshCw className={`w-3 h-3 ${isLoadingBin ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBin ? 'animate-spin' : ''}`} />
             <span>Refresh Bin</span>
           </button>
         )}
@@ -458,9 +458,9 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       {viewMode === 'active' ? (
         <>
           {/* 2. Top Summary KPI Cards (Highlights Today's Expenses) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Today's Expenses (Crucial user requirement) */}
-        <div className="bg-white rounded-xl border border-purple-200 p-4 shadow-2xs relative overflow-hidden bg-gradient-to-br from-purple-50/50 via-white to-white">
+        <div className="bg-white rounded-2xl border border-purple-200/80 p-4.5 shadow-xs relative overflow-hidden bg-gradient-to-br from-purple-50/60 via-white to-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-purple-900 uppercase tracking-wider">
               Today's Expenses
@@ -469,61 +469,61 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               Today: {todayStr}
             </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-purple-950">
+          <div className="mt-2.5 flex items-baseline justify-between">
+            <span className="text-2xl font-bold tracking-tight text-purple-950 font-numeric">
               {formatINR(stats.todayTotal)}
             </span>
-            <span className="text-xs font-semibold text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded-md">
+            <span className="text-xs font-semibold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-lg border border-purple-200/60">
               {stats.todayCount} Bills Today
             </span>
           </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">
+          <span className="text-[11px] text-slate-500 mt-1.5 block">
             {stats.todayCount === 0 ? 'No expenses logged today yet' : 'Lunch, petty cash & daily site burn'}
           </span>
         </div>
 
         {/* Card 2: This Month's Total */}
-        <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
               This Month's Total
             </span>
-            <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
               Month to Date
             </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-slate-900">
+          <div className="mt-2.5 flex items-baseline justify-between">
+            <span className="text-2xl font-bold tracking-tight text-slate-900 font-numeric">
               {formatINR(stats.monthTotal)}
             </span>
             <span className="text-xs text-slate-500 font-medium">
               {stats.monthCount} Bills
             </span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="text-[11px] text-slate-400 mt-1.5 block">
             Accumulated for current calendar month
           </span>
         </div>
 
         {/* Card 3: All-Time Expenditure */}
-        <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
               All-Time Site Bills
             </span>
-            <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
               Audited
             </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-slate-900">
+          <div className="mt-2.5 flex items-baseline justify-between">
+            <span className="text-2xl font-bold tracking-tight text-slate-900 font-numeric">
               {formatINR(stats.allTimeTotal)}
             </span>
             <span className="text-xs text-slate-500 font-medium">
               {stats.allTimeCount} Entries
             </span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
+          <span className="text-[11px] text-slate-400 mt-1.5 block">
             Paid: {formatINR(stats.paidTotal)} • Pending: {formatINR(stats.pendingTotal)}
           </span>
         </div>
@@ -537,19 +537,21 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               setDateFilter({ mode: 'exact', exactDate: todayStr, startDate: '', endDate: '' });
             }
           }}
-          className={`rounded-xl border p-4 shadow-2xs transition-all cursor-pointer flex flex-col justify-between ${
+          className={`rounded-2xl border p-4.5 shadow-xs transition-all duration-200 cursor-pointer flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md ${
             dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr
-              ? 'border-purple-500 bg-purple-600 text-white'
-              : 'border-slate-200/80 bg-white hover:bg-slate-50 text-slate-900'
+              ? 'border-[#653ef1] bg-gradient-to-br from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white shadow-[#653ef1]/20'
+              : 'border-slate-200/80 bg-white hover:bg-slate-50/80 text-slate-900'
           }`}
         >
           <div className="flex items-center justify-between">
             <span className={`text-[11px] font-bold uppercase tracking-wider ${dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'text-purple-100' : 'text-slate-500'}`}>
               Filter Quick Mode
             </span>
-            <Calendar className={`w-4 h-4 ${dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'text-white' : 'text-purple-600'}`} />
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'bg-white/20 text-white' : 'bg-purple-50 text-[#653ef1]'}`}>
+              <Calendar className="w-4 h-4" />
+            </div>
           </div>
-          <div className="mt-2">
+          <div className="mt-2.5">
             <span className="text-sm font-bold block">
               {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Showing Today Only' : 'Show Only Today'}
             </span>
@@ -684,7 +686,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setIsAddModalOpen(true)}
-                          className="mt-2 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-[#653ef1] hover:bg-[#592be8] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
                         >
                           + Record First Expense
                         </button>
@@ -712,7 +714,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setViewingExpense(exp);
                               setIsVoucherModalOpen(true);
                             }}
-                            className="font-mono font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200 transition-colors cursor-pointer"
+                            className="font-mono font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
                             title="Click to view & download bill voucher"
                           >
                             {exp.expense_code}
@@ -731,10 +733,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                                 fileName: exp.receipt_file_name || 'Bill-Receipt',
                                 voucherNumber: exp.expense_code,
                               })}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200 transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
                               title={`View uploaded bill copy (${exp.receipt_file_name || 'Receipt'}) - Supports iOS photos & PDF`}
                             >
-                              <Paperclip className="w-3 h-3 text-purple-600" />
+                              <Paperclip className="w-3 h-3 text-[#653ef1]" />
                               <span>Bill Copy</span>
                             </button>
                           )}
@@ -840,10 +842,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                                 fileName: exp.receipt_file_name || 'Bill-Receipt',
                                 voucherNumber: exp.expense_code,
                               })}
-                              className="p-1.5 rounded-md hover:bg-purple-100 text-purple-700 bg-purple-50 border border-purple-200 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-md hover:bg-[#653ef1]/15 text-[#653ef1] bg-[#653ef1]/5 border border-[#653ef1]/20 transition-colors cursor-pointer"
                               title={`View attached bill copy (${exp.receipt_file_name || 'Document'})`}
                             >
-                              <Paperclip className="w-3.5 h-3.5 text-purple-600" />
+                              <Paperclip className="w-3.5 h-3.5 text-[#653ef1]" />
                             </button>
                           )}
 
@@ -854,20 +856,20 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setViewingExpense(exp);
                               setIsVoucherModalOpen(true);
                             }}
-                            className="p-1.5 rounded-md hover:bg-purple-50 text-slate-400 hover:text-purple-700 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-md hover:bg-[#653ef1]/10 text-slate-400 hover:text-[#653ef1] transition-colors cursor-pointer"
                             title="View & Preview Bill Voucher Slip"
                           >
-                            <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                            <Receipt className="w-3.5 h-3.5 text-[#653ef1]" />
                           </button>
 
                           {/* Open Bill directly in Blob URL tab (No download) */}
                           <button
                             type="button"
                             onClick={() => viewSingleExpenseVoucherInNewTab(exp, project?.name || 'Noori Crest Tower')}
-                            className="p-1.5 rounded-md hover:bg-purple-50 text-slate-400 hover:text-purple-700 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-md hover:bg-[#653ef1]/10 text-slate-400 hover:text-[#653ef1] transition-colors cursor-pointer"
                             title="Open Bill Voucher directly in Blob URL tab (No file download)"
                           >
-                            <ExternalLink className="w-3.5 h-3.5 text-purple-600" />
+                            <ExternalLink className="w-3.5 h-3.5 text-[#653ef1]" />
                           </button>
 
                           {/* Edit Expense Details */}
@@ -877,10 +879,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setExpenseToEdit(exp);
                               setIsAddModalOpen(true);
                             }}
-                            className="p-1.5 rounded-md hover:bg-purple-50 text-slate-400 hover:text-purple-700 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-md hover:bg-[#653ef1]/10 text-slate-400 hover:text-[#653ef1] transition-colors cursor-pointer"
                             title="Edit expense details"
                           >
-                            <Edit2 className="w-3.5 h-3.5 text-purple-600" />
+                            <Edit2 className="w-3.5 h-3.5 text-[#653ef1]" />
                           </button>
 
                           {/* Delete Expense (Moves to Recycle Bin via Confirmation Modal) */}
