@@ -210,19 +210,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           </button>
         </form>
 
-        {/* Quick Demo Access */}
-        <button
-          type="button"
-          onClick={() => {
-            loginAsDemo();
-            onSuccess?.();
-          }}
-          className="w-full py-2.5 px-3 rounded-xl border border-dashed border-[#653ef1]/40 text-[#653ef1] hover:bg-[#653ef1]/5 hover:border-[#653ef1] text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-        >
-          <span>One-Click Demo Access</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-
         {/* Footer info */}
         <div className="text-center text-[11px] text-slate-400 font-medium">
           Protected by Row Level Security (RLS) & Auth Tokens.
