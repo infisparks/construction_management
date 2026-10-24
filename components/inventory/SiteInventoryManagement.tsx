@@ -39,7 +39,8 @@ import {
   Trash2,
   ArchiveRestore,
   MoreVertical,
-  ChevronDown
+  ChevronDown,
+  MessageCircle
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -55,7 +56,8 @@ import {
   viewInventoryVoucherPdfInNewTab,
   downloadInventoryVoucherPdf,
   downloadMaterialCheckoutHistoryPdf,
-  viewMaterialCheckoutHistoryPdfInNewTab
+  viewMaterialCheckoutHistoryPdfInNewTab,
+  uploadOrGetVoucherPdfUrl
 } from '@/lib/inventory/inventory-voucher-pdf';
 import { MaterialActionModal } from './MaterialActionModal';
 import { VoucherSlipModal } from './VoucherSlipModal';
@@ -69,6 +71,7 @@ import {
   viewInventoryStockSummaryPdfInNewTab,
   downloadInventoryStockSummaryPdf,
 } from '@/lib/inventory/inventory-stock-pdf';
+import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
 
 import { ProductProfileView } from './ProductProfileView';
 import { VendorProfileView } from './VendorProfileView';
@@ -315,6 +318,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // Stock Summary PDF Modal
   const [isStockPdfModalOpen, setIsStockPdfModalOpen] = useState(false);
 
+  // WhatsApp Share Modal
+  const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
+  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppSharePayload | null>(null);
+
   // Active View Tab
   const [activeTab, setActiveTab] = useState<'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin'>(initialTab);
   const [binViewMode, setBinViewMode] = useState<'products' | 'movements'>('products');
@@ -434,6 +441,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         const matches =
           t.voucherNumber.toLowerCase().includes(q) ||
           t.materialName.toLowerCase().includes(q) ||
+          (t.brand && t.brand.toLowerCase().includes(q)) ||
           (t.supplierName && t.supplierName.toLowerCase().includes(q)) ||
           (t.vehicleNumber && t.vehicleNumber.toLowerCase().includes(q));
         if (!matches) return false;
@@ -453,6 +461,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         const matches =
           t.voucherNumber.toLowerCase().includes(q) ||
           t.materialName.toLowerCase().includes(q) ||
+          (t.brand && t.brand.toLowerCase().includes(q)) ||
           (t.subcontractorName && t.subcontractorName.toLowerCase().includes(q)) ||
           (t.vehicleNumber && t.vehicleNumber.toLowerCase().includes(q));
         if (!matches) return false;
@@ -472,6 +481,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         const matches =
           t.voucherNumber.toLowerCase().includes(q) ||
           t.materialName.toLowerCase().includes(q) ||
+          (t.brand && t.brand.toLowerCase().includes(q)) ||
           (t.returnReason && t.returnReason.toLowerCase().includes(q)) ||
           (t.damageReason && t.damageReason.toLowerCase().includes(q));
         if (!matches) return false;
@@ -489,6 +499,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         searchQuery === '' ||
         t.voucherNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.materialName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.brand && t.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (t.supplierName && t.supplierName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (t.subcontractorName && t.subcontractorName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (t.vehicleNumber && t.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -595,6 +606,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           product_name: txData.materialName,
           product_code: currentMat?.code,
           category: txData.category,
+          brand: txData.brand,
           quantity: txData.quantity,
           unit: txData.unit,
           unit_rate: txData.unitRate,
@@ -663,6 +675,87 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
   const handleDownloadPdf = (tx: InventoryTransaction) => {
     downloadInventoryVoucherPdf(tx, project?.name || 'Noori Crest Tower');
+  };
+
+  // WhatsApp Share Handlers
+  const handleShareInventoryStatusToWhatsApp = () => {
+    const totalValuation = materials.reduce((acc, m) => acc + (m.currentStock * (m.averageUnitRate || 0)), 0);
+    const lowStockCount = materials.filter(m => m.currentStock <= m.minimumAlertStock).length;
+    const criticalStockCount = materials.filter(m => m.currentStock === 0).length;
+
+    const summaryText = [
+      `*SITE INVENTORY STATUS & VALUATION REPORT*`,
+      `🏢 Project: *${project?.name || 'Noori Crest Tower'}*`,
+      `📅 As on: *${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}*`,
+      ``,
+      `📊 *KEY METRICS:*`,
+      `• Total Tracked Items: *${materials.length}*`,
+      `• Total Live Valuation: *₹${totalValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}*`,
+      `• Low Stock Alert: *${lowStockCount} items*`,
+      `• Critical Out of Stock: *${criticalStockCount} items*`,
+      `• Total Recorded Transactions: *${transactions.length}*`,
+      ``,
+      `📦 *TOP ACTIVE MATERIALS:*`,
+      ...materials.slice(0, 5).map((m, i) => 
+        `  ${i + 1}. *${m.name}*: ${m.currentStock.toLocaleString('en-IN')} ${m.unit} (Val: ₹${(m.currentStock * (m.averageUnitRate || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })})`
+      ),
+      ``,
+      `_Automated report generated from Armee Enterprises Construction ERP._`
+    ].join('\n');
+
+    setWhatsAppPayload({
+      title: `${project?.name || 'Site'} Inventory Status Report`,
+      documentNo: `INV-STAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+      category: 'Inventory & Materials',
+      projectName: project?.name || 'Noori Crest Tower',
+      customSummary: summaryText,
+    });
+    setIsWhatsAppShareOpen(true);
+  };
+
+  const handleShareTransactionToWhatsApp = (tx: InventoryTransaction) => {
+    const isReceipt = tx.type === 'check_in';
+    const isReturn = tx.type === 'return';
+    const isDamage = tx.type === 'damage';
+    const typeLabel = isReceipt
+      ? 'Material Receipt (GRN)'
+      : isReturn
+      ? 'Material Return Slip'
+      : isDamage
+      ? 'Material Damage Slip'
+      : 'Material Issue (MIN)';
+
+    // Clean 1-line item summary since complete details are inside the attached PDF document
+    const itemSummary = `📦 ${tx.materialName}${tx.brand ? ` (${tx.brand})` : ''} • ${isReceipt ? '+' : '-'}${tx.quantity} ${tx.unit}${tx.totalAmount ? ` (₹${tx.totalAmount.toLocaleString('en-IN')})` : ''}`;
+
+    setWhatsAppPayload({
+      title: `${typeLabel} — ${tx.voucherNumber}`,
+      documentNo: tx.voucherNumber,
+      category: 'Bills & Vouchers',
+      projectName: project?.name || 'Noori Crest Tower',
+      mediaUrl: tx.fileUrl || undefined,
+      fileName: tx.fileName || `Voucher_${tx.voucherNumber}.pdf`,
+      customSummary: itemSummary,
+    });
+    setIsWhatsAppShareOpen(true);
+
+    // Asynchronously generate & upload official Voucher PDF to Supabase Storage so WhatsApp sends the actual PDF document!
+    (async () => {
+      try {
+        const { publicUrl, fileName } = await uploadOrGetVoucherPdfUrl(tx, project?.name || 'Noori Crest Tower');
+        setWhatsAppPayload((prev) => {
+          if (!prev || prev.documentNo !== tx.voucherNumber) return prev;
+          return {
+            ...prev,
+            mediaUrl: publicUrl,
+            fileName: fileName,
+            fileType: 'document',
+          };
+        });
+      } catch (uploadErr) {
+        console.warn('Could not upload voucher PDF to storage for WhatsApp:', uploadErr);
+      }
+    })();
   };
 
   const handleOpenMaterialHistory = (matId: string) => {
@@ -995,6 +1088,18 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           >
             <Printer className="w-3.5 h-3.5 text-purple-600" />
             <span>Preview PDF</span>
+          </button>
+
+          {/* Share Inventory Status via WhatsApp */}
+          <button
+            type="button"
+            onClick={handleShareInventoryStatusToWhatsApp}
+            className="h-9 px-3 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            title="Share full live inventory valuation & stock report via WhatsApp"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/20" />
+            <span className="hidden sm:inline">WhatsApp Status</span>
+            <span className="sm:hidden">WhatsApp</span>
           </button>
 
           <div className="h-4 w-[1px] bg-slate-200 mx-0.5 shrink-0 hidden sm:block" />
@@ -1445,8 +1550,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Storage Godown / Yard</th>
                   <th className="px-4 py-3 text-right">Current Stock</th>
-                  <th className="px-4 py-3 text-right">Min Buffer</th>
-                  <th className="px-4 py-3 text-right">Avg Rate (Rs.)</th>
                   <th className="px-4 py-3 text-right">Est. Valuation</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -1455,7 +1558,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={7} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading inventory from Supabase...</span>
@@ -1465,7 +1568,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : filteredMaterials.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No construction materials found in Supabase.</p>
                       <p className="text-xs text-slate-400 mt-1">Click &quot;+ Product&quot; above to create your first product profile.</p>
@@ -1522,22 +1625,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         {/* Current Stock */}
                         <td className="px-4 py-3 text-right font-bold text-slate-900 text-sm">
                           {m.currentStock} <span className="text-xs font-normal text-slate-500">{m.unit}</span>
-                        </td>
-
-                        {/* Min Buffer */}
-                        <td className="px-4 py-3 text-right text-slate-500 font-medium">
-                          {m.minimumAlertStock} {m.unit}
-                        </td>
-
-                        {/* Avg Rate */}
-                        <td className="px-4 py-3 text-right font-mono text-slate-600">
-                          {m.averageUnitRate > 0 ? (
-                            `Rs. ${m.averageUnitRate.toLocaleString('en-IN')}`
-                          ) : (
-                            <span className="text-slate-400 text-[11px] font-sans font-normal italic">
-                              Set on purchase
-                            </span>
-                          )}
                         </td>
 
                         {/* Valuation */}
@@ -1810,7 +1897,14 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-slate-800">{tx.materialName}</div>
-                        <div className="text-[11px] text-slate-500">{tx.category}</div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span>{tx.category}</span>
+                          {tx.brand && (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                              {tx.brand}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-emerald-700 text-sm">
                         +{tx.quantity} {tx.unit}
@@ -1849,6 +1943,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>View Bill (PDF)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleShareTransactionToWhatsApp(tx)}
+                            className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                            title="Share GRN Bill on WhatsApp"
+                          >
+                            <MessageCircle className="w-3 h-3 text-emerald-600 fill-emerald-600/20" />
+                            <span>WhatsApp</span>
                           </button>
                           <button
                             type="button"
@@ -1943,7 +2046,14 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-bold text-slate-800">{tx.materialName}</div>
-                        <div className="text-[11px] text-slate-500">{tx.category}</div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span>{tx.category}</span>
+                          {tx.brand && (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {tx.brand}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-indigo-700 text-sm">
                         -{tx.quantity} {tx.unit}
@@ -1979,6 +2089,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>View Bill (PDF)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleShareTransactionToWhatsApp(tx)}
+                            className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                            title="Share Issue Voucher on WhatsApp"
+                          >
+                            <MessageCircle className="w-3 h-3 text-emerald-600 fill-emerald-600/20" />
+                            <span>WhatsApp</span>
                           </button>
                           <button
                             type="button"
@@ -2093,7 +2212,14 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-800">{tx.materialName}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">{tx.materialId}</div>
+                          <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span>{tx.category || tx.materialId}</span>
+                            {tx.brand && (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {tx.brand}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className={`px-4 py-3 text-right font-bold text-sm ${isRet ? 'text-amber-800' : 'text-rose-700'}`}>
                           -{tx.quantity} {tx.unit}
@@ -2137,6 +2263,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             >
                               <ExternalLink className="w-3 h-3" />
                               <span>View Bill (PDF)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleShareTransactionToWhatsApp(tx)}
+                              className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                              title="Share Return Bill on WhatsApp"
+                            >
+                              <MessageCircle className="w-3 h-3 text-emerald-600 fill-emerald-600/20" />
+                              <span>WhatsApp</span>
                             </button>
                             <button
                               type="button"
@@ -2296,6 +2431,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             >
                               <ExternalLink className="w-3 h-3" />
                               <span>View Bill (PDF)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleShareTransactionToWhatsApp(tx)}
+                              className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1"
+                              title="Share Voucher Bill on WhatsApp"
+                            >
+                              <MessageCircle className="w-3 h-3 text-emerald-600 fill-emerald-600/20" />
+                              <span>WhatsApp</span>
                             </button>
                             <button
                               type="button"
@@ -2584,7 +2728,14 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="font-bold text-slate-800">{tx.materialName}</div>
+                            <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                              <span>{tx.materialName}</span>
+                              {tx.brand && (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {tx.brand}
+                                </span>
+                              )}
+                            </div>
                             <div className="font-bold text-rose-700 text-xs">
                               {tx.quantity} {tx.unit}
                             </div>
@@ -2660,6 +2811,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         onClose={() => setIsVoucherModalOpen(false)}
         transaction={viewingTransaction}
         projectName={project?.name || 'Noori Crest Tower'}
+        onShareWhatsApp={handleShareTransactionToWhatsApp}
       />
 
       {/* Material Quick Action Drawer */}
@@ -2696,6 +2848,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           setVendorDrawerDefaultType(defType || 'vendor');
           setIsVendorDrawerOpen(true);
         }}
+        onShareWhatsApp={handleShareTransactionToWhatsApp}
       />
 
       {/* Product Profile Sidebar Drawer */}
@@ -2720,6 +2873,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         onClose={() => setIsStockPdfModalOpen(false)}
         materials={materials}
         projectName={project?.name || 'Noori Crest Tower'}
+        onShareWhatsApp={handleShareInventoryStatusToWhatsApp}
       />
 
       {/* Uploaded Physical Bill Viewer Modal (PNG/PDF) */}
@@ -2729,6 +2883,16 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         fileUrl={billViewerState.fileUrl}
         fileName={billViewerState.fileName}
         voucherNumber={billViewerState.voucherNumber}
+      />
+
+      {/* WhatsApp Share Modal for Inventory Reports & Vouchers */}
+      <WhatsAppShareModal
+        isOpen={isWhatsAppShareOpen}
+        onClose={() => {
+          setIsWhatsAppShareOpen(false);
+          setWhatsAppPayload(null);
+        }}
+        payload={whatsAppPayload}
       />
     </div>
   );

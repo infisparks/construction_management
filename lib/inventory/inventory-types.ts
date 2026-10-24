@@ -37,6 +37,7 @@ export interface InventoryTransaction {
   materialCode?: string;
   materialName: string;
   category: string;
+  brand?: string;
   quantity: number;
   unit: string;
   unitRate?: number;

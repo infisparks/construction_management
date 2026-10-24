@@ -147,6 +147,10 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
   const [materialId, setMaterialId] = useState<string>('');
   const [quantity, setQuantity] = useState<number | ''>('');
 
+  // Brand Name & Profile Toggle (Replaces generic dropdown during Check-In per CEO requirement)
+  const [brandName, setBrandName] = useState<string>('');
+  const [isChangingProfile, setIsChangingProfile] = useState<boolean>(false);
+
   // Check-In fields (default empty / null)
   const [unitRate, setUnitRate] = useState<number | ''>('');
   const [checkInGstRate, setCheckInGstRate] = useState<0 | 5 | 12 | 18 | 28>(0);
@@ -189,6 +193,8 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       const targetMat = materials.find((m) => m.id === selectedMaterialId) || materials[0];
       if (targetMat) {
         setMaterialId(targetMat.id);
+        setBrandName(targetMat.brand || '');
+        setIsChangingProfile(false);
         setUnitRate(targetMat.averageUnitRate > 0 ? targetMat.averageUnitRate : '');
         setCheckInGstRate((targetMat.gstRate !== undefined ? targetMat.gstRate : 0) as any);
         setStorageLocation(targetMat.storageLocation || allLocations[0] || 'Central Site Store #1');
@@ -225,6 +231,18 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       .slice(0, 3);
   }, [transactions, currentMat]);
 
+  // Distinct brands used previously for this material (e.g. UltraTech, Ambuja, ACC for Cement)
+  const brandSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    if (currentMat?.brand && currentMat.brand.trim()) set.add(currentMat.brand.trim());
+    (transactions || [])
+      .filter((t) => t.materialId === currentMat?.id && t.brand && t.brand.trim())
+      .forEach((t) => {
+        if (t.brand) set.add(t.brand.trim());
+      });
+    return Array.from(set);
+  }, [transactions, currentMat]);
+
   // Last purchase record for current material
   const lastPurchaseTx = useMemo(() => {
     if (!transactions || !currentMat) return null;
@@ -244,6 +262,8 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
     setMaterialId(newId);
     const m = materials.find((mat) => mat.id === newId);
     if (m) {
+      setBrandName(m.brand || '');
+      setIsChangingProfile(false);
       setUnitRate(m.averageUnitRate > 0 ? m.averageUnitRate : '');
       setCheckInGstRate((m.gstRate !== undefined ? m.gstRate : 0) as any);
       setStorageLocation(m.storageLocation || allLocations[0] || 'Central Site Store #1');
@@ -332,6 +352,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       materialId: currentMat.id,
       materialName: currentMat.name,
       category: currentMat.category,
+      brand: brandName.trim() || currentMat.brand || undefined,
       quantity: qtyNum,
       unit: currentMat.unit,
       unitRate: rateNum,
@@ -524,37 +545,154 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
           {/* Section 1: Material & Quantity */}
           <div className="space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-medium text-slate-700">
-                  Select Construction Material *
-                </label>
-                {onOpenProductDrawer && (
+            {actionType === 'check_in' ? (
+              /* Check-In: Active Product Profile Card + Brand Name Input (replaces bulky dropdown per CEO requirement) */
+              <div className="space-y-2.5">
+                <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200 flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-[58px] px-2.5 h-9 rounded-lg bg-purple-600 text-white font-bold text-xs font-mono tracking-tight flex items-center justify-center shrink-0 shadow-xs whitespace-nowrap">
+                      {currentMat?.code || 'PRD'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                          {currentMat?.name || 'Select Product Profile'}
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                          {currentMat?.category || 'Material'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        Current Store Balance: <strong className="text-purple-700 font-bold">{currentStock} {currentMat?.unit}</strong>
+                      </div>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={onOpenProductDrawer}
-                    className="text-purple-600 hover:text-purple-800 text-[10px] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                    onClick={() => setIsChangingProfile(!isChangingProfile)}
+                    className="shrink-0 ml-2 text-[11px] font-semibold text-purple-700 hover:text-purple-900 px-2.5 py-1.5 rounded-lg hover:bg-purple-100/70 border border-purple-200 transition-colors cursor-pointer"
                   >
-                    <PlusCircle className="w-3 h-3" />
-                    <span>+ New Product Profile</span>
+                    {isChangingProfile ? 'Done' : 'Change Profile'}
                   </button>
+                </div>
+
+                {/* Optional Profile Selector if user explicitly clicks Change Profile */}
+                {isChangingProfile && (
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in duration-150 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700">
+                        Switch Product Profile:
+                      </label>
+                      {onOpenProductDrawer && (
+                        <button
+                          type="button"
+                          onClick={onOpenProductDrawer}
+                          className="text-purple-600 text-[10px] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <PlusCircle className="w-3 h-3" />
+                          <span>+ New Profile</span>
+                        </button>
+                      )}
+                    </div>
+                    <SearchableSelect
+                      options={materialOptions}
+                      value={materialId}
+                      onChange={handleMaterialChange}
+                      placeholder="Select another product profile..."
+                      searchPlaceholder="Search material by name or code..."
+                    />
+                  </div>
+                )}
+
+                {/* Brand Name & Specification (Added directly here in place of the dropdown) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-800 text-xs flex items-center gap-1">
+                      <span>Brand Name & Specification</span>
+                      <span className="text-purple-600 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400">e.g. UltraTech 53 OPC, Ambuja PPC</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="Enter brand name & grade (e.g. UltraTech 53 OPC, Ambuja PPC, ACC)..."
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-2 focus:ring-purple-100 transition-all"
+                    required
+                  />
+                  {brandSuggestions.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 font-medium">Quick select:</span>
+                      {brandSuggestions.map((b) => (
+                        <button
+                          key={b}
+                          type="button"
+                          onClick={() => setBrandName(b)}
+                          className={`text-[10px] px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
+                            brandName === b
+                              ? 'bg-purple-600 text-white border-purple-600 font-bold'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 font-medium'
+                          }`}
+                        >
+                          {b}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Check-Out / Return / Damage: Standard Profile Selector with optional Brand selector */
+              <div className="space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-medium text-slate-700">
+                      Select Construction Material *
+                    </label>
+                    {onOpenProductDrawer && (
+                      <button
+                        type="button"
+                        onClick={onOpenProductDrawer}
+                        className="text-purple-600 hover:text-purple-800 text-[10px] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <PlusCircle className="w-3 h-3" />
+                        <span>+ New Product Profile</span>
+                      </button>
+                    )}
+                  </div>
+                  <SearchableSelect
+                    options={materialOptions}
+                    value={materialId}
+                    onChange={handleMaterialChange}
+                    placeholder="Search & select material profile..."
+                    searchPlaceholder="Search material by name or code..."
+                    required
+                  />
+                  {currentMat && (
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Category: <strong className="text-slate-700">{currentMat.category}</strong></span>
+                      <span>Store Balance: <strong className="text-purple-700">{currentMat.currentStock} {currentMat.unit}</strong></span>
+                    </div>
+                  )}
+                </div>
+
+                {brandSuggestions.length > 0 && (
+                  <div>
+                    <label className="block font-medium text-slate-700 mb-1">
+                      Brand / Specification (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={brandName}
+                      onChange={(e) => setBrandName(e.target.value)}
+                      placeholder="e.g. UltraTech 53 OPC..."
+                      className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-2 focus:ring-purple-100"
+                    />
+                  </div>
                 )}
               </div>
-              <SearchableSelect
-                options={materialOptions}
-                value={materialId}
-                onChange={handleMaterialChange}
-                placeholder="Search & select material profile..."
-                searchPlaceholder="Search material by name or code..."
-                required
-              />
-              {currentMat && (
-                <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Category: <strong className="text-slate-700">{currentMat.category}</strong></span>
-                  <span>Store Balance: <strong className="text-purple-700">{currentMat.currentStock} {currentMat.unit}</strong></span>
-                </div>
-              )}
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>

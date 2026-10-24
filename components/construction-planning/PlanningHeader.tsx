@@ -24,7 +24,8 @@ import {
   Wrench,
   User,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  MessageCircle
 } from 'lucide-react';
 import { ProjectInfo, ViewMode } from '@/lib/construction-planning/types';
 import { formatDisplayDate, calculateDurationDetails } from '@/lib/construction-planning/schedule-utils';
@@ -65,6 +66,7 @@ interface PlanningHeaderProps {
   onOpenBilling?: () => void;
   onOpenSubcontractorBills?: () => void;
   onOpenSitesManager?: () => void;
+  onShareTimelineWhatsApp?: () => void;
   userEmail?: string;
   userRole?: string;
   userPage?: string | null;
@@ -89,6 +91,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
   onOpenBilling,
   onOpenSubcontractorBills,
   onOpenSitesManager,
+  onShareTimelineWhatsApp,
   userEmail,
   userRole,
   userPage,
@@ -313,6 +316,19 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                     </button>
                   )}
 
+                  {/* Quick WhatsApp Timeline Share Button */}
+                  {onShareTimelineWhatsApp && (
+                    <button
+                      type="button"
+                      onClick={onShareTimelineWhatsApp}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 transition-all cursor-pointer shadow-2xs"
+                      title="Share project timeline & milestones via WhatsApp"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/20" />
+                      <span className="hidden md:inline">WhatsApp</span>
+                    </button>
+                  )}
+
                   {/* Quick Tools & Modules Dropdown */}
                   {hasAnyTools && (
                     <div className="relative" ref={toolsRef}>
@@ -396,6 +412,23 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                             >
                               <Receipt className="w-4 h-4 text-emerald-600" />
                               <span className="font-medium">Billing Khata & Parties</span>
+                            </button>
+                          )}
+
+                          {onShareTimelineWhatsApp && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onShareTimelineWhatsApp();
+                                setIsToolsOpen(false);
+                              }}
+                              className="w-full flex items-center justify-between px-3 py-1.5 text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors text-left cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <MessageCircle className="w-4 h-4 text-emerald-600" />
+                                <span className="font-medium">Share Timeline (WhatsApp)</span>
+                              </div>
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Quick</span>
                             </button>
                           )}
 

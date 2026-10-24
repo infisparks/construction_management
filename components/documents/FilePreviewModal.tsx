@@ -30,7 +30,8 @@ import {
   Loader2,
   Database,
   Copy,
-  Check
+  Check,
+  MessageCircle
 } from 'lucide-react';
 import { ProjectFile } from '@/lib/construction-planning/types';
 import { getProjectDocumentPdfUrl } from '@/lib/construction-planning/project-document-pdf';
@@ -44,6 +45,7 @@ interface FilePreviewModalProps {
   onToggleStar?: (id: string, isStarred: boolean) => void;
   onDeleteFile?: (file: ProjectFile) => void;
   onRestoreFile?: (file: ProjectFile) => void;
+  onShareWhatsApp?: (file: ProjectFile) => void;
 }
 
 // Sample BOQ items for spreadsheet in-app view
@@ -67,6 +69,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onToggleStar,
   onDeleteFile,
   onRestoreFile,
+  onShareWhatsApp,
 }) => {
   const [activeTab, setActiveTab] = useState<'viewer' | 'details'>('viewer');
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
@@ -562,6 +565,18 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                   <Trash2 className="w-4 h-4" />
                 </button>
               )
+            )}
+
+            {onShareWhatsApp && (
+              <button
+                type="button"
+                onClick={() => onShareWhatsApp(file)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
+                title="Send document via WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </button>
             )}
 
             <button

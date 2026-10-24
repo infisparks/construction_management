@@ -3,6 +3,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FolderKanban, 
+  Folder,
+  FolderOpen,
+  ArrowLeft,
+  ChevronRight,
+  HardHat,
+  Camera,
   Search, 
   Upload, 
   Filter, 
@@ -36,7 +42,9 @@ import {
   AlertTriangle,
   Archive,
   Undo2,
-  X
+  X,
+  MessageCircle,
+  Phone
 } from 'lucide-react';
 import { ProjectInfo, ProjectFile, FileCategory, FileType } from '@/lib/construction-planning/types';
 import { 
@@ -52,6 +60,8 @@ import {
 } from '@/lib/supabase/project-files';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
+import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
+import { WhatsAppContactsManagerModal } from '@/components/whatsapp/WhatsAppContactsManagerModal';
 import {
   fetchDropdownCategory,
   DEFAULT_DOCUMENT_CATEGORIES
@@ -157,7 +167,10 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
 
   // Default to list / table format per user request
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const [viewMode, setViewMode] = useState<'grid' | 'table' | 'folder'>('table');
+  const [activeFolderCategory, setActiveFolderCategory] = useState<string | null>(null);
+  const [folderSearchQuery, setFolderSearchQuery] = useState('');
+  const [folderFileType, setFolderFileType] = useState<FileType | 'all'>('all');
 
   // Sync selectedCategory whenever initialCategory prop changes from sidebar navigation
   useEffect(() => {
@@ -177,6 +190,27 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<ProjectFile | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // WhatsApp Share & Contacts
+  const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
+  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppSharePayload | null>(null);
+  const [isContactsManagerOpen, setIsContactsManagerOpen] = useState(false);
+
+  const handleShareToWhatsApp = (file: ProjectFile) => {
+    const fullUrl = file.file_url ? resolveFileUrl(file.file_url) : '';
+    setWhatsAppPayload({
+      title: file.title,
+      documentNo: file.document_no,
+      category: file.category,
+      projectName: project.name,
+      mediaUrl: fullUrl,
+      fileName: file.file_name,
+      fileType: file.file_type,
+      fileSize: file.file_size,
+      customSummary: file.description || undefined,
+    });
+    setIsWhatsAppShareOpen(true);
+  };
 
   // Toast message
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info'; undoAction?: () => void } | null>(null);
@@ -379,6 +413,134 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
     }
   };
 
+  const getCategoryFolderMeta = (categoryName: string) => {
+    switch (categoryName) {
+      case 'Architectural drawings':
+        return { icon: Layers, tag: 'Architectural' };
+      case 'Structural and RCC drawings':
+        return { icon: HardHat, tag: 'Structural' };
+      case 'MEP drawings':
+        return { icon: Sparkles, tag: 'MEP Services' };
+      case 'Site photographs and reports':
+        return { icon: ImageIcon, tag: 'Site Photos' };
+      case 'Contracts and agreements':
+        return { icon: ShieldCheck, tag: 'Contracts' };
+      case 'Legal and statutory documents':
+        return { icon: FileText, tag: 'Compliance' };
+      case 'BOQs and cost estimates':
+        return { icon: FileSpreadsheet, tag: 'Commercial' };
+      case 'Quotations and purchase orders':
+        return { icon: FileSpreadsheet, tag: 'Procurement' };
+      case 'Bills, invoices and payment records':
+        return { icon: FileText, tag: 'Finance' };
+      case 'Meeting minutes and correspondence':
+        return { icon: User, tag: 'Meetings' };
+      case 'Quality, safety and handover documents':
+        return { icon: ShieldCheck, tag: 'Quality & Safety' };
+      case 'Project information':
+        return { icon: Building2, tag: 'Project Info' };
+      default:
+        return { icon: FolderKanban, tag: 'Documents' };
+    }
+  };
+
+  // Category Folders for Desktop Folder View
+  const categoryFolderList = useMemo(() => {
+    const cats = categoryOptions.filter(c => c.value !== 'all');
+
+    return cats.map(cat => {
+      const allCategoryFiles = currentList.filter(f => {
+        if (f.category !== cat.value) return false;
+        if (onlyStarred && !f.is_starred) return false;
+        if (!matchesDateFilter(f.created_at, dateFilter)) return false;
+        return true;
+      });
+
+      const matchingFiles = searchQuery.trim()
+        ? allCategoryFiles.filter(f => {
+            const q = searchQuery.toLowerCase();
+            return (
+              f.title?.toLowerCase().includes(q) ||
+              f.file_name?.toLowerCase().includes(q) ||
+              f.document_no?.toLowerCase().includes(q) ||
+              f.description?.toLowerCase().includes(q)
+            );
+          })
+        : allCategoryFiles;
+
+      const imageFiles = matchingFiles.filter(f => f.file_type === 'image' && f.file_url);
+      const dwgFiles = matchingFiles.filter(f => f.file_type === 'dwg');
+      const pdfFiles = matchingFiles.filter(f => f.file_type === 'pdf');
+      const spreadsheetFiles = matchingFiles.filter(f => f.file_type === 'spreadsheet');
+
+      const imageThumbnails = imageFiles.slice(0, 4).map(f => resolveFileUrl(f.file_url));
+      const totalBytes = matchingFiles.reduce((acc, f) => acc + (f.file_size || 0), 0);
+
+      return {
+        ...cat,
+        files: matchingFiles,
+        fileCount: matchingFiles.length,
+        imageCount: imageFiles.length,
+        dwgCount: dwgFiles.length,
+        pdfCount: pdfFiles.length,
+        spreadsheetCount: spreadsheetFiles.length,
+        imageThumbnails,
+        totalBytes,
+      };
+    }).filter(folder => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return folder.label.toLowerCase().includes(q) || folder.fileCount > 0;
+      }
+      return true;
+    });
+  }, [categoryOptions, currentList, searchQuery, onlyStarred, dateFilter]);
+
+  // Active folder details when a category folder is opened
+  const activeFolderData = useMemo(() => {
+    if (!activeFolderCategory) return null;
+    const folder = categoryFolderList.find(f => f.value === activeFolderCategory);
+    if (!folder) {
+      const files = currentList.filter(f => f.category === activeFolderCategory);
+      const imageFiles = files.filter(f => f.file_type === 'image' && f.file_url);
+      return {
+        label: activeFolderCategory,
+        value: activeFolderCategory,
+        files,
+        fileCount: files.length,
+        imageCount: imageFiles.length,
+        dwgCount: files.filter(f => f.file_type === 'dwg').length,
+        pdfCount: files.filter(f => f.file_type === 'pdf').length,
+        spreadsheetCount: files.filter(f => f.file_type === 'spreadsheet').length,
+        imageThumbnails: imageFiles.slice(0, 4).map(f => resolveFileUrl(f.file_url)),
+        totalBytes: files.reduce((acc, f) => acc + (f.file_size || 0), 0)
+      };
+    }
+    return folder;
+  }, [activeFolderCategory, categoryFolderList, currentList]);
+
+  // Sub-filter inside open folder
+  const activeFolderFilteredFiles = useMemo(() => {
+    if (!activeFolderData) return [];
+    let files = activeFolderData.files;
+
+    if (folderSearchQuery.trim()) {
+      const q = folderSearchQuery.toLowerCase();
+      files = files.filter(f => 
+        f.title?.toLowerCase().includes(q) ||
+        f.file_name?.toLowerCase().includes(q) ||
+        f.document_no?.toLowerCase().includes(q) ||
+        f.description?.toLowerCase().includes(q)
+      );
+    }
+
+    if (folderFileType !== 'all') {
+      files = files.filter(f => f.file_type === folderFileType);
+    }
+
+    return files;
+  }, [activeFolderData, folderSearchQuery, folderFileType]);
+
   const handleDownloadFile = (file: ProjectFile) => {
     const targetUrl = resolveFileUrl(file.file_url);
     if (targetUrl) {
@@ -467,6 +629,16 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 title="Refresh Documents"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#653ef1]' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsContactsManagerOpen(true)}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:border-emerald-500/50 hover:bg-emerald-50/40 hover:text-emerald-700 transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+                title="Manage WhatsApp Directory & Saved Contacts"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-600 fill-emerald-600/10" />
+                <span className="hidden sm:inline">WhatsApp Contacts</span>
               </button>
 
               <button
@@ -666,8 +838,24 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             )}
           </div>
 
-          {/* 5. View Mode Toggle (Grid vs Table) */}
-          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50 shrink-0 self-end md:self-auto">
+          {/* 5. View Mode Toggle (Folder vs Grid vs Table) */}
+          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50 shrink-0 self-end md:self-auto gap-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('folder');
+                setActiveFolderCategory(null);
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all cursor-pointer text-xs ${
+                viewMode === 'folder'
+                  ? 'bg-white text-[#653ef1] shadow-2xs font-bold border border-[#653ef1]/20'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Desktop Folders View"
+            >
+              <Folder className="w-3.5 h-3.5 text-[#653ef1]" />
+              <span className="hidden sm:inline">Folders</span>
+            </button>
             <button
               type="button"
               onClick={() => setViewMode('grid')}
@@ -701,7 +889,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         )}
 
         {/* Empty State */}
-        {!isLoading && filteredFiles.length === 0 && (
+        {!isLoading && viewMode !== 'folder' && filteredFiles.length === 0 && (
           <div className="p-12 text-center bg-white rounded-xl border border-slate-200 space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
               {activeTab === 'bin' ? <Trash2 className="w-6 h-6 text-slate-400" /> : <FolderKanban className="w-6 h-6 text-[#653ef1]" />}
@@ -805,6 +993,17 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               >
                                 <Download className="w-3.5 h-3.5 text-slate-400" />
                                 <span>Download</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleShareToWhatsApp(file);
+                                  setActiveMenuId(null);
+                                }}
+                                className="w-full px-3 py-1.5 text-xs text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer font-medium"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/20" />
+                                <span>Share on WhatsApp</span>
                               </button>
                               <div className="my-1 border-t border-slate-100" />
                               <button
@@ -915,6 +1114,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View In-App</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShareToWhatsApp(file)}
+                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
+                          title="Share via WhatsApp"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
@@ -1065,6 +1272,15 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
                             <button
                               type="button"
+                              onClick={() => handleShareToWhatsApp(file)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
+                              title="Share via WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => handleSoftDelete(file)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                               title="Move to Recycle Bin"
@@ -1102,6 +1318,530 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           </div>
         )}
 
+        {/* 3. DESKTOP FOLDERS & ALBUMS VIEW */}
+        {!isLoading && viewMode === 'folder' && (
+          <div className="space-y-5 animate-in fade-in duration-200">
+            {/* Case A: Root Desktop Folders Grid */}
+            {!activeFolderCategory ? (
+              <div className="space-y-4">
+                {/* Header Information Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#653ef1] flex items-center justify-center font-bold shadow-2xs border border-purple-100 shrink-0">
+                      <Folder className="w-5 h-5 fill-[#653ef1]/20" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        <span>Desktop Folders & Categories</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20">
+                          {categoryFolderList.length} Folders
+                        </span>
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Double-click or select any desktop folder below to open and browse photos, blueprints, and files.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 self-end sm:self-auto">
+                    <span className="bg-slate-100 px-2.5 py-1 rounded-lg">
+                      {currentList.length} Total Files
+                    </span>
+                    <span className="bg-purple-50 text-[#653ef1] px-2.5 py-1 rounded-lg border border-purple-100 font-mono">
+                      {formatFileSize(totalStorageBytes)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Empty Folders check (e.g. if search query matched 0 folders) */}
+                {categoryFolderList.length === 0 ? (
+                  <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                    <Folder className="w-10 h-10 text-slate-300 mx-auto" />
+                    <h3 className="text-sm font-bold text-slate-700">No Folders Match Search</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      No document folders or files match "{searchQuery}". Clear your search or reset filters.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="px-3.5 py-1.5 rounded-xl bg-[#653ef1] text-white text-xs font-bold shadow-xs cursor-pointer"
+                    >
+                      Clear Search
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    {categoryFolderList.map((folder) => {
+                      const meta = getCategoryFolderMeta(folder.value);
+                      const IconComponent = meta.icon;
+
+                      return (
+                        <div
+                          key={folder.value}
+                          onClick={() => {
+                            setActiveFolderCategory(folder.value);
+                            setFolderSearchQuery('');
+                            setFolderFileType('all');
+                          }}
+                          className="bg-white rounded-2xl border border-slate-200/90 hover:border-[#653ef1]/50 p-5 shadow-2xs hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col justify-between"
+                        >
+                          {/* Folder Top Glow on hover */}
+                          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#653ef1]/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                          {/* Desktop Folder Icon Art with 3D Depth & Paper/Photo Peek */}
+                          <div className="relative w-28 h-20 mb-4 mx-auto flex items-center justify-center">
+                            {/* Realistic Folder Tab */}
+                            <div className="absolute top-0 left-2 w-11 h-4 bg-gradient-to-r from-[#653ef1] to-[#7f5af8] rounded-t-lg shadow-2xs" />
+
+                            {/* Back Folder Body */}
+                            <div className="absolute top-2.5 inset-x-0 bottom-0 bg-gradient-to-br from-[#653ef1] via-[#5b32e6] to-[#4c24d4] rounded-2xl shadow-sm" />
+
+                            {/* Paper / Image Sheets Peeking Out */}
+                            <div className="absolute top-3.5 inset-x-2.5 h-10 bg-white rounded-t-md shadow-xs border border-white/90 transition-all duration-300 group-hover:-translate-y-3 flex items-center justify-center overflow-hidden">
+                              {folder.imageThumbnails.length > 0 ? (
+                                <img
+                                  src={folder.imageThumbnails[0]}
+                                  alt=""
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full p-1.5 flex flex-col justify-center gap-1 bg-gradient-to-b from-slate-50 to-slate-100">
+                                  <div className="w-10 h-1 bg-slate-300 rounded-full" />
+                                  <div className="w-14 h-1 bg-slate-200 rounded-full" />
+                                  <div className="w-8 h-1 bg-[#653ef1]/30 rounded-full" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Second Peeking Image thumbnail if multiple images */}
+                            {folder.imageThumbnails.length > 1 && (
+                              <div className="absolute top-2 inset-x-3.5 h-8 bg-white/90 rounded-t-sm shadow-xs border border-white/80 transition-all duration-300 group-hover:-translate-y-4.5 -rotate-3 overflow-hidden opacity-90 group-hover:opacity-100">
+                                <img
+                                  src={folder.imageThumbnails[1]}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {/* Front Folder Flap with 3D Depth & Glossy Bevel */}
+                            <div className="absolute top-7 inset-x-0 bottom-0 bg-gradient-to-b from-[#7e58f8] via-[#653ef1] to-[#552ee6] rounded-b-2xl rounded-t-md shadow-md transition-all duration-300 group-hover:scale-y-[0.96] flex items-center justify-center border-t border-white/30">
+                              {/* Center category icon badge in frosted glass */}
+                              <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-white shadow-2xs border border-white/20">
+                                <IconComponent className="w-4 h-4 stroke-[2.2]" />
+                              </div>
+                            </div>
+
+                            {/* File count pill badge */}
+                            <span
+                              className={`absolute -top-1 -right-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs tabular-nums ${
+                                folder.fileCount > 0
+                                  ? 'bg-[#653ef1] text-white border-white ring-2 ring-purple-100'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}
+                            >
+                              {folder.fileCount}
+                            </span>
+                          </div>
+
+                          {/* Folder Info */}
+                          <div className="text-center space-y-1 mt-1">
+                            <h3
+                              className="text-sm font-bold text-slate-900 group-hover:text-[#653ef1] transition-colors line-clamp-1"
+                              title={folder.label}
+                            >
+                              {folder.label}
+                            </h3>
+
+                            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                              <span>{folder.fileCount} {folder.fileCount === 1 ? 'file' : 'files'}</span>
+                              <span>•</span>
+                              <span className="font-mono text-slate-600">{formatFileSize(folder.totalBytes)}</span>
+                            </div>
+
+                            {/* Image previews peek row */}
+                            {folder.imageThumbnails.length > 0 && (
+                              <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-slate-100">
+                                <span className="text-[10px] font-semibold text-slate-400">Photos:</span>
+                                <div className="flex -space-x-1.5 overflow-hidden">
+                                  {folder.imageThumbnails.slice(0, 3).map((thumb, idx) => (
+                                    <img
+                                      key={idx}
+                                      src={thumb}
+                                      alt=""
+                                      className="inline-block h-5 w-5 rounded-full ring-2 ring-white object-cover shadow-2xs"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                                {folder.imageCount > 3 && (
+                                  <span className="text-[10px] text-slate-500 font-bold">
+                                    +{folder.imageCount - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Folder Card Footer */}
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-[#653ef1] group-hover:text-[#5022e3]">
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                              {meta.tag}
+                            </span>
+                            <span className="flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                              <span>Open Folder</span>
+                              <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Case B: Inside Active Category Folder */
+              <div className="space-y-4">
+                {/* Navigation Bar & Breadcrumb */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setActiveFolderCategory(null)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:text-[#653ef1] hover:bg-purple-50 hover:border-purple-200 transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+                      <span>Back to All Folders</span>
+                    </button>
+
+                    <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <span className="cursor-pointer hover:text-slate-800" onClick={() => setActiveFolderCategory(null)}>
+                        Vault
+                      </span>
+                      <ChevronRight className="w-3 h-3 text-slate-400" />
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <FolderOpen className="w-4 h-4 text-[#653ef1]" />
+                        <span>{activeFolderData?.label}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsUploadModalOpen(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
+                      <span>Upload to this Folder</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Folder Header Banner */}
+                <div className="bg-gradient-to-r from-[#653ef1]/10 via-[#653ef1]/5 to-white border border-[#653ef1]/20 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center font-bold shadow-md shadow-[#653ef1]/25 shrink-0">
+                      <FolderOpen className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                        {activeFolderData?.label}
+                      </h2>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Browse, preview full-resolution images, download blueprints, and manage files stored in this category.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs tabular-nums">
+                      {activeFolderFilteredFiles.length} {activeFolderFilteredFiles.length === 1 ? 'document' : 'documents'}
+                    </span>
+                    <span className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-xs font-mono font-bold text-[#653ef1] shadow-2xs tabular-nums">
+                      {formatFileSize(activeFolderData?.totalBytes || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* In-Folder Filter Bar */}
+                <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={folderSearchQuery}
+                      onChange={(e) => setFolderSearchQuery(e.target.value)}
+                      placeholder={`Search in ${activeFolderData?.label}...`}
+                      className="w-full text-xs pl-9 pr-4 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* File Type Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+                    {(['all', 'image', 'dwg', 'pdf', 'spreadsheet'] as const).map((type) => {
+                      const count = type === 'all'
+                        ? activeFolderData?.fileCount || 0
+                        : type === 'image'
+                        ? activeFolderData?.imageCount || 0
+                        : type === 'dwg'
+                        ? activeFolderData?.dwgCount || 0
+                        : type === 'pdf'
+                        ? activeFolderData?.pdfCount || 0
+                        : activeFolderData?.spreadsheetCount || 0;
+
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setFolderFileType(type)}
+                          className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                            folderFileType === type
+                              ? 'bg-[#653ef1] text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{type === 'all' ? 'All Files' : type.toUpperCase()}</span>
+                          <span className={`text-[10px] rounded-full px-1.5 py-0.2 ${
+                            folderFileType === type ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Files & Photos Display inside Open Folder */}
+                {activeFolderFilteredFiles.length === 0 ? (
+                  <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#653ef1] flex items-center justify-center mx-auto">
+                      <FolderOpen className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">No Documents in this Folder</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      {folderSearchQuery.trim()
+                        ? `No files match "${folderSearchQuery}" in this folder.`
+                        : `This category folder currently has no files uploaded. Click below to add the first document or photo.`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsUploadModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer mt-1"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload to {activeFolderData?.label}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    {activeFolderFilteredFiles.map((file) => {
+                      const isImage = file.file_type === 'image' && Boolean(file.file_url);
+
+                      return (
+                        <div
+                          key={file.id}
+                          className="bg-white rounded-2xl border border-slate-200/90 hover:border-[#653ef1]/40 shadow-2xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between overflow-hidden group relative"
+                        >
+                          {/* Image or File Thumbnail Header */}
+                          {isImage ? (
+                            <div
+                              onClick={() => {
+                                setPreviewFile(file);
+                                setIsPreviewOpen(true);
+                              }}
+                              className="w-full aspect-[4/3] bg-slate-100 relative overflow-hidden cursor-pointer group/thumb"
+                            >
+                              <img
+                                src={resolveFileUrl(file.file_url)}
+                                alt={file.title}
+                                className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+
+                              {/* Gradient vignette overlay */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/20 opacity-60 group-hover/thumb:opacity-80 transition-opacity" />
+
+                              {/* Top Pills */}
+                              <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-black/50 text-white backdrop-blur-xs border border-white/20">
+                                  {file.document_no}
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/90 text-white backdrop-blur-xs shadow-xs">
+                                  {file.status || 'Approved'}
+                                </span>
+                              </div>
+
+                              {/* Hover Quick Action Buttons */}
+                              <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover/thumb:opacity-100 transition-opacity bg-black/30 backdrop-blur-2xs">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewFile(file);
+                                    setIsPreviewOpen(true);
+                                  }}
+                                  className="w-9 h-9 rounded-xl bg-white text-[#653ef1] flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                                  title="Fullscreen Preview"
+                                >
+                                  <Eye className="w-4 h-4 stroke-[2.2]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadFile(file);
+                                  }}
+                                  className="w-9 h-9 rounded-xl bg-white text-slate-700 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                                  title="Download"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleShareToWhatsApp(file);
+                                  }}
+                                  className="w-9 h-9 rounded-xl bg-white text-emerald-600 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                                  title="Send via WhatsApp"
+                                >
+                                  <MessageCircle className="w-4 h-4 fill-emerald-600/20" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleStar(file.id, !file.is_starred);
+                                  }}
+                                  className={`w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all cursor-pointer ${
+                                    file.is_starred ? 'text-amber-500' : 'text-slate-400'
+                                  }`}
+                                  title="Favorite"
+                                >
+                                  <Star className={`w-4 h-4 ${file.is_starred ? 'fill-amber-400' : ''}`} />
+                                </button>
+                              </div>
+
+                              {/* Bottom caption on image */}
+                              <div className="absolute bottom-2 inset-x-2.5 text-white pointer-events-none">
+                                <span className="text-xs font-bold block truncate drop-shadow-sm">
+                                  {file.title}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Non-image File Header */
+                            <div className="p-4 pb-2">
+                              <div className="flex items-start justify-between gap-2 mb-2.5">
+                                <div className="w-11 h-11 rounded-xl bg-purple-50/80 border border-purple-100 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                  {getFileIcon(file.file_type)}
+                                </div>
+                                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 truncate">
+                                  {file.document_no}
+                                </span>
+                              </div>
+
+                              <h4
+                                onClick={() => {
+                                  setPreviewFile(file);
+                                  setIsPreviewOpen(true);
+                                }}
+                                className="text-xs font-bold text-slate-900 group-hover:text-[#653ef1] transition-colors cursor-pointer line-clamp-2 leading-snug"
+                                title={file.title}
+                              >
+                                {file.title}
+                              </h4>
+                              <span className="text-[11px] text-slate-400 font-mono block truncate mt-0.5">
+                                {file.file_name}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Card Metadata & Actions Footer */}
+                          <div className="p-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
+                              <span>{formatFileSize(file.file_size)}</span>
+                              {file.building_floor && (
+                                <>
+                                  <span>•</span>
+                                  <span className="truncate max-w-[90px]">{file.building_floor}</span>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPreviewFile(file);
+                                  setIsPreviewOpen(true);
+                                }}
+                                className="p-1.5 text-slate-500 hover:text-[#653ef1] hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                title="View In-App"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadFile(file)}
+                                className="p-1.5 text-slate-500 hover:text-[#653ef1] hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                title="Download"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareToWhatsApp(file)}
+                                className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                title="Share via WhatsApp"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </button>
+                              {activeTab === 'vault' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSoftDelete(file)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Move to Recycle Bin"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreFile(file)}
+                                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Restore"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* Upload Document Modal */}
@@ -1112,6 +1852,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         projectCode={project.code}
         projectName={project.name}
         userEmail={userEmail}
+        defaultCategory={(activeFolderCategory as FileCategory) || undefined}
         onFileUploaded={(newFile) => {
           setActiveFiles(prev => [newFile, ...prev]);
           fetchDropdownCategory('document_category', DEFAULT_DOCUMENT_CATEGORIES).then(setDynamicCategories);
@@ -1140,6 +1881,27 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           handleRestoreFile(f);
           setIsPreviewOpen(false);
         }}
+        onShareWhatsApp={handleShareToWhatsApp}
+      />
+
+      {/* WhatsApp Share Modal */}
+      <WhatsAppShareModal
+        isOpen={isWhatsAppShareOpen}
+        onClose={() => {
+          setIsWhatsAppShareOpen(false);
+          setWhatsAppPayload(null);
+        }}
+        payload={whatsAppPayload}
+        onSuccessToast={(msg) => {
+          setToastMessage({ text: msg, type: 'success' });
+          setTimeout(() => setToastMessage(null), 4000);
+        }}
+      />
+
+      {/* WhatsApp Contacts Directory Manager Modal */}
+      <WhatsAppContactsManagerModal
+        isOpen={isContactsManagerOpen}
+        onClose={() => setIsContactsManagerOpen(false)}
       />
 
     </div>

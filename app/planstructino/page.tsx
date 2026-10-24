@@ -64,6 +64,7 @@ import { useRouter } from 'next/navigation';
 import { LoginPage } from '@/components/auth/LoginPage';
 import { SitesManagerModal } from '@/components/projects/SitesManagerModal';
 import { DbProject } from '@/lib/supabase/types';
+import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
 import { 
   resolveActiveSite, 
   setStoredActiveSite, 
@@ -227,6 +228,48 @@ export default function ConstructionPlanningPage() {
 
   const handleToggleAllNotes = () => {
     setAreAllNotesOpen((prev) => !prev);
+  };
+
+  // WhatsApp Timeline Share Modal
+  const [isTimelineWhatsAppOpen, setIsTimelineWhatsAppOpen] = useState(false);
+  const [timelineWhatsAppPayload, setTimelineWhatsAppPayload] = useState<WhatsAppSharePayload | null>(null);
+
+  const handleShareTimelineToWhatsApp = () => {
+    const completedTasks = tasks.filter((t) => t.progress === 100).length;
+    const inProgressTasks = tasks.filter((t) => t.progress > 0 && t.progress < 100).length;
+    const criticalTasks = tasks.filter((t) => t.isCritical).length;
+    const projectMilestones = tasks.filter((t) => t.type === 'milestone');
+
+    const summaryText = [
+      `*PROJECT TIMELINE & PROGRESS REPORT*`,
+      `🏢 Site: *${project.name} (${project.code})*`,
+      `📅 Report Date: *${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}*`,
+      ``,
+      `📈 *PROGRESS METRICS:*`,
+      `• Overall Project Progress: *${project.overallProgress}%*`,
+      `• Start Date: *${project.plannedStartDate}*`,
+      `• Target Finish: *${project.forecastCompletionDate || project.plannedCompletionDate}*`,
+      `• Total Work Tasks: *${tasks.length}*`,
+      `• Completed Tasks: *${completedTasks}*`,
+      `• In-Progress Active: *${inProgressTasks}*`,
+      `• Critical Path Activities: *${criticalTasks}*`,
+      ``,
+      `🎯 *KEY MILESTONES:*`,
+      ...projectMilestones.slice(0, 4).map(
+        (m, i) => `  ${i + 1}. *${m.name}*: ${m.status === 'completed' ? '✅ Completed' : `⏳ Target: ${m.plannedEndDate || m.forecastEndDate}`}`
+      ),
+      ``,
+      `_Automated project status from Armee Enterprises Construction ERP._`,
+    ].join('\n');
+
+    setTimelineWhatsAppPayload({
+      title: `${project.name} Timeline & Milestone Report`,
+      documentNo: `TIME-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+      category: 'Project information',
+      projectName: project.name,
+      customSummary: summaryText,
+    });
+    setIsTimelineWhatsAppOpen(true);
   };
 
   // Active Project ID for Supabase Planning Tables (Checks state, then URL ?site=, then localStorage, then fallback)
@@ -1461,6 +1504,7 @@ export default function ConstructionPlanningPage() {
           onOpenBilling={() => handleOpenMaterialDrawer('billing')}
           onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
           onOpenSitesManager={() => setIsSitesManagerOpen(true)}
+          onShareTimelineWhatsApp={handleShareTimelineToWhatsApp}
           userEmail={user.email || undefined}
           userRole={userRole?.role}
           userPage={userRole?.page}
@@ -1813,6 +1857,17 @@ export default function ConstructionPlanningPage() {
         activeProjectId={activeDbProject?.id}
         onSelectProject={handleSelectDbProject}
         showToast={showToast}
+      />
+
+      {/* Global WhatsApp Share Modal for Timeline & Progress */}
+      <WhatsAppShareModal
+        isOpen={isTimelineWhatsAppOpen}
+        onClose={() => {
+          setIsTimelineWhatsAppOpen(false);
+          setTimelineWhatsAppPayload(null);
+        }}
+        payload={timelineWhatsAppPayload}
+        onSuccessToast={(msg) => showToast(msg, 'success')}
       />
 
     </div>

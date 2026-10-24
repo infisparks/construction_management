@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { InventoryTransaction } from './inventory-types';
 import { drawBarcodeOnPdf } from '@/lib/common/pdf-barcode';
 import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
+import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
 
 /**
  * Formats a monetary value safely without using the unicode rupee symbol (₹),
@@ -228,7 +229,7 @@ export function generateInventoryVoucherPdf(
     [
       '1',
       itemCode,
-      transaction.materialName,
+      transaction.brand ? `${transaction.materialName} (${transaction.brand})` : transaction.materialName,
       transaction.category,
       `${isCheckIn ? '+' : '-'}${transaction.quantity} ${transaction.unit}`,
       transaction.unitRate ? formatINR(transaction.unitRate) : '—',
@@ -414,6 +415,25 @@ export function viewInventoryVoucherPdfInNewTab(
   const { blobUrl } = getInventoryVoucherPdfBlobUrl(transaction, projectName);
   window.open(blobUrl, '_blank');
   return blobUrl;
+}
+
+/**
+ * Generates the official voucher PDF, converts it to a File, and uploads to Supabase Storage
+ * bucket 'inventory-documents/vouchers' so that a genuine public HTTPS URL is available for WhatsApp.
+ */
+export async function uploadOrGetVoucherPdfUrl(
+  transaction: InventoryTransaction,
+  projectName?: string
+): Promise<{ publicUrl: string; fileName: string }> {
+  const { blob } = getInventoryVoucherPdfBlobUrl(transaction, projectName);
+  const cleanVoucher = (transaction.voucherNumber || 'voucher').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `Voucher_${cleanVoucher}.pdf`;
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  const result = await uploadInventoryBillToStorage(file, 'vouchers');
+  return {
+    publicUrl: result.publicUrl,
+    fileName: fileName,
+  };
 }
 
 /**

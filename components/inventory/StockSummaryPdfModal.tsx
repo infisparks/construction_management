@@ -8,7 +8,8 @@ import {
   Printer,
   Package,
   Layers,
-  FileText
+  FileText,
+  MessageCircle
 } from 'lucide-react';
 import { ConstructionMaterial } from '@/lib/inventory/inventory-types';
 import {
@@ -21,6 +22,7 @@ interface StockSummaryPdfModalProps {
   onClose: () => void;
   materials: ConstructionMaterial[];
   projectName?: string;
+  onShareWhatsApp?: () => void;
 }
 
 export const StockSummaryPdfModal: React.FC<StockSummaryPdfModalProps> = ({
@@ -28,6 +30,7 @@ export const StockSummaryPdfModal: React.FC<StockSummaryPdfModalProps> = ({
   onClose,
   materials,
   projectName = 'Noori Crest Tower',
+  onShareWhatsApp,
 }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -98,6 +101,18 @@ export const StockSummaryPdfModal: React.FC<StockSummaryPdfModalProps> = ({
               <span className="hidden sm:inline">Open in New Tab</span>
               <span className="sm:hidden">New Tab</span>
             </button>
+
+            {onShareWhatsApp && (
+              <button
+                type="button"
+                onClick={onShareWhatsApp}
+                className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                title="Send inventory stock report on WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </button>
+            )}
 
             <button
               type="button"

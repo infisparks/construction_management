@@ -44,6 +44,7 @@ interface UploadDocumentModalProps {
   projectCode?: string;
   projectName?: string;
   userEmail?: string;
+  defaultCategory?: FileCategory;
   onFileUploaded: (file: ProjectFile) => void;
   onSiteCreated?: (project: DbProject) => void;
 }
@@ -70,6 +71,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   projectCode,
   projectName,
   userEmail,
+  defaultCategory,
   onFileUploaded,
   onSiteCreated,
 }) => {
@@ -119,7 +121,14 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 
   // Required / Primary Fields
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<FileCategory>('Site photographs and reports');
+  const [category, setCategory] = useState<FileCategory>(defaultCategory || 'Site photographs and reports');
+
+  // Sync category with defaultCategory when modal opens
+  useEffect(() => {
+    if (defaultCategory) {
+      setCategory(defaultCategory);
+    }
+  }, [defaultCategory, isOpen]);
 
   // Dynamic categories from Supabase category table
   const [categoriesList, setCategoriesList] = useState<string[]>(DEFAULT_DOCUMENT_CATEGORIES);

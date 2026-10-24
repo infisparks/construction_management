@@ -26,7 +26,8 @@ import {
   AlertCircle,
   Undo2,
   Save,
-  UserPlus
+  UserPlus,
+  MessageCircle
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -60,6 +61,7 @@ interface MaterialHistoryDrawerProps {
   subcontractors?: InventorySubcontractor[];
   vendorProfiles?: VendorProfile[];
   onOpenVendorDrawer?: (defaultType?: 'vendor' | 'contractor' | 'other') => void;
+  onShareWhatsApp?: (tx: InventoryTransaction) => void;
 }
 
 export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
@@ -77,6 +79,7 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
   subcontractors = [],
   vendorProfiles = [],
   onOpenVendorDrawer,
+  onShareWhatsApp,
 }) => {
   const [filterMode, setFilterMode] = useState<'checkouts_only' | 'all' | 'bin'>(defaultFilter);
 
@@ -580,6 +583,15 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
                         </span>
                       </div>
 
+                      {tx.brand && (
+                        <div className="col-span-2 pt-1 border-t border-purple-100 flex items-center gap-1.5">
+                          <span className="text-slate-500 font-medium">Brand: </span>
+                          <span className="font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] border border-purple-200">
+                            {tx.brand}
+                          </span>
+                        </div>
+                      )}
+
                       {tx.purpose && (
                         <div className="col-span-2 pt-1 border-t border-slate-200/60">
                           <span className="text-slate-500 font-medium">Purpose: </span>
@@ -652,6 +664,18 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
                           <Download className="w-3 h-3" />
                           <span>Download</span>
                         </button>
+
+                        {onShareWhatsApp && (
+                          <button
+                            type="button"
+                            onClick={() => onShareWhatsApp(tx)}
+                            className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                            title="Send Voucher Bill & PDF on WhatsApp"
+                          >
+                            <MessageCircle className="w-3 h-3 fill-white" />
+                            <span>WhatsApp</span>
+                          </button>
+                        )}
 
                         {/* If in Bin: Restore Button */}
                         {isDeleted ? (

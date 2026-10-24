@@ -18,7 +18,8 @@ import {
   ArrowUpRight,
   ExternalLink,
   FileText,
-  Paperclip
+  Paperclip,
+  MessageCircle
 } from 'lucide-react';
 import { InventoryTransaction } from '@/lib/inventory/inventory-types';
 import {
@@ -34,6 +35,7 @@ interface VoucherSlipModalProps {
   transaction: InventoryTransaction | null;
   projectName?: string;
   defaultViewMode?: 'slip' | 'pdf';
+  onShareWhatsApp?: (tx: InventoryTransaction) => void;
 }
 
 export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
@@ -42,6 +44,7 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
   transaction,
   projectName = 'Noori Crest Tower',
   defaultViewMode = 'pdf',
+  onShareWhatsApp,
 }) => {
   const [viewMode, setViewMode] = useState<'slip' | 'pdf'>(defaultViewMode);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -151,6 +154,18 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Open Blob URL PDF</span>
             </button>
+
+            {onShareWhatsApp && (
+              <button
+                type="button"
+                onClick={() => onShareWhatsApp(transaction)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                title="Send this voucher PDF directly on WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                <span>Send WhatsApp</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -291,8 +306,11 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                   <tr>
                     <td className="px-4 py-3">
                       <div className="font-bold text-slate-900">{transaction.materialName}</div>
-                      <div className="text-[11px] text-purple-700 font-semibold font-mono mt-0.5">
-                        Code: {getCleanItemCode(transaction.materialCode, transaction.materialId, 1)}
+                      <div className="text-[11px] text-purple-700 font-semibold font-mono mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span>Code: {getCleanItemCode(transaction.materialCode, transaction.materialId, 1)}</span>
+                        {transaction.brand && (
+                          <span className="text-slate-600 font-sans font-medium">• Brand: <strong className="text-purple-700">{transaction.brand}</strong></span>
+                        )}
                       </div>
                     </td>
                     <td className={`px-4 py-3 text-right font-bold text-sm ${

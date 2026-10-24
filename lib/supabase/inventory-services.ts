@@ -106,6 +106,7 @@ export interface InventoryTransactionRecord {
   product_name: string;
   product_code?: string;
   category?: string;
+  brand?: string;
   quantity: number;
   unit: string;
   stock_after?: number;
@@ -236,6 +237,7 @@ export async function createInventoryTransaction(
           product_name: tx.product_name,
           product_code: tx.product_code || null,
           category: tx.category || null,
+          brand: tx.brand || null,
           quantity: tx.quantity,
           unit: tx.unit,
           stock_after: calculatedStockAfter,
@@ -464,6 +466,7 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
     materialCode: row.product_code || undefined,
     materialName: row.product_name,
     category: row.category || 'General',
+    brand: row.brand || undefined,
     quantity: Number(row.quantity),
     unit: row.unit,
     unitRate: row.unit_rate !== null && row.unit_rate !== undefined ? Number(row.unit_rate) : undefined,
