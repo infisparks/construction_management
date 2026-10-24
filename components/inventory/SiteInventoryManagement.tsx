@@ -70,6 +70,7 @@ import { InventoryBillViewerModal } from './InventoryBillViewerModal';
 import {
   viewInventoryStockSummaryPdfInNewTab,
   downloadInventoryStockSummaryPdf,
+  uploadOrGetStockSummaryPdfUrl
 } from '@/lib/inventory/inventory-stock-pdf';
 import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
 
@@ -94,7 +95,10 @@ import {
   deleteProfileProduct,
   restoreProfileProduct,
   fetchDeletedProfileProducts,
+  fetchDeletedProfileVendors,
+  restoreProfileVendor,
   ProfileProduct,
+  ProfileVendor,
 } from '@/lib/supabase/profile-services';
 import { 
   DateFilterControl, 
@@ -267,15 +271,20 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
   // Recycle Bin State
   const [deletedProducts, setDeletedProducts] = useState<ProfileProduct[]>([]);
+  const [deletedVendors, setDeletedVendors] = useState<ProfileVendor[]>([]);
   const [isLoadingBin, setIsLoadingBin] = useState(false);
 
   const loadDeletedProducts = async () => {
     setIsLoadingBin(true);
     try {
-      const data = await fetchDeletedProfileProducts();
-      setDeletedProducts(data || []);
+      const [prods, vends] = await Promise.all([
+        fetchDeletedProfileProducts(),
+        fetchDeletedProfileVendors(),
+      ]);
+      setDeletedProducts(prods || []);
+      setDeletedVendors(vends || []);
     } catch (err) {
-      console.error('Error fetching deleted products:', err);
+      console.error('Error fetching deleted items for bin:', err);
     } finally {
       setIsLoadingBin(false);
     }
@@ -309,6 +318,16 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     }
   };
 
+  const handleRestoreVendorFromBin = async (id: string, name: string) => {
+    const { error } = await restoreProfileVendor(id);
+    if (!error) {
+      showToast?.(`Vendor "${name}" restored to Active Parties!`, 'success');
+      await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
+    } else {
+      showToast?.('Failed to restore vendor profile', 'error');
+    }
+  };
+
   // Profile Drawers State
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [isVendorDrawerOpen, setIsVendorDrawerOpen] = useState(false);
@@ -324,7 +343,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
   // Active View Tab
   const [activeTab, setActiveTab] = useState<'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin'>(initialTab);
-  const [binViewMode, setBinViewMode] = useState<'products' | 'movements'>('products');
+  const [binViewMode, setBinViewMode] = useState<'products' | 'movements' | 'vendors'>('products');
 
   // Sync initialTab when changed externally
   useEffect(() => {
@@ -695,22 +714,40 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       `• Critical Out of Stock: *${criticalStockCount} items*`,
       `• Total Recorded Transactions: *${transactions.length}*`,
       ``,
-      `📦 *TOP ACTIVE MATERIALS:*`,
-      ...materials.slice(0, 5).map((m, i) => 
-        `  ${i + 1}. *${m.name}*: ${m.currentStock.toLocaleString('en-IN')} ${m.unit} (Val: ₹${(m.currentStock * (m.averageUnitRate || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })})`
-      ),
-      ``,
       `_Automated report generated from Armee Enterprises Construction ERP._`
     ].join('\n');
 
+    const docNo = `INV-STAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+
     setWhatsAppPayload({
       title: `${project?.name || 'Site'} Inventory Status Report`,
-      documentNo: `INV-STAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+      documentNo: docNo,
       category: 'Inventory & Materials',
       projectName: project?.name || 'Noori Crest Tower',
       customSummary: summaryText,
+      isGeneratingMedia: true,
     });
     setIsWhatsAppShareOpen(true);
+
+    // Asynchronously generate & upload official Stock Summary PDF report to Supabase Storage
+    (async () => {
+      try {
+        const { publicUrl, fileName } = await uploadOrGetStockSummaryPdfUrl(materials, project?.name || 'Noori Crest Tower');
+        setWhatsAppPayload((prev) => {
+          if (!prev || prev.documentNo !== docNo) return prev;
+          return {
+            ...prev,
+            mediaUrl: publicUrl,
+            fileName: fileName,
+            fileType: 'document',
+            isGeneratingMedia: false,
+          };
+        });
+      } catch (uploadErr) {
+        console.warn('Could not upload stock summary PDF to storage for WhatsApp:', uploadErr);
+        setWhatsAppPayload((prev) => (prev ? { ...prev, isGeneratingMedia: false } : null));
+      }
+    })();
   };
 
   const handleShareTransactionToWhatsApp = (tx: InventoryTransaction) => {
@@ -728,34 +765,41 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     // Clean 1-line item summary since complete details are inside the attached PDF document
     const itemSummary = `📦 ${tx.materialName}${tx.brand ? ` (${tx.brand})` : ''} • ${isReceipt ? '+' : '-'}${tx.quantity} ${tx.unit}${tx.totalAmount ? ` (₹${tx.totalAmount.toLocaleString('en-IN')})` : ''}`;
 
+    const alreadyHasUrl = Boolean(tx.fileUrl && tx.fileUrl.startsWith('http'));
+
     setWhatsAppPayload({
       title: `${typeLabel} — ${tx.voucherNumber}`,
       documentNo: tx.voucherNumber,
       category: 'Bills & Vouchers',
       projectName: project?.name || 'Noori Crest Tower',
-      mediaUrl: tx.fileUrl || undefined,
+      mediaUrl: alreadyHasUrl ? tx.fileUrl : undefined,
       fileName: tx.fileName || `Voucher_${tx.voucherNumber}.pdf`,
       customSummary: itemSummary,
+      isGeneratingMedia: !alreadyHasUrl,
     });
     setIsWhatsAppShareOpen(true);
 
-    // Asynchronously generate & upload official Voucher PDF to Supabase Storage so WhatsApp sends the actual PDF document!
-    (async () => {
-      try {
-        const { publicUrl, fileName } = await uploadOrGetVoucherPdfUrl(tx, project?.name || 'Noori Crest Tower');
-        setWhatsAppPayload((prev) => {
-          if (!prev || prev.documentNo !== tx.voucherNumber) return prev;
-          return {
-            ...prev,
-            mediaUrl: publicUrl,
-            fileName: fileName,
-            fileType: 'document',
-          };
-        });
-      } catch (uploadErr) {
-        console.warn('Could not upload voucher PDF to storage for WhatsApp:', uploadErr);
-      }
-    })();
+    if (!alreadyHasUrl) {
+      // Asynchronously generate & upload official Voucher PDF to Supabase Storage so WhatsApp sends the actual PDF document!
+      (async () => {
+        try {
+          const { publicUrl, fileName } = await uploadOrGetVoucherPdfUrl(tx, project?.name || 'Noori Crest Tower');
+          setWhatsAppPayload((prev) => {
+            if (!prev || prev.documentNo !== tx.voucherNumber) return prev;
+            return {
+              ...prev,
+              mediaUrl: publicUrl,
+              fileName: fileName,
+              fileType: 'document',
+              isGeneratingMedia: false,
+            };
+          });
+        } catch (uploadErr) {
+          console.warn('Could not upload voucher PDF to storage for WhatsApp:', uploadErr);
+          setWhatsAppPayload((prev) => (prev ? { ...prev, isGeneratingMedia: false } : null));
+        }
+      })();
+    }
   };
 
   const handleOpenMaterialHistory = (matId: string) => {
@@ -2561,7 +2605,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               </div>
               <div>
                 <span className="font-bold text-rose-900 text-sm">
-                  Recycle Bin ({deletedProducts.length + deletedTransactions.length} Soft-Deleted Items)
+                  Recycle Bin ({deletedProducts.length + deletedTransactions.length + deletedVendors.length} Soft-Deleted Items)
                 </span>
                 <p className="text-xs text-rose-700">
                   Items deleted are safely retained with <code className="font-mono bg-rose-100 px-1 py-0.5 rounded text-rose-800">is_deleted = true</code>. They do not affect active store stock balances and can be restored anytime.
@@ -2593,6 +2637,17 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   }`}
                 >
                   Movements & Vouchers ({deletedTransactions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBinViewMode('vendors')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    binViewMode === 'vendors'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  Vendors & Parties ({deletedVendors.length})
                 </button>
               </div>
 
@@ -2772,6 +2827,77 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                                 <span>Restore Voucher</span>
                               </button>
                             </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW C: DELETED VENDORS & PARTIES */}
+          {binViewMode === 'vendors' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Vendor / Party Name</th>
+                      <th className="px-4 py-3">Classification</th>
+                      <th className="px-4 py-3">Contact Person</th>
+                      <th className="px-4 py-3">Phone</th>
+                      <th className="px-4 py-3">Trade / Specialization</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {deletedVendors.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          <Trash2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                          <p className="font-semibold text-slate-700">No deleted vendor profiles in bin</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">All vendor & party profiles are active.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      deletedVendors.map((v) => (
+                        <tr key={v.id} className="hover:bg-rose-50/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800 line-through">{v.name}</div>
+                            {v.address && <div className="text-[11px] text-slate-400">{v.address}</div>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold capitalize bg-slate-100 text-slate-700 border border-slate-200">
+                              {v.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {v.contact_person || '—'}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-slate-600">
+                            {v.phone || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {v.trade || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              Deleted (In Bin)
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleRestoreVendorFromBin(v.id, v.name)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                              title="Restore party back to active directory"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Restore Party</span>
+                            </button>
                           </td>
                         </tr>
                       ))

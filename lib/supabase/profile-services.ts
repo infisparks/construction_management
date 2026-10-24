@@ -268,3 +268,37 @@ export async function deleteProfileVendor(id: string): Promise<{ error: any }> {
     return { error: err };
   }
 }
+
+export async function restoreProfileVendor(id: string): Promise<{ error: any }> {
+  try {
+    const { error } = await supabase
+      .from('profile_vendor')
+      .update({ is_deleted: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    return { error };
+  } catch (err) {
+    console.error('Failed to restore profile_vendor:', err);
+    return { error: err };
+  }
+}
+
+export async function fetchDeletedProfileVendors(): Promise<ProfileVendor[]> {
+  try {
+    const { data, error } = await supabase
+      .from('profile_vendor')
+      .select('*')
+      .eq('is_deleted', true)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching deleted profile_vendor from Supabase:', error);
+      return [];
+    }
+    return (data || []) as ProfileVendor[];
+  } catch (err) {
+    console.error('Failed to fetch deleted profile_vendor:', err);
+    return [];
+  }
+}
+

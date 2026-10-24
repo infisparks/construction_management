@@ -18,7 +18,11 @@ import {
   RefreshCw,
   Info,
   UserPlus,
-  Briefcase
+  Briefcase,
+  AlertTriangle,
+  RotateCcw,
+  Archive,
+  ShieldAlert
 } from 'lucide-react';
 import {
   ProfileVendor,
@@ -26,6 +30,8 @@ import {
   createProfileVendor,
   updateProfileVendor,
   deleteProfileVendor,
+  restoreProfileVendor,
+  fetchDeletedProfileVendors
 } from '@/lib/supabase/profile-services';
 
 interface VendorProfileViewProps {
@@ -36,13 +42,20 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
   showToast,
 }) => {
   const [vendors, setVendors] = useState<ProfileVendor[]>([]);
+  const [deletedVendors, setDeletedVendors] = useState<ProfileVendor[]>([]);
+  const [activeDirectoryTab, setActiveDirectoryTab] = useState<'active' | 'trash'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'vendor' | 'contractor' | 'client' | 'other'>('all');
 
-  // Modal State
+  // Modal State for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<ProfileVendor | null>(null);
+
+  // Soft Delete Confirmation Modal State (Requires typing "DELETE")
+  const [vendorToDelete, setVendorToDelete] = useState<ProfileVendor | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form State
   const [name, setName] = useState('');
@@ -58,21 +71,32 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load from Supabase profile_vendor table
+  // Load from Supabase profile_vendor table (both active and soft-deleted)
   const loadVendors = async () => {
     setIsLoading(true);
-    const data = await fetchProfileVendors();
-    setVendors(data);
-    setIsLoading(false);
+    try {
+      const [activeList, deletedList] = await Promise.all([
+        fetchProfileVendors(),
+        fetchDeletedProfileVendors(),
+      ]);
+      setVendors(activeList || []);
+      setDeletedVendors(deletedList || []);
+    } catch (err) {
+      console.error('Failed to load vendors:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     loadVendors();
   }, []);
 
-  // Filtered vendors
+  // Filtered vendors based on active directory tab
+  const currentList = activeDirectoryTab === 'active' ? vendors : deletedVendors;
+
   const filteredVendors = useMemo(() => {
-    return vendors.filter((v) => {
+    return currentList.filter((v) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -87,7 +111,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
 
       return matchesSearch && matchesType;
     });
-  }, [vendors, searchQuery, typeFilter]);
+  }, [currentList, searchQuery, typeFilter]);
 
   const handleOpenAddModal = () => {
     setEditingVendor(null);
@@ -164,16 +188,50 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
     setIsModalOpen(false);
   };
 
-  const handleDelete = async (id: string, vendorName: string) => {
-    if (!window.confirm(`Are you sure you want to delete profile for "${vendorName}"?`)) {
-      return;
-    }
-    const { error } = await deleteProfileVendor(id);
-    if (!error) {
-      setVendors((prev) => prev.filter((v) => v.id !== id));
-      showToast?.('Vendor profile deleted.', 'info');
-    } else {
+  // Open safe delete modal (no permanent delete, requires typing "DELETE")
+  const handleInitiateDelete = (vendor: ProfileVendor) => {
+    setVendorToDelete(vendor);
+    setDeleteConfirmationText('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!vendorToDelete) return;
+    if (deleteConfirmationText.trim().toUpperCase() !== 'DELETE') return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await deleteProfileVendor(vendorToDelete.id);
+      if (!error) {
+        setVendors((prev) => prev.filter((v) => v.id !== vendorToDelete.id));
+        setDeletedVendors((prev) => [{ ...vendorToDelete, is_deleted: true }, ...prev]);
+        showToast?.(`Vendor "${vendorToDelete.name}" moved to Recycle Bin. You can restore it anytime.`, 'info');
+        setVendorToDelete(null);
+        setDeleteConfirmationText('');
+      } else {
+        showToast?.('Failed to delete vendor profile', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to soft-delete vendor:', err);
       showToast?.('Failed to delete vendor profile', 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Restore vendor from soft delete
+  const handleRestoreVendor = async (vendor: ProfileVendor) => {
+    try {
+      const { error } = await restoreProfileVendor(vendor.id);
+      if (!error) {
+        setDeletedVendors((prev) => prev.filter((v) => v.id !== vendor.id));
+        setVendors((prev) => [{ ...vendor, is_deleted: false }, ...prev]);
+        showToast?.(`Vendor "${vendor.name}" restored to Active Parties!`, 'success');
+      } else {
+        showToast?.('Failed to restore vendor profile', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to restore vendor:', err);
+      showToast?.('Failed to restore vendor profile', 'error');
     }
   };
 
@@ -192,7 +250,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                   Vendors & Parties Directory
                 </h2>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  {filteredVendors.length} Parties
+                  {vendors.length} Active • {deletedVendors.length} in Bin
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -202,22 +260,52 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* View Mode Toggle: Active vs Recycle Bin */}
+            <div className="flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveDirectoryTab('active')}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  activeDirectoryTab === 'active'
+                    ? 'bg-white text-purple-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Active Parties ({vendors.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDirectoryTab('trash')}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                  activeDirectoryTab === 'trash'
+                    ? 'bg-rose-600 text-white shadow-2xs'
+                    : 'text-rose-700 hover:bg-rose-50'
+                }`}
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Recycle Bin ({deletedVendors.length})</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={loadVendors}
-              className="h-8 w-8 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center justify-center transition-colors"
+              className="h-8 w-8 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center justify-center transition-colors cursor-pointer"
               title="Refresh from database"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-purple-600' : 'text-slate-500'}`} />
             </button>
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="h-8 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Add Party</span>
-            </button>
+
+            {activeDirectoryTab === 'active' && (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="h-8 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Add Party</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -227,7 +315,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search vendor profile by name, trade, contact person, phone..."
+              placeholder={`Search ${activeDirectoryTab === 'active' ? 'active' : 'archived'} vendor profile by name, trade, contact person, phone...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:bg-white transition-colors"
@@ -261,6 +349,18 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
         </div>
       </div>
 
+      {/* Active vs Recycle Bin Banner */}
+      {activeDirectoryTab === 'trash' && (
+        <div className="bg-rose-50/70 border border-rose-200/80 rounded-xl p-3 flex items-center justify-between text-xs text-rose-800">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>
+              <strong>Recycle Bin (Soft-Deleted Parties):</strong> These profiles are stored with <code className="font-mono bg-rose-100 px-1 py-0.5 rounded text-rose-900 font-bold">is_deleted = true</code>. Click <strong>Restore Party</strong> to instantly reinstate any profile back to active use.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 2. Vendors Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -289,15 +389,21 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
                     <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p className="font-semibold text-slate-600">No vendor or party profiles found</p>
-                    <button
-                      type="button"
-                      onClick={handleOpenAddModal}
-                      className="mt-3 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-bold hover:bg-purple-100 text-xs inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add your first vendor profile</span>
-                    </button>
+                    <p className="font-semibold text-slate-600">
+                      {activeDirectoryTab === 'active'
+                        ? 'No active vendor or party profiles found'
+                        : 'Recycle Bin is empty (no deleted vendor profiles)'}
+                    </p>
+                    {activeDirectoryTab === 'active' && (
+                      <button
+                        type="button"
+                        onClick={handleOpenAddModal}
+                        className="mt-3 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-bold hover:bg-purple-100 text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add your first vendor profile</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -305,12 +411,21 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                   <tr key={v.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-xs shrink-0">
+                        <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-xs shrink-0 ${
+                          activeDirectoryTab === 'trash'
+                            ? 'bg-rose-100 border-rose-200 text-rose-700'
+                            : 'bg-purple-100 border-purple-200 text-purple-700'
+                        }`}>
                           {v.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 truncate">
-                            {v.name}
+                          <div className="font-bold text-slate-900 truncate flex items-center gap-1.5">
+                            <span>{v.name}</span>
+                            {activeDirectoryTab === 'trash' && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 border border-rose-200">
+                                In Bin
+                              </span>
+                            )}
                           </div>
                           {v.address && (
                             <div className="text-[11px] text-slate-400 truncate max-w-xs">
@@ -385,22 +500,36 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(v)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition-colors"
-                          title="Edit profile"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(v.id, v.name)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete profile"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {activeDirectoryTab === 'active' ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(v)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition-colors cursor-pointer"
+                              title="Edit profile"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateDelete(v)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Move to Recycle Bin"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreVendor(v)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                            title="Restore party to active directory"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Restore Party</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -630,6 +759,130 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Safe Delete Confirmation Modal (Requires typing "DELETE") */}
+      {vendorToDelete && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            if (!isDeleting) {
+              setVendorToDelete(null);
+              setDeleteConfirmationText('');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-4 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-700">
+                  <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    Confirm Party Deletion
+                  </h3>
+                  <p className="text-xs text-rose-700 font-medium">
+                    Soft delete • Safe to restore anytime
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setVendorToDelete(null);
+                  setDeleteConfirmationText('');
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white/60 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Party to be moved to Recycle Bin
+                </span>
+                <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <span>{vendorToDelete.name}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 capitalize">
+                    {vendorToDelete.type}
+                  </span>
+                </div>
+                {vendorToDelete.trade && (
+                  <p className="text-slate-500 text-xs">Trade: {vendorToDelete.trade}</p>
+                )}
+                {vendorToDelete.phone && (
+                  <p className="text-slate-500 font-mono text-xs">Phone: {vendorToDelete.phone}</p>
+                )}
+              </div>
+
+              <p className="text-slate-600 leading-relaxed">
+                This party will be marked with <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-purple-700 font-bold">is_deleted = true</code> and safely retained in the Recycle Bin. No records are permanently destroyed.
+              </p>
+
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-slate-800 font-bold">
+                  To confirm, type <span className="font-mono text-rose-600 font-black">DELETE</span> below:
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder='Type "DELETE" here'
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-rose-300 bg-rose-50/30 text-xs font-mono font-bold text-rose-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && deleteConfirmationText.trim().toUpperCase() === 'DELETE' && !isDeleting) {
+                      handleConfirmDelete();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setVendorToDelete(null);
+                  setDeleteConfirmationText('');
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleteConfirmationText.trim().toUpperCase() !== 'DELETE' || isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm shadow-rose-600/25 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Archiving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Party</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

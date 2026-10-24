@@ -37,6 +37,7 @@ export interface WhatsAppSharePayload {
   fileType?: string;
   fileSize?: number;
   customSummary?: string;
+  isGeneratingMedia?: boolean;
 }
 
 interface WhatsAppShareModalProps {
@@ -98,18 +99,29 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     if (payload) {
       // 1. If media / PDF document is attached: keep caption crisp & minimal (the PDF has all details!)
       if (payload.mediaUrl) {
-        const lines: string[] = [`📄 *${payload.title}*`];
         if (payload.customSummary && payload.customSummary.trim()) {
-          lines.push(payload.customSummary.trim());
+          const trimmed = payload.customSummary.trim();
+          // If customSummary is already a structured report (e.g. inventory status report), keep it intact
+          if (trimmed.startsWith('*SITE INVENTORY') || trimmed.includes(payload.title)) {
+            setCaption(trimmed);
+            return;
+          }
+          const lines: string[] = [`📄 *${payload.title}*`, trimmed];
+          if (payload.projectName && !trimmed.includes(payload.projectName)) {
+            lines.push(`🏢 ${payload.projectName}`);
+          }
+          setCaption(lines.join('\n'));
+          return;
         }
-        if (payload.projectName) {
-          lines.push(`🏢 ${payload.projectName}`);
-        }
+
+        const lines: string[] = [`📄 *${payload.title}*`];
+        if (payload.documentNo) lines.push(`🔖 Ref: ${payload.documentNo}`);
+        if (payload.projectName) lines.push(`🏢 Site: ${payload.projectName}`);
         setCaption(lines.join('\n'));
         return;
       }
 
-      // 2. If no media attached and customSummary is provided (e.g. status report text):
+      // 2. If no media attached yet and customSummary is provided (e.g. status report text):
       if (payload.customSummary && payload.customSummary.trim()) {
         setCaption(payload.customSummary.trim());
         return;
@@ -298,26 +310,26 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
               {payload.mediaUrl ? (
                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="truncate max-w-[280px] font-mono text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                    <span>📎</span>
+                  <span className="truncate max-w-[280px] font-mono text-[10px] text-emerald-700 font-bold flex items-center gap-1.5">
+                    <span className="text-sm">📎</span>
                     <span>{payload.fileName || 'Attached PDF Document'}</span>
                   </span>
                   <a
                     href={payload.mediaUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[#653ef1] hover:underline font-semibold flex items-center gap-1 shrink-0 text-[11px]"
+                    className="text-[#653ef1] hover:underline font-semibold flex items-center gap-1 shrink-0 text-[11px] bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100"
                   >
                     <span>Preview PDF</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
-              ) : (
-                <div className="pt-2 border-t border-slate-200/60 flex items-center gap-2 text-[11px] text-slate-400">
-                  <div className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                  <span>Preparing official PDF bill attachment for WhatsApp...</span>
+              ) : payload.isGeneratingMedia ? (
+                <div className="pt-2 border-t border-slate-200/60 flex items-center gap-2 text-[11px] text-amber-700 font-semibold bg-amber-50/80 px-3 py-1.5 rounded-xl border border-amber-200/60 animate-pulse">
+                  <div className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Compressing & uploading official PDF to Supabase...</span>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Recipient Selection Section */}
@@ -417,11 +429,16 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
               <button
                 type="button"
-                disabled={isSending}
+                disabled={isSending || Boolean(payload.isGeneratingMedia)}
                 onClick={handleSend}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-sm shadow-emerald-500/25 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-sm shadow-emerald-500/25 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                {isSending ? (
+                {payload.isGeneratingMedia ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Generating PDF URL...</span>
+                  </>
+                ) : isSending ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Sending to WhatsApp...</span>

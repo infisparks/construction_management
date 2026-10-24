@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { ConstructionMaterial } from './inventory-types';
 import { formatINR, getCleanItemCode } from './inventory-voucher-pdf';
 import { registerPoppinsFont } from '@/lib/common/pdf-poppins';
+import { uploadInventoryBillToStorage } from '@/lib/supabase/inventory-services';
 
 export interface StockSummaryPdfOptions {
   projectName?: string;
@@ -306,3 +307,25 @@ export function viewInventoryStockSummaryPdfInNewTab(
   }
   return blobUrl;
 }
+
+/**
+ * Generates the official stock summary PDF, converts it to a File, and uploads to Supabase Storage
+ * bucket 'inventory-documents/stock_reports' so that a genuine public HTTPS URL is available for WhatsApp.
+ */
+export async function uploadOrGetStockSummaryPdfUrl(
+  materials: ConstructionMaterial[],
+  projectName: string = 'Noori Crest Tower'
+): Promise<{ publicUrl: string; fileName: string }> {
+  const doc = generateInventoryStockSummaryPdf(materials, { projectName });
+  const blob = doc.output('blob');
+  const cleanProj = (projectName || 'Site').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const fileName = `Stock_Report_${cleanProj}_${dateStr}.pdf`;
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  const result = await uploadInventoryBillToStorage(file, 'stock_reports');
+  return {
+    publicUrl: result.publicUrl,
+    fileName: fileName,
+  };
+}
+
