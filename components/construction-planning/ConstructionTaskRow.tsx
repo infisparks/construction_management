@@ -98,7 +98,10 @@ export const ConstructionTaskRow: React.FC<ConstructionTaskRowProps> = ({
 
   // Status badge styling
   const getStatusBadge = (status: ScheduleStatus) => {
-    switch (status) {
+    const effectiveStatus = (node.varianceDays > 0 && status !== 'completed' && status !== 'blocked') 
+      ? 'delayed' 
+      : status;
+    switch (effectiveStatus) {
       case 'completed':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">

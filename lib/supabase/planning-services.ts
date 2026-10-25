@@ -218,6 +218,73 @@ export async function deletePlanTask(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Restore a Soft-Deleted Plan Task (sets is_deleted = false in Supabase)
+ * Strictly restores only this specific task record.
+ */
+export async function restorePlanTask(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('plan_tasks')
+      .update({ is_deleted: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error restoring plan task:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to restore plan task:', err);
+    return false;
+  }
+}
+
+/**
+ * Restore All Soft-Deleted Plan Tasks for a Project
+ */
+export async function restoreAllPlanTasks(projectId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('plan_tasks')
+      .update({ is_deleted: false, updated_at: new Date().toISOString() })
+      .eq('project_id', projectId)
+      .eq('is_deleted', true);
+
+    if (error) {
+      console.error('Error restoring all plan tasks:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to restore all plan tasks:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetch Deleted Plan Tasks for the Recycle Bin / Restore Modal
+ */
+export async function fetchDeletedPlanTasks(projectId: string): Promise<ConstructionTask[]> {
+  try {
+    const { data, error } = await supabase
+      .from('plan_tasks')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('is_deleted', true)
+      .order('updated_at', { ascending: false });
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data.map(mapDbToConstructionTask);
+  } catch (err) {
+    console.error('Failed to fetch deleted plan tasks:', err);
+    return [];
+  }
+}
+
 // ==========================================
 // 4. DEPENDENCIES OPERATIONS
 // ==========================================

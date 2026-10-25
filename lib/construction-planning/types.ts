@@ -110,6 +110,7 @@ export interface ProjectInfo {
   plannedStartDate: string;
   plannedCompletionDate: string;
   forecastCompletionDate: string;
+  varianceDays?: number;
   clientName: string;
   generalContractor: string;
   overallProgress: number;

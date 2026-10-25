@@ -281,6 +281,14 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     )
   );
 
+  const isDwg = Boolean(
+    file && (
+      file.file_type === 'dwg' ||
+      /\.(dwg|dxf|cad)$/i.test(file.file_name || '') ||
+      /\.(dwg|dxf|cad)$/i.test(file.file_url || '')
+    )
+  );
+
   // Generate or obtain PDF URL when opening a PDF
   useEffect(() => {
     if (!file || !isOpen) {
@@ -583,10 +591,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               type="button"
               onClick={handleDownload}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-xs cursor-pointer"
-              title="Download File"
+              title={`Download ${isDwg ? 'DWG File' : 'File'}`}
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Download</span>
+              <span className="hidden sm:inline">{isDwg ? 'Download DWG' : 'Download'}</span>
             </button>
 
             <button

@@ -14,7 +14,8 @@ import {
   X,
   SlidersHorizontal,
   FileSpreadsheet,
-  FileText
+  FileText,
+  RotateCcw
 } from 'lucide-react';
 import { ViewMode, ScheduleStatus } from '@/lib/construction-planning/types';
 import { 
@@ -43,6 +44,8 @@ interface TaskToolbarProps {
   onDateFilterChange?: (filter: DateFilterState) => void;
   areAllNotesOpen?: boolean;
   onToggleAllNotes?: () => void;
+  onOpenRestoreModal?: () => void;
+  deletedTasksCount?: number;
 }
 
 export const TaskToolbar: React.FC<TaskToolbarProps> = ({
@@ -64,6 +67,8 @@ export const TaskToolbar: React.FC<TaskToolbarProps> = ({
   onDateFilterChange,
   areAllNotesOpen,
   onToggleAllNotes,
+  onOpenRestoreModal,
+  deletedTasksCount = 0,
 }) => {
   const views: { id: ViewMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'list', label: 'Task List', icon: ListTree },

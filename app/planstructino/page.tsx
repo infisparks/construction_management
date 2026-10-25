@@ -80,11 +80,14 @@ import {
   isDateFilterActive 
 } from '@/components/common/DateFilterControl';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
+import { RestoreTasksModal } from '@/components/construction-planning/RestoreTasksModal';
 import {
   fetchPlanTasks,
   createPlanTask,
   updatePlanTask,
   deletePlanTask,
+  restorePlanTask,
+  fetchDeletedPlanTasks,
   fetchPlanDependencies,
   createPlanDependency,
   deletePlanDependency,
@@ -225,6 +228,8 @@ export default function ConstructionPlanningPage() {
   const [activityLogs, setActivityLogs] = useState<TaskActivityLog[]>([]);
   const [recoveryScenarios, setRecoveryScenarios] = useState<RecoveryScenario[]>([]);
   const [areAllNotesOpen, setAreAllNotesOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [deletedTasksCount, setDeletedTasksCount] = useState(0);
 
   const handleToggleAllNotes = () => {
     setAreAllNotesOpen((prev) => !prev);
@@ -310,6 +315,13 @@ export default function ConstructionPlanningPage() {
           setProgressEntries(dbProgress || []);
           setIssues(dbIssues || []);
           setActivityLogs(dbLogs || []);
+
+          // Fetch deleted tasks count for Recycle Bin indicator
+          fetchDeletedPlanTasks(activeProjectId)
+            .then((deleted) => {
+              if (isMounted) setDeletedTasksCount(deleted?.length || 0);
+            })
+            .catch(() => {});
         }
       } catch (err) {
         console.error('Failed to synchronize Supabase planning data:', err);
@@ -876,9 +888,14 @@ export default function ConstructionPlanningPage() {
     showToast(`Activity "${task?.name}" marked as started on site.`);
 
     // Persist live to Supabase plan_* tables
+    const scheduledTasks = recalculateParentRollups(updated);
+    const targetScheduled = scheduledTasks.find((t) => t.id === taskId);
     await updatePlanTask(taskId, {
-      status: 'in_progress',
+      status: targetScheduled?.status || 'in_progress',
       actualStartDate: today,
+      forecastStartDate: targetScheduled?.forecastStartDate,
+      forecastEndDate: targetScheduled?.forecastEndDate,
+      varianceDays: targetScheduled?.varianceDays ?? 0,
       progress: newProgress,
       notes: updatedNotes,
     }, activeProjectId);
@@ -1115,9 +1132,14 @@ export default function ConstructionPlanningPage() {
     if (createdProgress) {
       setProgressEntries((prev) => prev.map((p) => p.id === newEntry.id ? createdProgress : p));
     }
+    const scheduledTasks = recalculateParentRollups(updated);
+    const targetScheduled = scheduledTasks.find((t) => t.id === entry.taskId);
     await updatePlanTask(entry.taskId, {
       progress: entry.newProgress,
-      status: newStatus,
+      status: targetScheduled?.status || newStatus,
+      forecastStartDate: targetScheduled?.forecastStartDate,
+      forecastEndDate: targetScheduled?.forecastEndDate,
+      varianceDays: targetScheduled?.varianceDays ?? 0,
       actualStartDate: newStartDate,
       actualEndDate: newEndDate,
       completedQuantity: newCompletedQty,
@@ -1289,6 +1311,11 @@ export default function ConstructionPlanningPage() {
     // Persist soft-delete to Supabase plan_tasks (is_deleted: true)
     const deletePromises = Array.from(idsToDelete).map((id) => deletePlanTask(id));
     await Promise.all(deletePromises);
+
+    // Update deleted tasks count
+    fetchDeletedPlanTasks(activeProjectId)
+      .then((deleted) => setDeletedTasksCount(deleted?.length || 0))
+      .catch(() => {});
   };
 
   // Dependencies Management
@@ -1505,6 +1532,8 @@ export default function ConstructionPlanningPage() {
           onOpenSubcontractorBills={() => handleViewChange('subcontractor-bills')}
           onOpenSitesManager={() => setIsSitesManagerOpen(true)}
           onShareTimelineWhatsApp={handleShareTimelineToWhatsApp}
+          onOpenRestoreActivities={() => setIsRestoreModalOpen(true)}
+          deletedActivitiesCount={deletedTasksCount}
           userEmail={user.email || undefined}
           userRole={userRole?.role}
           userPage={userRole?.page}
@@ -1560,6 +1589,8 @@ export default function ConstructionPlanningPage() {
                 onDateFilterChange={setTaskDateFilter}
                 areAllNotesOpen={areAllNotesOpen}
                 onToggleAllNotes={handleToggleAllNotes}
+                onOpenRestoreModal={() => setIsRestoreModalOpen(true)}
+                deletedTasksCount={deletedTasksCount}
               />
             </>
           )}
@@ -1845,6 +1876,26 @@ export default function ConstructionPlanningPage() {
             : `This activity will be soft-deleted. It will be immediately ignored in Gantt charts, schedule metrics, and progress rollups.`
         }
         requireKeyword="DELETE"
+      />
+
+      {/* Restore Soft-Deleted Tasks Modal (Recycle Bin) */}
+      <RestoreTasksModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        projectId={activeProjectId}
+        projectName={project.name}
+        activeTasks={tasks}
+        onTaskRestored={async () => {
+          const dbTasks = await fetchPlanTasks(activeProjectId);
+          const loadedTasks = recalculateParentRollups(deduplicateTaskList(dbTasks || []));
+          setTasks(loadedTasks);
+          if (loadedTasks.length > 0) {
+            setProject((prev) => calculateProjectRollup(loadedTasks, prev));
+          }
+          const deleted = await fetchDeletedPlanTasks(activeProjectId);
+          setDeletedTasksCount(deleted?.length || 0);
+          showToast('Activity restored to schedule timeline!', 'success');
+        }}
       />
 
       {/* Sites & Construction Projects Management Modal */}

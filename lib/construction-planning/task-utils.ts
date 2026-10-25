@@ -1,5 +1,5 @@
 import { ConstructionTask, ScheduleStatus, ProjectInfo } from './types';
-import { calculateDaysBetween, calculateDurationDetails } from './schedule-utils';
+import { calculateDaysBetween, calculateDurationDetails, addDaysToDate } from './schedule-utils';
 
 export interface TaskNode extends ConstructionTask {
   children: TaskNode[];
@@ -78,18 +78,109 @@ export function flattenTaskTree(
 }
 
 /**
+ * Dynamically computes real-time schedule forecasts, variances, and status for leaf tasks.
+ * If a task is overdue (planned end date has passed, or start date was delayed),
+ * this calculates the real forecast finish date, variance in days, and marks it as delayed.
+ */
+export function recalculateDynamicTaskSchedules(
+  tasks: ConstructionTask[],
+  todayStr?: string
+): ConstructionTask[] {
+  const today = todayStr || new Date().toISOString().split('T')[0];
+
+  return tasks.map((task) => {
+    // Work packages roll up their dates from children, so skip leaf calculation for them
+    if (task.type === 'work_package') {
+      return { ...task };
+    }
+
+    const t = { ...task };
+    const duration = t.plannedDurationDays > 0 
+      ? t.plannedDurationDays 
+      : Math.max(1, calculateDaysBetween(t.plannedStartDate, t.plannedEndDate));
+
+    // 1. Completed Task
+    if (t.status === 'completed' || t.progress >= 100) {
+      t.status = 'completed';
+      t.progress = 100;
+      const actualEnd = t.actualEndDate || t.plannedEndDate;
+      t.forecastStartDate = t.actualStartDate || t.plannedStartDate;
+      t.forecastEndDate = actualEnd;
+      t.varianceDays = t.actualEndDate ? calculateDaysBetween(t.plannedEndDate, t.actualEndDate) : 0;
+      return t;
+    }
+
+    // 2. Started / In-Progress Task
+    if (t.actualStartDate || t.progress > 0) {
+      const remainingProgressFactor = Math.max(0, 100 - t.progress) / 100;
+      const remainingDays = Math.max(1, Math.round(duration * remainingProgressFactor));
+      
+      t.forecastStartDate = t.actualStartDate || t.plannedStartDate;
+      
+      // Work continues from today onwards (or actualStartDate if in the future)
+      const baseDate = t.actualStartDate && t.actualStartDate > today ? t.actualStartDate : today;
+      t.forecastEndDate = addDaysToDate(baseDate, remainingDays);
+
+      const delayFromForecast = calculateDaysBetween(t.plannedEndDate, t.forecastEndDate);
+      const delayFromToday = calculateDaysBetween(t.plannedEndDate, today);
+      t.varianceDays = Math.max(delayFromForecast, delayFromToday);
+
+      if (t.varianceDays > 0) {
+        if (t.status !== 'blocked') {
+          t.status = 'delayed';
+        }
+      } else {
+        t.status = 'in_progress';
+      }
+      return t;
+    }
+
+    // 3. Not Started Task
+    // If today is past planned start date, task start is already delayed!
+    if (today > t.plannedStartDate) {
+      t.forecastStartDate = today;
+      t.forecastEndDate = addDaysToDate(today, duration);
+      const delayFromForecast = calculateDaysBetween(t.plannedEndDate, t.forecastEndDate);
+      const delayFromToday = calculateDaysBetween(t.plannedEndDate, today);
+      t.varianceDays = Math.max(delayFromForecast, delayFromToday);
+
+      if (t.varianceDays > 0 || today > t.plannedEndDate) {
+        if (t.status !== 'blocked') {
+          t.status = 'delayed';
+        }
+      } else {
+        t.status = 'at_risk';
+      }
+      return t;
+    }
+
+    // 4. Future Task (today <= plannedStartDate)
+    t.forecastStartDate = t.plannedStartDate;
+    t.forecastEndDate = t.plannedEndDate;
+    t.varianceDays = 0;
+    if (t.status !== 'blocked' && t.status !== 'ready_to_start') {
+      t.status = 'not_started';
+    }
+    return t;
+  });
+}
+
+/**
  * Recalculates parent work packages' progress and date ranges based on their children.
  * Parent progress is the average of its children's progress.
  * Parent planned start is min(child start), planned end is max(child end).
  */
-export function recalculateParentRollups(tasks: ConstructionTask[]): ConstructionTask[] {
+export function recalculateParentRollups(tasks: ConstructionTask[], todayStr?: string): ConstructionTask[] {
   const uniqueTasks = deduplicateTaskList(tasks);
+  // Step 1: Compute dynamic real-time schedules and delays for all leaf tasks
+  const scheduledTasks = recalculateDynamicTaskSchedules(uniqueTasks, todayStr);
+
   const tasksById = new Map<string, ConstructionTask>();
-  uniqueTasks.forEach((t) => tasksById.set(t.id, { ...t }));
+  scheduledTasks.forEach((t) => tasksById.set(t.id, { ...t }));
 
   // Find all tasks that are parents
   const parentIds = new Set<string>();
-  tasks.forEach((t) => {
+  scheduledTasks.forEach((t) => {
     if (t.parentTaskId) {
       parentIds.add(t.parentTaskId);
     }
@@ -116,22 +207,6 @@ export function recalculateParentRollups(tasks: ConstructionTask[]): Constructio
       const totalProgress = directChildren.reduce((acc, c) => acc + c.progress, 0);
       const avgProgress = Math.round(totalProgress / directChildren.length);
 
-      // Determine parent status
-      let newStatus: ScheduleStatus = parent.status;
-      if (avgProgress === 100 || (directChildren.length > 0 && directChildren.every((c) => c.status === 'completed'))) {
-        newStatus = 'completed';
-      } else if (directChildren.some((c) => c.status === 'delayed')) {
-        newStatus = 'delayed';
-      } else if (directChildren.some((c) => c.status === 'at_risk')) {
-        newStatus = 'at_risk';
-      } else if (directChildren.some((c) => c.status === 'blocked')) {
-        newStatus = 'blocked';
-      } else if (directChildren.some((c) => c.status === 'in_progress' || c.progress > 0)) {
-        newStatus = 'in_progress';
-      } else if (directChildren.every((c) => c.status === 'not_started')) {
-        newStatus = 'not_started';
-      }
-
       // Rollup dates
       const startDates = directChildren
         .map((c) => c.plannedStartDate)
@@ -141,6 +216,10 @@ export function recalculateParentRollups(tasks: ConstructionTask[]): Constructio
         .map((c) => c.plannedEndDate)
         .filter(Boolean)
         .sort();
+      const forecastStartDates = directChildren
+        .map((c) => c.forecastStartDate)
+        .filter(Boolean)
+        .sort();
       const forecastEndDates = directChildren
         .map((c) => c.forecastEndDate)
         .filter(Boolean)
@@ -148,7 +227,25 @@ export function recalculateParentRollups(tasks: ConstructionTask[]): Constructio
 
       const newPlannedStart = startDates[0] || parent.plannedStartDate;
       const newPlannedEnd = endDates[endDates.length - 1] || parent.plannedEndDate;
+      const newForecastStart = forecastStartDates[0] || parent.forecastStartDate;
       const newForecastEnd = forecastEndDates[forecastEndDates.length - 1] || parent.forecastEndDate;
+      const newVarianceDays = Math.max(0, calculateDaysBetween(newPlannedEnd, newForecastEnd));
+
+      // Determine parent status
+      let newStatus: ScheduleStatus = parent.status;
+      if (avgProgress === 100 || (directChildren.length > 0 && directChildren.every((c) => c.status === 'completed'))) {
+        newStatus = 'completed';
+      } else if (directChildren.some((c) => c.status === 'delayed') || newVarianceDays > 0) {
+        newStatus = 'delayed';
+      } else if (directChildren.some((c) => c.status === 'blocked')) {
+        newStatus = 'blocked';
+      } else if (directChildren.some((c) => c.status === 'at_risk')) {
+        newStatus = 'at_risk';
+      } else if (directChildren.some((c) => c.status === 'in_progress' || c.progress > 0)) {
+        newStatus = 'in_progress';
+      } else if (directChildren.every((c) => c.status === 'not_started')) {
+        newStatus = 'not_started';
+      }
 
       // Critical rollup: if any child is critical, parent is critical
       const isCritical = directChildren.some((c) => c.isCritical);
@@ -158,14 +255,18 @@ export function recalculateParentRollups(tasks: ConstructionTask[]): Constructio
         parent.status !== newStatus ||
         parent.plannedStartDate !== newPlannedStart ||
         parent.plannedEndDate !== newPlannedEnd ||
+        parent.forecastStartDate !== newForecastStart ||
         parent.forecastEndDate !== newForecastEnd ||
+        parent.varianceDays !== newVarianceDays ||
         parent.isCritical !== isCritical
       ) {
         parent.progress = avgProgress;
         parent.status = newStatus;
         parent.plannedStartDate = newPlannedStart;
         parent.plannedEndDate = newPlannedEnd;
+        parent.forecastStartDate = newForecastStart;
         parent.forecastEndDate = newForecastEnd;
+        parent.varianceDays = newVarianceDays;
         parent.isCritical = isCritical;
         changed = true;
       }
@@ -236,12 +337,14 @@ export function calculateProjectRollup(
 
   // Overall progress is weighted average of leaf tasks
   const avgProgress = Math.round(leafTasks.reduce((acc, t) => acc + t.progress, 0) / leafTasks.length);
+  const projectVarianceDays = Math.max(0, calculateDaysBetween(maxPlannedEnd, maxForecastEnd));
 
   return {
     ...baseProject,
     plannedStartDate: minPlannedStart,
     plannedCompletionDate: maxPlannedEnd,
     forecastCompletionDate: maxForecastEnd,
+    varianceDays: projectVarianceDays,
     durationMonths: dynamicMonths,
     overallProgress: avgProgress,
   };

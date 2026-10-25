@@ -67,6 +67,8 @@ interface PlanningHeaderProps {
   onOpenSubcontractorBills?: () => void;
   onOpenSitesManager?: () => void;
   onShareTimelineWhatsApp?: () => void;
+  onOpenRestoreActivities?: () => void;
+  deletedActivitiesCount?: number;
   userEmail?: string;
   userRole?: string;
   userPage?: string | null;
@@ -92,6 +94,8 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
   onOpenSubcontractorBills,
   onOpenSitesManager,
   onShareTimelineWhatsApp,
+  onOpenRestoreActivities,
+  deletedActivitiesCount = 0,
   userEmail,
   userRole,
   userPage,
@@ -130,7 +134,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
   const canViewStore = isViewAllowed('materials', userRole, userPage);
   const canViewBilling = isViewAllowed('billing', userRole, userPage);
   const canViewSettings = isModuleAllowed('controls', userRole, userPage);
-  const hasAnyTools = canViewCritical || canViewRecovery || canViewSubBills || canViewStore || canViewBilling || canAddTask;
+  const hasAnyTools = canViewCritical || canViewRecovery || canViewSubBills || canViewStore || canViewBilling || canAddTask || Boolean(onOpenRestoreActivities);
 
   // Only show planning timeline actions (Log Progress, Add Task, Quick Tools) on the Timeline & Schedule views
   const isTimelineView = Boolean(isPlanningView) && (
@@ -344,6 +348,11 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                       >
                         <Sliders className="w-3.5 h-3.5 text-slate-500" />
                         <span className="hidden sm:inline">Tools</span>
+                        {deletedActivitiesCount > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono bg-purple-100 text-purple-700 border border-purple-200">
+                            {deletedActivitiesCount}
+                          </span>
+                        )}
                         <ChevronDown className="w-3 h-3 text-slate-400" />
                       </button>
 
@@ -353,6 +362,30 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                             Quick Tools & Modules
                           </div>
                           
+                          {/* 1. Restore Activities (On Top) */}
+                          {onOpenRestoreActivities && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onOpenRestoreActivities();
+                                setIsToolsOpen(false);
+                              }}
+                              className="w-full flex items-center justify-between px-3 py-2 text-slate-700 hover:bg-purple-50 hover:text-[#653ef1] transition-colors text-left cursor-pointer border-b border-slate-100 mb-0.5"
+                            >
+                              <div className="flex items-center gap-2">
+                                <RotateCcw className="w-4 h-4 text-[#653ef1]" />
+                                <span className="font-semibold text-slate-800 hover:text-[#653ef1]">Restore Activities</span>
+                              </div>
+                              {deletedActivitiesCount > 0 ? (
+                                <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-full">
+                                  {deletedActivitiesCount}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono text-slate-400">0</span>
+                              )}
+                            </button>
+                          )}
+
                           {canViewCritical && (
                             <button
                               type="button"
