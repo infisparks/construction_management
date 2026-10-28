@@ -2,12 +2,21 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/supabase/auth-context';
 import { resolveActiveSite } from '@/lib/supabase/site-storage';
 
 export default function Home() {
   const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
 
   useEffect(() => {
+    if (isAuthLoading) return;
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
     async function initNavigation() {
       try {
         const { activeProject, allProjects } = await resolveActiveSite();
@@ -22,7 +31,7 @@ export default function Home() {
       }
     }
     initNavigation();
-  }, [router]);
+  }, [user, isAuthLoading, router]);
 
   return (
     <div className="min-h-screen bg-[#F5F6F8] flex items-center justify-center text-xs text-slate-500 font-sans">

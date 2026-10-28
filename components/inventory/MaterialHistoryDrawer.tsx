@@ -83,6 +83,9 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
 }) => {
   const [filterMode, setFilterMode] = useState<'checkouts_only' | 'all' | 'bin'>(defaultFilter);
 
+  // Set to true to re-enable movement voucher editing in the future
+  const SHOW_VOUCHER_EDIT = false;
+
   // Modals state: Delete confirmation (requires typing "delete")
   const [deleteConfirmTx, setDeleteConfirmTx] = useState<InventoryTransaction | null>(null);
   const [deleteInput, setDeleteInput] = useState<string>('');
@@ -689,17 +692,20 @@ export const MaterialHistoryDrawer: React.FC<MaterialHistoryDrawerProps> = ({
                             <span>Restore</span>
                           </button>
                         ) : (
-                          /* If Active: Edit and Delete Buttons */
+                          /* If Active: Edit (hidden for now) and Delete Buttons */
                           <>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(tx)}
-                              className="px-2.5 py-1 rounded-md border border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 text-slate-700 font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
-                              title="Edit / Update this movement entry"
-                            >
-                              <Edit2 className="w-3 h-3 text-purple-600" />
-                              <span>Edit</span>
-                            </button>
+                            {/* Edit option temporarily hidden as requested - set SHOW_VOUCHER_EDIT = true to re-enable */}
+                            {SHOW_VOUCHER_EDIT && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(tx)}
+                                className="px-2.5 py-1 rounded-md border border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 text-slate-700 font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Edit / Update this movement entry"
+                              >
+                                <Edit2 className="w-3 h-3 text-purple-600" />
+                                <span>Edit</span>
+                              </button>
+                            )}
 
                             <button
                               type="button"

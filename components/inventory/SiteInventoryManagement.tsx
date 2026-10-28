@@ -1594,7 +1594,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Storage Godown / Yard</th>
                   <th className="px-4 py-3 text-right">Current Stock</th>
-                  <th className="px-4 py-3 text-right">Est. Valuation</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -1602,7 +1601,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={6} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading inventory from Supabase...</span>
@@ -1612,7 +1611,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : filteredMaterials.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No construction materials found in Supabase.</p>
                       <p className="text-xs text-slate-400 mt-1">Click &quot;+ Product&quot; above to create your first product profile.</p>
@@ -1622,7 +1621,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   filteredMaterials.map((m) => {
                     const isLow = m.currentStock <= m.minimumAlertStock && m.currentStock > 0;
                     const isDepleted = m.currentStock <= 0;
-                    const valuation = m.currentStock * m.averageUnitRate;
 
                     return (
                       <tr key={m.id} className="hover:bg-purple-50/20 transition-colors">
@@ -1669,11 +1667,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                         {/* Current Stock */}
                         <td className="px-4 py-3 text-right font-bold text-slate-900 text-sm">
                           {m.currentStock} <span className="text-xs font-normal text-slate-500">{m.unit}</span>
-                        </td>
-
-                        {/* Valuation */}
-                        <td className="px-4 py-3 text-right font-bold font-mono text-slate-900">
-                          Rs. {Math.round(valuation).toLocaleString('en-IN')}
                         </td>
 
                         {/* Status Badge */}

@@ -153,8 +153,10 @@ export default function ConstructionPlanningPage() {
     overallProgress: 0,
   });
 
-  // Resolve and persist active site from localStorage & Supabase on mount
+  // Resolve and persist active site from localStorage & Supabase on mount or auth change
   useEffect(() => {
+    if (isAuthLoading || !user) return;
+
     let isMounted = true;
     async function initSite() {
       try {
@@ -187,7 +189,7 @@ export default function ConstructionPlanningPage() {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [user, isAuthLoading, router]);
 
   const handleSelectDbProject = (dbProj: DbProject) => {
     // Immediately clear previous site's state so tasks never mix or linger
@@ -287,6 +289,8 @@ export default function ConstructionPlanningPage() {
 
   // Synchronize planning data live with Supabase plan_* tables
   useEffect(() => {
+    if (isAuthLoading || !user) return;
+
     let isMounted = true;
     async function loadPlanningData() {
       setIsLoadingPlanningDb(true);
@@ -336,7 +340,7 @@ export default function ConstructionPlanningPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeProjectId]);
+  }, [activeProjectId, user, isAuthLoading]);
 
   // Active View & Filter State (initialized SSR-safely, synced from URL on client mount)
   const [currentView, setCurrentView] = useState<ViewMode>('list');
@@ -1452,7 +1456,7 @@ export default function ConstructionPlanningPage() {
 
   // Without login, software cannot be accessed!
   if (!user) {
-    return <LoginPage />;
+    return <LoginPage onSuccess={() => router.replace('/planstructino')} />;
   }
 
   // Determine whether current view is one of the Planning Schedule views

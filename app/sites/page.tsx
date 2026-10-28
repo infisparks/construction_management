@@ -28,6 +28,7 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { DbProject } from '@/lib/supabase/types';
 import { useAuth } from '@/lib/supabase/auth-context';
+import { LoginPage } from '@/components/auth/LoginPage';
 import {
   getStoredActiveSiteId,
   setStoredActiveSite,
@@ -37,7 +38,13 @@ import {
 function SitesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, userRole, signOut } = useAuth();
+  const { user, userRole, isLoading: isAuthLoading, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace('/login');
+    }
+  }, [user, isAuthLoading, router]);
 
   const [projects, setProjects] = useState<DbProject[]>([]);
   const [activeSiteId, setActiveSiteId] = useState<string | null>(null);
@@ -103,8 +110,10 @@ function SitesPageContent() {
   };
 
   useEffect(() => {
-    loadSites();
-  }, [searchParams]);
+    if (!isAuthLoading && user) {
+      loadSites();
+    }
+  }, [searchParams, user, isAuthLoading]);
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -285,6 +294,21 @@ function SitesPageContent() {
   });
 
   const activeProjectsCount = projects.filter((p) => !p.is_deleted).length;
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#F5F6F8] flex items-center justify-center text-xs text-slate-500 font-sans">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-7 h-7 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <span>Verifying security session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage onSuccess={() => router.replace('/sites')} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#F5F6F8] text-[#111827] flex flex-col font-sans">

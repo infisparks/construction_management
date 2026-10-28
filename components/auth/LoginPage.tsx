@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/supabase/auth-context';
 
 interface LoginPageProps {
@@ -19,7 +20,8 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
-  const { signIn, signUp, loginAsDemo } = useAuth();
+  const router = useRouter();
+  const { user, isLoading, signIn, signUp, loginAsDemo } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +29,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // If already authenticated, redirect to Dashboard automatically
+  React.useEffect(() => {
+    if (!isLoading && user) {
+      onSuccess?.();
+      router.replace('/planstructino');
+    }
+  }, [user, isLoading, router, onSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,11 +55,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
         if (error) {
           // If Supabase invalid credentials in demo environment, auto fallback to demo session
           loginAsDemo();
-          setSuccessMessage('Session Authenticated! Loading software...');
+          setSuccessMessage('Session Authenticated! Redirecting to Dashboard...');
           onSuccess?.();
+          setTimeout(() => {
+            router.replace('/planstructino');
+          }, 150);
         } else {
-          setSuccessMessage('Authentication successful! Loading software...');
+          setSuccessMessage('Authentication successful! Redirecting to Dashboard...');
           onSuccess?.();
+          setTimeout(() => {
+            router.replace('/planstructino');
+          }, 150);
         }
       } else {
         const { error } = await signUp(email.trim(), password.trim());
