@@ -572,129 +572,144 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
       {viewMode === 'active' ? (
         <>
-          {/* 2. Top Summary KPI Cards (4 Ultra-Modern Cards with Full-Card Tinted Gradients Matching 3D Icons) */}
+          {/* 2. Top Summary KPI Cards (4 Cards Identical to Timeline Style: Left 3D Icon, Number + Badge, Wave Corner) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            {/* Card 1: Today's Expenses with Full-Card Lavender/Purple Gradient */}
-            <div className="shine-container shine-hover bg-gradient-to-br from-[#faf7ff] via-[#f3eeff] to-[#ebe0ff] p-3 sm:p-3.5 rounded-3xl border border-[#ddd3fe] shadow-[0_4px_16px_rgba(109,40,217,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#c4b5fd] hover:shadow-[0_10px_24px_rgba(147,51,234,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
-              {/* Vibrant Purple Floor Glow Pool */}
-              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.7)_0%,rgba(99,102,241,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
-
-              {/* Top Row: Title + Today Badge */}
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#6e46f2] to-[#8253fa] flex items-center justify-center text-white shadow-xs shadow-purple-500/25 shrink-0">
-                    <Calendar className="w-3.5 h-3.5 text-white stroke-[2.2]" />
-                  </div>
-                  <span className="text-[11px] font-bold text-[#37246e] uppercase tracking-wider">
-                    Today's Expenses
-                  </span>
-                </div>
-                <span className="text-[10.5px] font-bold text-[#5b21b6] bg-[#ece5ff] border border-[#d8c5fd] px-2.5 py-0.5 rounded-full font-mono">
-                  Today: {todayStr}
-                </span>
-              </div>
-
-              {/* Bottom Row: Number on left, 3D Purple Rupee Receipt on right */}
-              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
-                <div>
-                  <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
-                    {formatINR(stats.todayTotal)}
-                  </div>
-                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
-                    {stats.todayCount === 0 ? 'No expenses logged today yet' : `${stats.todayCount} Bills Today`}
-                  </span>
-                </div>
-                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+            {/* Card 1: Today's Expenses */}
+            <div className="rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#faf7ff] via-[#f3eeff] to-[#ebe0ff] border-[#ddd3fe] hover:border-purple-300 hover:shadow-md hover:-translate-y-1">
+              {/* Card Body: Left 3D Icon, Right Metric Info */}
+              <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
+                {/* 3D Glossy Icon */}
+                <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/bill/Glossy Purple Rupee Receipt Icon.png"
                     alt="Today's Expenses"
-                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(147,51,234,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                    className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
                   />
                 </div>
+
+                {/* Metric Info Column */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
+                    Today's Expenses
+                  </span>
+
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
+                      {formatINR(stats.todayTotal)}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap bg-purple-100 text-[#6e46f2] border border-purple-200/90 font-mono">
+                      Today: {todayStr}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row: Subtext */}
+              <div className="mt-2 pt-1 relative z-10">
+                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
+                  {stats.todayCount === 0 ? 'No expenses logged today yet' : `${stats.todayCount} Bills Today`}
+                </p>
+              </div>
+
+              {/* Organic Bottom-Right Corner Wave Accent */}
+              <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
+                <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
+                  <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#c4b5fd" />
+                </svg>
               </div>
             </div>
 
-            {/* Card 2: This Month's Total with Full-Card Sky Blue Gradient */}
-            <div className="shine-container shine-hover bg-gradient-to-br from-[#f3f8ff] via-[#e8f2ff] to-[#d9ebfe] p-3 sm:p-3.5 rounded-3xl border border-[#bedbfe] shadow-[0_4px_16px_rgba(37,99,235,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:shadow-[0_10px_24px_rgba(59,130,246,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
-              {/* Vibrant Gold & Sky Blue Floor Glow Pool */}
-              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.7)_0%,rgba(234,179,8,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
-
-              {/* Top Row: Title + Month to Date Badge */}
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#0284c7] to-[#2563eb] flex items-center justify-center text-white shadow-xs shadow-blue-500/25 shrink-0">
-                    <Layers className="w-3.5 h-3.5 text-white stroke-[2.2]" />
-                  </div>
-                  <span className="text-[11px] font-bold text-[#1e3a8a] uppercase tracking-wider">
-                    This Month's Total
-                  </span>
-                </div>
-                <span className="text-[10.5px] font-bold text-[#1d4ed8] bg-[#dbeafe] border border-[#bfdbfe] px-2.5 py-0.5 rounded-full">
-                  Month to Date
-                </span>
-              </div>
-
-              {/* Bottom Row: Number on left, 3D Gold Rupee Coins on right */}
-              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
-                <div>
-                  <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
-                    {formatINR(stats.monthTotal)}
-                  </div>
-                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
-                    Accumulated for current calendar month
-                  </span>
-                </div>
-                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+            {/* Card 2: This Month's Total */}
+            <div className="rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#f2f8ff] via-[#e8f2ff] to-[#d9ebfe] border-[#bedbfe] hover:border-blue-300 hover:shadow-md hover:-translate-y-1">
+              {/* Card Body: Left 3D Icon, Right Metric Info */}
+              <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
+                {/* 3D Glossy Icon */}
+                <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/bill/Glossy Gold Rupee Coin Stacks.png"
                     alt="This Month's Total"
-                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(234,179,8,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                    className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
                   />
                 </div>
+
+                {/* Metric Info Column */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
+                    This Month's Total
+                  </span>
+
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
+                      {formatINR(stats.monthTotal)}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap bg-blue-100 text-blue-800 border border-blue-200/90">
+                      Month to Date
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row: Subtext */}
+              <div className="mt-2 pt-1 relative z-10">
+                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
+                  Accumulated for current calendar month
+                </p>
+              </div>
+
+              {/* Organic Bottom-Right Corner Wave Accent */}
+              <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
+                <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
+                  <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#93c5fd" />
+                </svg>
               </div>
             </div>
 
-            {/* Card 3: All-Time Site Bills with Full-Card Mint/Emerald Gradient */}
-            <div className="shine-container shine-hover bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] p-3 sm:p-3.5 rounded-3xl border border-[#baf2cf] shadow-[0_4px_16px_rgba(16,185,129,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#86efac] hover:shadow-[0_10px_24px_rgba(16,185,129,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
-              {/* Brilliant Emerald Green Floor Glow Pool */}
-              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.75)_0%,rgba(16,185,129,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
-
-              {/* Top Row: Title + Audited Badge */}
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#10b981] to-[#059669] flex items-center justify-center text-white shadow-xs shadow-emerald-500/25 shrink-0">
-                    <FileText className="w-3.5 h-3.5 text-white stroke-[2.2]" />
-                  </div>
-                  <span className="text-[11px] font-bold text-[#065f46] uppercase tracking-wider">
-                    All-Time Site Bills
-                  </span>
-                </div>
-                <span className="text-[10.5px] font-bold text-[#047857] bg-[#d1fae5] border border-[#a7f3d0] px-2.5 py-0.5 rounded-full">
-                  Audited
-                </span>
-              </div>
-
-              {/* Bottom Row: Number on left, 3D Receipt with Green Checkmark on right */}
-              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
-                <div>
-                  <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
-                    {formatINR(stats.allTimeTotal)}
-                  </div>
-                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
-                    Paid: {formatINR(stats.paidTotal)} • Pending: {formatINR(stats.pendingTotal)}
-                  </span>
-                </div>
-                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+            {/* Card 3: All-Time Site Bills */}
+            <div className="rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] border-[#baf2cf] hover:border-emerald-300 hover:shadow-md hover:-translate-y-1">
+              {/* Card Body: Left 3D Icon, Right Metric Info */}
+              <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
+                {/* 3D Glossy Icon */}
+                <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/bill/Receipt with Green Checkmark.png"
                     alt="All-Time Site Bills"
-                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(16,185,129,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                    className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
                   />
                 </div>
+
+                {/* Metric Info Column */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
+                    All-Time Site Bills
+                  </span>
+
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
+                      {formatINR(stats.allTimeTotal)}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap bg-emerald-100 text-emerald-800 border border-emerald-200/90">
+                      Audited
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row: Subtext */}
+              <div className="mt-2 pt-1 relative z-10">
+                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
+                  Paid: {formatINR(stats.paidTotal)} • Pending: {formatINR(stats.pendingTotal)}
+                </p>
+              </div>
+
+              {/* Organic Bottom-Right Corner Wave Accent */}
+              <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
+                <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
+                  <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#86efac" />
+                </svg>
               </div>
             </div>
 
-            {/* Card 4: Filter Quick Mode with Full-Card Warm Peach/Amber Gradient */}
+            {/* Card 4: Filter Quick Mode */}
             <div 
               onClick={() => {
                 if (dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr) {
@@ -703,45 +718,54 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                   setDateFilter({ mode: 'exact', exactDate: todayStr, startDate: '', endDate: '' });
                 }
               }}
-              className="shine-container shine-hover bg-gradient-to-br from-[#fffdf7] via-[#fff7ed] to-[#ffedd5] p-3 sm:p-3.5 rounded-3xl border border-[#fed7aa] shadow-[0_4px_16px_rgba(245,158,11,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#fdba74] hover:shadow-[0_10px_24px_rgba(245,158,11,0.18)] cursor-pointer flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
+              className={`rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#fffdf5] via-[#fff5ea] to-[#ffe5d0] border-[#fed7aa] hover:border-amber-300 hover:shadow-md cursor-pointer hover:-translate-y-1 ${
+                dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'border-amber-600 ring-2 ring-amber-500/30 shadow-md' : ''
+              }`}
             >
-              {/* Radiant Warm Amber & Orange Floor Glow Pool */}
-              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.7)_0%,rgba(239,68,68,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
-
-              {/* Top Row: Title + Funnel Badge */}
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#f59e0b] to-[#ea580c] flex items-center justify-center text-white shadow-xs shadow-amber-500/25 shrink-0">
-                    <Filter className="w-3.5 h-3.5 text-white stroke-[2.2]" />
-                  </div>
-                  <span className="text-[11px] font-bold text-[#9a3412] uppercase tracking-wider">
-                    Filter Quick Mode
-                  </span>
-                </div>
-                {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr && (
-                  <span className="text-[10.5px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-2.5 py-0.5 rounded-full">
-                    Active
-                  </span>
-                )}
-              </div>
-
-              {/* Bottom Row: Action text on left, 3D Calendar Checkmark on right */}
-              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
-                <div>
-                  <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
-                    {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Showing Today Only' : 'Show Only Today'}
-                  </div>
-                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
-                    Click to isolate today's receipts & lunch
-                  </span>
-                </div>
-                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              {/* Card Body: Left 3D Icon, Right Metric Info */}
+              <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
+                {/* 3D Glossy Icon */}
+                <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/bill/Glossy Calendar Checkmark Icon.png"
                     alt="Filter Quick Mode"
-                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(245,158,11,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                    className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
                   />
                 </div>
+
+                {/* Metric Info Column */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
+                    Filter Quick Mode
+                  </span>
+
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                      {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Showing Today' : 'Show Today Only'}
+                    </span>
+                    <span className={`text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap ${
+                      dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300 font-bold'
+                        : 'bg-amber-100/70 text-amber-800 border border-amber-200'
+                    }`}>
+                      {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Active' : 'Quick Filter'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row: Subtext */}
+              <div className="mt-2 pt-1 relative z-10">
+                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
+                  Click to isolate today's receipts & lunch
+                </p>
+              </div>
+
+              {/* Organic Bottom-Right Corner Wave Accent */}
+              <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
+                <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
+                  <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#fdba74" />
+                </svg>
               </div>
             </div>
           </div>
