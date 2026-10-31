@@ -190,8 +190,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const projectOptions: SearchableOption[] = useMemo(() => {
     return projectsList.map((p) => ({
       value: p.id,
@@ -370,6 +368,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div 

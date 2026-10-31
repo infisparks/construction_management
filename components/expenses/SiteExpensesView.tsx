@@ -31,7 +31,9 @@ import {
   Paperclip,
   Edit2,
   ArchiveRestore,
-  RotateCcw
+  RotateCcw,
+  Box,
+  FileText
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
 import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
@@ -69,6 +71,8 @@ interface SiteExpensesViewProps {
   userEmail?: string;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
   externalActionTrigger?: { action: string; timestamp: number } | null;
+  activeCommercialTab?: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders';
+  onSelectCommercialTab?: (tab: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders') => void;
 }
 
 export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
@@ -77,6 +81,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   userEmail,
   showToast,
   externalActionTrigger,
+  activeCommercialTab = 'expenses',
+  onSelectCommercialTab,
 }) => {
   const [expenses, setExpenses] = useState<SiteExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -324,130 +330,239 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   }, [externalActionTrigger]);
 
   return (
-    <div className="w-full space-y-4 sm:space-y-5 animate-in fade-in duration-150">
-      {/* 1. Header Toolbar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white flex items-center justify-center shadow-md shadow-[#653ef1]/25 shrink-0">
-            <Receipt className="w-5 h-5 stroke-[2.2] text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                Site Bills & Petty Cash Expenses
+    <div className="w-full space-y-2.5 sm:space-y-3 animate-in fade-in duration-150">
+      {/* 1. Executive Top Header (Matching Reference Image with Transparent 3D Bill Cube & Finance Illustration) */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_8px_30px_rgb(0,0,0,0.03)] overflow-hidden transition-all duration-300 relative group">
+        
+        {/* Soft Ambient Backdrop Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-50/30 via-white to-indigo-50/20 pointer-events-none" />
+
+        {/* Delicate Fluid Aurora Wave Ribbon (Matching Reference Design) */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden opacity-35"
+          preserveAspectRatio="none"
+          viewBox="0 0 1200 160"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M-50 140 C 200 160, 320 60, 550 80 C 780 100, 920 20, 1250 50"
+            stroke="url(#auroraGradientExp1)"
+            strokeWidth="36"
+            strokeLinecap="round"
+            className="filter blur-[16px]"
+          />
+          <path
+            d="M-30 110 C 240 130, 380 40, 620 60 C 860 80, 1020 10, 1260 30"
+            stroke="url(#auroraGradientExp2)"
+            strokeWidth="18"
+            strokeLinecap="round"
+            className="filter blur-[8px]"
+          />
+          <defs>
+            <linearGradient id="auroraGradientExp1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.4" />
+              <stop offset="35%" stopColor="#ec4899" stopOpacity="0.25" />
+              <stop offset="70%" stopColor="#6366f1" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.3" />
+            </linearGradient>
+            <linearGradient id="auroraGradientExp2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.6" />
+              <stop offset="50%" stopColor="#c084fc" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.5" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Top Hero Section: Logo, Title, 3D Finance Illustration & Project Commercial Badge */}
+        <div className="relative px-4 sm:px-5 py-2.5 sm:py-3 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          
+          {/* Left: 3D Transparent Floating Receipt Icon & Title Block */}
+          <div className="flex items-center gap-3 sm:gap-3.5 shrink-0 z-10">
+            <img
+              src="/bill/3D Receipt with Rupee Badge.png"
+              alt="Commercial Bills & Expenses"
+              className="w-13 h-13 sm:w-15 sm:h-15 object-contain shrink-0 animate-float-slow select-none pointer-events-none drop-shadow-[0_6px_16px_rgba(101,62,241,0.3)]"
+            />
+            <div>
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                Commercial
+              </span>
+              <h1 className="text-2xl sm:text-[25px] font-extrabold text-[#6338eb] tracking-tight leading-none mt-0.5">
+                Bills & Expenses
               </h1>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Sync
+              <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs sm:max-w-sm leading-snug">
+                Manage site bills, petty cash, work orders & all commercial expenses in one place.
+              </p>
+            </div>
+          </div>
+
+          {/* Center: 3D Billing Finance Icon Set (Enlarged to fill space beautifully) */}
+          <div className="hidden lg:flex items-end justify-center relative flex-1 max-w-xl xl:max-w-2xl mx-auto px-3 pointer-events-none select-none z-10">
+            {/* Luminous Glow Behind Center Graphic */}
+            <div className="absolute inset-x-8 bottom-1 h-20 bg-gradient-to-r from-purple-400/20 via-pink-400/15 to-cyan-400/20 rounded-full blur-2xl" />
+            
+            <img
+              src="/bill/3D Purple Billing Finance Icon Set.png"
+              alt="Commercial Billing & Finance Suite"
+              className="w-full max-w-[560px] h-28 sm:h-32 xl:h-36 object-contain relative z-10 drop-shadow-[0_8px_20px_rgba(0,0,0,0.1)] transition-transform duration-500 hover:scale-[1.02]"
+            />
+          </div>
+
+          {/* Right: Project Commercial Card Badge */}
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-gradient-to-br from-[#f8f6ff] to-[#f0ecff] border border-[#ddd4ff] shadow-xs shrink-0 z-10">
+            <div className="w-8 h-8 rounded-xl bg-[#6338eb]/10 border border-[#6338eb]/20 flex items-center justify-center">
+              <Box className="w-4.5 h-4.5 text-[#6338eb]" />
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                Project Commercial
+              </span>
+              <span className="text-xs sm:text-sm font-black text-[#6338eb] tracking-tight block">
+                {project?.name ? project.name.toUpperCase() : 'SITE OFFICE'}
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              Quick logging and daily breakdown for lunch, petty cash, diesel & site vendor payments
-            </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Refresh Sync */}
-          <button
-            type="button"
-            onClick={loadExpenses}
-            className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Refresh from Supabase"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#653ef1]' : 'text-slate-400'}`} />
-            <span>Sync</span>
-          </button>
+        {/* Bottom Strip / Ribbon (Tabs on Left, Action Buttons on Right) */}
+        <div className="px-4 sm:px-5 py-2 border-t border-slate-100 bg-gradient-to-r from-slate-50/90 via-purple-50/15 to-slate-50/90 flex flex-wrap items-center justify-between gap-2 relative z-10">
+          
+          {/* Left: Commercial Navigation Tabs */}
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Tab 1: Site Daily Bills & Expenses */}
+            <button
+              type="button"
+              onClick={() => onSelectCommercialTab?.('expenses')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeCommercialTab === 'expenses'
+                  ? 'bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5 text-[#6338eb]" />
+              <span>Site Daily Bills & Expenses</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-[#6338eb] font-semibold border border-[#ddd4ff]">
+                Daily Burn & Petty Cash
+              </span>
+            </button>
 
-          {/* Export CSV */}
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Export CSV spreadsheet"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
-            <span>Export</span>
-          </button>
+            {/* Tab 2: Work Orders & Khata */}
+            <button
+              type="button"
+              onClick={() => onSelectCommercialTab?.('contractor-work-orders')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeCommercialTab === 'contractor-work-orders'
+                  ? 'bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5 text-slate-500" />
+              <span>Work Orders & Khata</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
+                Extra Work & Payouts
+              </span>
+            </button>
+          </div>
 
-          {/* Preview PDF */}
-          <button
-            type="button"
-            onClick={handlePreviewPdf}
-            className="h-8 px-2.5 rounded-lg border border-[#653ef1]/30 bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-            title="Preview all expenses in Blob URL PDF statement"
-          >
-            <Printer className="w-3.5 h-3.5 text-[#653ef1]" />
-            <span>Preview PDF</span>
-          </button>
+          {/* Right: Action Buttons Group */}
+          <div className="flex items-center gap-2 relative">
+            {/* Sync */}
+            <button
+              type="button"
+              onClick={loadExpenses}
+              className="h-8 px-3 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:border-slate-300"
+              title="Refresh from Supabase"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-purple-600' : 'text-slate-500'}`} />
+              <span>Sync</span>
+            </button>
 
-          {/* Open Statement in Blob URL (New Tab) */}
-          <button
-            type="button"
-            onClick={() => viewSiteExpensesPdfInNewTab(filteredExpenses, project?.name || 'Noori Crest Tower', 'Expenses Statement')}
-            className="h-8 px-2.5 rounded-lg border border-[#653ef1]/30 bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-            title="Open full expense report in Blob URL tab (No download)"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-[#653ef1]" />
-            <span>Open Blob URL</span>
-          </button>
+            {/* Export */}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="h-8 px-3 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:border-slate-300"
+              title="Export CSV spreadsheet"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
+              <span>Export</span>
+            </button>
 
-          <div className="h-4 w-[1px] bg-slate-200 mx-0.5 hidden sm:block" />
+            {/* Preview PDF */}
+            <button
+              type="button"
+              onClick={handlePreviewPdf}
+              className="h-8 px-3.5 rounded-full border border-[#e3d8ff] bg-[#f4f0ff] hover:bg-[#ebe3ff] text-[#6338eb] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+              title="Preview all expenses in Blob URL PDF statement"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#6338eb]" />
+              <span>Preview PDF</span>
+            </button>
 
-          {/* Add Expense (Electric Violet #653ef1) */}
-          <button
-            type="button"
-            onClick={() => {
-              setExpenseToEdit(null);
-              setIsAddModalOpen(true);
-            }}
-            className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-[#653ef1]/35 hover:shadow-md hover:shadow-[#653ef1]/45 transition-all cursor-pointer active:scale-95"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>+ Add Expense</span>
-          </button>
+            {/* Open Blob URL */}
+            <button
+              type="button"
+              onClick={() => viewSiteExpensesPdfInNewTab(filteredExpenses, project?.name || 'Noori Crest Tower', 'Expenses Statement')}
+              className="h-8 px-3.5 rounded-full border border-[#e3d8ff] bg-[#f4f0ff] hover:bg-[#ebe3ff] text-[#6338eb] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+              title="Open full expense report in Blob URL tab (No download)"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#6338eb]" />
+              <span>Open Blob URL</span>
+            </button>
+
+            {/* + Add Expense Button with Continuous Shine Beam & Purple Glow */}
+            <button
+              type="button"
+              onClick={() => {
+                setExpenseToEdit(null);
+                setIsAddModalOpen(true);
+              }}
+              className="shine-container shine-infinite h-8 px-5 rounded-full bg-gradient-to-r from-[#7b46f8] via-[#6338eb] to-[#5a24ea] hover:from-[#8855fa] hover:to-[#501fe0] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-[0_4px_16px_rgba(99,56,235,0.4)] hover:shadow-[0_6px_22px_rgba(99,56,235,0.55)] cursor-pointer active:scale-95"
+            >
+              <Plus className="w-4 h-4 stroke-[2.4]" />
+              <span>+ Add Expense</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* 1.5 View Mode Switcher: Active Site Bills vs Recycle Bin */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-xs flex items-center justify-between gap-2 overflow-x-auto">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setViewMode('active')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-              viewMode === 'active'
-                ? 'bg-[#653ef1] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-            }`}
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            <span>Active Site Bills ({expenses.length})</span>
-          </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setViewMode('active')}
+          className={`h-8.5 px-4 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            viewMode === 'active'
+              ? 'bg-[#6338eb] text-white shadow-sm shadow-[#6338eb]/30'
+              : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700'
+          }`}
+        >
+          <Receipt className="w-3.5 h-3.5" />
+          <span>Active Site Bills ({expenses.length})</span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setViewMode('bin');
-              loadDeletedExpenses();
-            }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-              viewMode === 'bin'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'text-rose-700 hover:bg-rose-50 border border-rose-200'
-            }`}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Recycle Bin ({deletedExpenses.length})</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setViewMode('bin');
+            loadDeletedExpenses();
+          }}
+          className={`h-8.5 px-4 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+            viewMode === 'bin'
+              ? 'bg-[#e11d48] text-white shadow-sm shadow-[#e11d48]/30'
+              : 'bg-white hover:bg-rose-50 border border-[#fed2d8] text-[#e11d48]'
+          }`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Recycle Bin ({deletedExpenses.length})</span>
+        </button>
 
         {viewMode === 'bin' && (
           <button
             type="button"
             onClick={loadDeletedExpenses}
-            className="px-3 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 transition-all"
+            className="h-8.5 px-3 rounded-2xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 transition-all ml-auto"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBin ? 'animate-spin' : ''}`} />
             <span>Refresh Bin</span>
@@ -457,192 +572,261 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
       {viewMode === 'active' ? (
         <>
-          {/* 2. Top Summary KPI Cards (Highlights Today's Expenses) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Card 1: Today's Expenses (Crucial user requirement) */}
-        <div className="bg-white rounded-2xl border border-purple-200/80 p-4.5 shadow-xs relative overflow-hidden bg-gradient-to-br from-purple-50/60 via-white to-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-purple-900 uppercase tracking-wider">
-              Today's Expenses
-            </span>
-            <span className="text-[10px] font-mono font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200">
-              Today: {todayStr}
-            </span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-purple-950 font-numeric">
-              {formatINR(stats.todayTotal)}
-            </span>
-            <span className="text-xs font-semibold text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-lg border border-purple-200/60">
-              {stats.todayCount} Bills Today
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-500 mt-1.5 block">
-            {stats.todayCount === 0 ? 'No expenses logged today yet' : 'Lunch, petty cash & daily site burn'}
-          </span>
-        </div>
+          {/* 2. Top Summary KPI Cards (4 Ultra-Modern Cards with Full-Card Tinted Gradients Matching 3D Icons) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            {/* Card 1: Today's Expenses with Full-Card Lavender/Purple Gradient */}
+            <div className="shine-container shine-hover bg-gradient-to-br from-[#faf7ff] via-[#f3eeff] to-[#ebe0ff] p-3 sm:p-3.5 rounded-3xl border border-[#ddd3fe] shadow-[0_4px_16px_rgba(109,40,217,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#c4b5fd] hover:shadow-[0_10px_24px_rgba(147,51,234,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
+              {/* Vibrant Purple Floor Glow Pool */}
+              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.7)_0%,rgba(99,102,241,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
 
-        {/* Card 2: This Month's Total */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              This Month's Total
-            </span>
-            <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-              Month to Date
-            </span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-slate-900 font-numeric">
-              {formatINR(stats.monthTotal)}
-            </span>
-            <span className="text-xs text-slate-500 font-medium">
-              {stats.monthCount} Bills
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1.5 block">
-            Accumulated for current calendar month
-          </span>
-        </div>
+              {/* Top Row: Title + Today Badge */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#6e46f2] to-[#8253fa] flex items-center justify-center text-white shadow-xs shadow-purple-500/25 shrink-0">
+                    <Calendar className="w-3.5 h-3.5 text-white stroke-[2.2]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-[#37246e] uppercase tracking-wider">
+                    Today's Expenses
+                  </span>
+                </div>
+                <span className="text-[10.5px] font-bold text-[#5b21b6] bg-[#ece5ff] border border-[#d8c5fd] px-2.5 py-0.5 rounded-full font-mono">
+                  Today: {todayStr}
+                </span>
+              </div>
 
-        {/* Card 3: All-Time Expenditure */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              All-Time Site Bills
-            </span>
-            <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-              Audited
-            </span>
-          </div>
-          <div className="mt-2.5 flex items-baseline justify-between">
-            <span className="text-2xl font-bold tracking-tight text-slate-900 font-numeric">
-              {formatINR(stats.allTimeTotal)}
-            </span>
-            <span className="text-xs text-slate-500 font-medium">
-              {stats.allTimeCount} Entries
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1.5 block">
-            Paid: {formatINR(stats.paidTotal)} • Pending: {formatINR(stats.pendingTotal)}
-          </span>
-        </div>
+              {/* Bottom Row: Number on left, 3D Purple Rupee Receipt on right */}
+              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+                <div>
+                  <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                    {formatINR(stats.todayTotal)}
+                  </div>
+                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                    {stats.todayCount === 0 ? 'No expenses logged today yet' : `${stats.todayCount} Bills Today`}
+                  </span>
+                </div>
+                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+                  <img
+                    src="/bill/Glossy Purple Rupee Receipt Icon.png"
+                    alt="Today's Expenses"
+                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(147,51,234,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                  />
+                </div>
+              </div>
+            </div>
 
-        {/* Card 4: Quick Today Filter Shortcut */}
-        <div 
-          onClick={() => {
-            if (dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr) {
-              setDateFilter(DEFAULT_DATE_FILTER);
-            } else {
-              setDateFilter({ mode: 'exact', exactDate: todayStr, startDate: '', endDate: '' });
-            }
-          }}
-          className={`rounded-2xl border p-4.5 shadow-xs transition-all duration-200 cursor-pointer flex flex-col justify-between hover:-translate-y-0.5 hover:shadow-md ${
-            dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr
-              ? 'border-[#653ef1] bg-gradient-to-br from-[#6e46f2] via-[#653ef1] to-[#592be8] text-white shadow-[#653ef1]/20'
-              : 'border-slate-200/80 bg-white hover:bg-slate-50/80 text-slate-900'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'text-purple-100' : 'text-slate-500'}`}>
-              Filter Quick Mode
-            </span>
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'bg-white/20 text-white' : 'bg-purple-50 text-[#653ef1]'}`}>
-              <Calendar className="w-4 h-4" />
+            {/* Card 2: This Month's Total with Full-Card Sky Blue Gradient */}
+            <div className="shine-container shine-hover bg-gradient-to-br from-[#f3f8ff] via-[#e8f2ff] to-[#d9ebfe] p-3 sm:p-3.5 rounded-3xl border border-[#bedbfe] shadow-[0_4px_16px_rgba(37,99,235,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:shadow-[0_10px_24px_rgba(59,130,246,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
+              {/* Vibrant Gold & Sky Blue Floor Glow Pool */}
+              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.7)_0%,rgba(234,179,8,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+              {/* Top Row: Title + Month to Date Badge */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#0284c7] to-[#2563eb] flex items-center justify-center text-white shadow-xs shadow-blue-500/25 shrink-0">
+                    <Layers className="w-3.5 h-3.5 text-white stroke-[2.2]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-[#1e3a8a] uppercase tracking-wider">
+                    This Month's Total
+                  </span>
+                </div>
+                <span className="text-[10.5px] font-bold text-[#1d4ed8] bg-[#dbeafe] border border-[#bfdbfe] px-2.5 py-0.5 rounded-full">
+                  Month to Date
+                </span>
+              </div>
+
+              {/* Bottom Row: Number on left, 3D Gold Rupee Coins on right */}
+              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+                <div>
+                  <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                    {formatINR(stats.monthTotal)}
+                  </div>
+                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                    Accumulated for current calendar month
+                  </span>
+                </div>
+                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+                  <img
+                    src="/bill/Glossy Gold Rupee Coin Stacks.png"
+                    alt="This Month's Total"
+                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(234,179,8,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: All-Time Site Bills with Full-Card Mint/Emerald Gradient */}
+            <div className="shine-container shine-hover bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] p-3 sm:p-3.5 rounded-3xl border border-[#baf2cf] shadow-[0_4px_16px_rgba(16,185,129,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#86efac] hover:shadow-[0_10px_24px_rgba(16,185,129,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
+              {/* Brilliant Emerald Green Floor Glow Pool */}
+              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.75)_0%,rgba(16,185,129,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+              {/* Top Row: Title + Audited Badge */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#10b981] to-[#059669] flex items-center justify-center text-white shadow-xs shadow-emerald-500/25 shrink-0">
+                    <FileText className="w-3.5 h-3.5 text-white stroke-[2.2]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-[#065f46] uppercase tracking-wider">
+                    All-Time Site Bills
+                  </span>
+                </div>
+                <span className="text-[10.5px] font-bold text-[#047857] bg-[#d1fae5] border border-[#a7f3d0] px-2.5 py-0.5 rounded-full">
+                  Audited
+                </span>
+              </div>
+
+              {/* Bottom Row: Number on left, 3D Receipt with Green Checkmark on right */}
+              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+                <div>
+                  <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                    {formatINR(stats.allTimeTotal)}
+                  </div>
+                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                    Paid: {formatINR(stats.paidTotal)} • Pending: {formatINR(stats.pendingTotal)}
+                  </span>
+                </div>
+                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+                  <img
+                    src="/bill/Receipt with Green Checkmark.png"
+                    alt="All-Time Site Bills"
+                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(16,185,129,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Filter Quick Mode with Full-Card Warm Peach/Amber Gradient */}
+            <div 
+              onClick={() => {
+                if (dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr) {
+                  setDateFilter(DEFAULT_DATE_FILTER);
+                } else {
+                  setDateFilter({ mode: 'exact', exactDate: todayStr, startDate: '', endDate: '' });
+                }
+              }}
+              className="shine-container shine-hover bg-gradient-to-br from-[#fffdf7] via-[#fff7ed] to-[#ffedd5] p-3 sm:p-3.5 rounded-3xl border border-[#fed7aa] shadow-[0_4px_16px_rgba(245,158,11,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#fdba74] hover:shadow-[0_10px_24px_rgba(245,158,11,0.18)] cursor-pointer flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
+            >
+              {/* Radiant Warm Amber & Orange Floor Glow Pool */}
+              <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.7)_0%,rgba(239,68,68,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+              {/* Top Row: Title + Funnel Badge */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#f59e0b] to-[#ea580c] flex items-center justify-center text-white shadow-xs shadow-amber-500/25 shrink-0">
+                    <Filter className="w-3.5 h-3.5 text-white stroke-[2.2]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-[#9a3412] uppercase tracking-wider">
+                    Filter Quick Mode
+                  </span>
+                </div>
+                {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr && (
+                  <span className="text-[10.5px] font-bold text-amber-800 bg-amber-100/90 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+
+              {/* Bottom Row: Action text on left, 3D Calendar Checkmark on right */}
+              <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+                <div>
+                  <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                    {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Showing Today Only' : 'Show Only Today'}
+                  </div>
+                  <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                    Click to isolate today's receipts & lunch
+                  </span>
+                </div>
+                <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+                  <img
+                    src="/bill/Glossy Calendar Checkmark Icon.png"
+                    alt="Filter Quick Mode"
+                    className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(245,158,11,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="mt-2.5">
-            <span className="text-sm font-bold block">
-              {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Showing Today Only' : 'Show Only Today'}
-            </span>
-            <span className={`text-[11px] block mt-0.5 ${dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'text-purple-100' : 'text-slate-500'}`}>
-              Click to isolate today's receipts & lunch
-            </span>
+
+          {/* 3. Filter & Search Toolbar (Modern Pill Inputs & Selects) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-[#6338eb] absolute left-3 top-2.5 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search expense description, vendor, code, payee, or notes..."
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#6338eb] focus:ring-1 focus:ring-[#6338eb]/20 bg-slate-50/50"
+              />
+            </div>
+
+            {/* Filters Group */}
+            <div className="flex items-center flex-wrap gap-2">
+              {/* Universal Date Filter: Start & End Date (Range) + Particular Custom Date */}
+              <DateFilterControl
+                value={dateFilter}
+                onChange={setDateFilter}
+                label="Filter Date"
+              />
+
+              {/* Category Filter */}
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] font-medium cursor-pointer"
+              >
+                <option value="all">All Categories</option>
+                {availableCategories.map(cat => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+
+              {/* Payment Method Filter */}
+              <select
+                value={paymentMethodFilter}
+                onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] font-medium cursor-pointer"
+              >
+                <option value="all">All Payment Modes</option>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI / GPay</option>
+                <option value="petty_cash">Petty Cash Box</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="cheque">Cheque</option>
+              </select>
+
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] font-medium cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="reimbursable">Reimbursement</option>
+              </select>
+
+              {/* Clear Filters (if any active) */}
+              {(searchQuery || isDateFilterActive(dateFilter) || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setDateFilter(DEFAULT_DATE_FILTER);
+                    setCategoryFilter('all');
+                    setPaymentMethodFilter('all');
+                    setStatusFilter('all');
+                  }}
+                  className="text-xs text-[#6338eb] hover:underline px-2 py-1 font-semibold cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* 3. Filter & Search Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-2.5 sm:p-3 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
-        {/* Search Input */}
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search expense description, vendor, code, payee, or notes..."
-            className="w-full h-8.5 pl-9 pr-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 bg-slate-50/50"
-          />
-        </div>
-
-        {/* Filters Group */}
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Universal Date Filter: Start & End Date (Range) + Particular Custom Date */}
-          <DateFilterControl
-            value={dateFilter}
-            onChange={setDateFilter}
-            label="Filter Date"
-          />
-
-          {/* Category Filter */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="h-8.5 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600 font-medium cursor-pointer"
-          >
-            <option value="all">All Categories</option>
-            {availableCategories.map(cat => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-
-          {/* Payment Method Filter */}
-          <select
-            value={paymentMethodFilter}
-            onChange={(e) => setPaymentMethodFilter(e.target.value)}
-            className="h-8.5 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600 font-medium cursor-pointer"
-          >
-            <option value="all">All Payment Modes</option>
-            <option value="cash">Cash</option>
-            <option value="upi">UPI / GPay</option>
-            <option value="petty_cash">Petty Cash Box</option>
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="cheque">Cheque</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-8.5 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600 font-medium cursor-pointer"
-          >
-            <option value="all">All Statuses</option>
-            <option value="paid">Paid</option>
-            <option value="pending">Pending</option>
-            <option value="reimbursable">Reimbursement</option>
-          </select>
-
-          {/* Clear Filters (if any active) */}
-          {(searchQuery || isDateFilterActive(dateFilter) || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all') && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setDateFilter(DEFAULT_DATE_FILTER);
-                setCategoryFilter('all');
-                setPaymentMethodFilter('all');
-                setStatusFilter('all');
-              }}
-              className="text-xs text-purple-700 hover:underline px-2 py-1 font-semibold cursor-pointer"
-            >
-              Reset
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* 4. Table View */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
@@ -831,7 +1015,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1.5">
                           {/* View Uploaded Bill Copy (supports iOS HEIC, PDF, images) */}
                           {exp.receipt_url && (
                             <button
@@ -842,10 +1026,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                                 fileName: exp.receipt_file_name || 'Bill-Receipt',
                                 voucherNumber: exp.expense_code,
                               })}
-                              className="p-1.5 rounded-md hover:bg-[#653ef1]/15 text-[#653ef1] bg-[#653ef1]/5 border border-[#653ef1]/20 transition-colors cursor-pointer"
+                              className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
                               title={`View attached bill copy (${exp.receipt_file_name || 'Document'})`}
                             >
-                              <Paperclip className="w-3.5 h-3.5 text-[#653ef1]" />
+                              <Paperclip className="w-3.5 h-3.5 text-[#6338eb]" />
                             </button>
                           )}
 
@@ -856,20 +1040,20 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setViewingExpense(exp);
                               setIsVoucherModalOpen(true);
                             }}
-                            className="p-1.5 rounded-md hover:bg-[#653ef1]/10 text-slate-400 hover:text-[#653ef1] transition-colors cursor-pointer"
+                            className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
                             title="View & Preview Bill Voucher Slip"
                           >
-                            <Receipt className="w-3.5 h-3.5 text-[#653ef1]" />
+                            <Receipt className="w-3.5 h-3.5 text-[#6338eb]" />
                           </button>
 
                           {/* Open Bill directly in Blob URL tab (No download) */}
                           <button
                             type="button"
                             onClick={() => viewSingleExpenseVoucherInNewTab(exp, project?.name || 'Noori Crest Tower')}
-                            className="p-1.5 rounded-md hover:bg-[#653ef1]/10 text-slate-400 hover:text-[#653ef1] transition-colors cursor-pointer"
+                            className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
                             title="Open Bill Voucher directly in Blob URL tab (No file download)"
                           >
-                            <ExternalLink className="w-3.5 h-3.5 text-[#653ef1]" />
+                            <ExternalLink className="w-3.5 h-3.5 text-[#6338eb]" />
                           </button>
 
                           {/* Edit Expense Details */}
@@ -879,10 +1063,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setExpenseToEdit(exp);
                               setIsAddModalOpen(true);
                             }}
-                            className="p-1.5 rounded-md hover:bg-[#653ef1]/10 text-slate-400 hover:text-[#653ef1] transition-colors cursor-pointer"
+                            className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
                             title="Edit expense details"
                           >
-                            <Edit2 className="w-3.5 h-3.5 text-[#653ef1]" />
+                            <Edit2 className="w-3.5 h-3.5 text-[#6338eb]" />
                           </button>
 
                           {/* Delete Expense (Moves to Recycle Bin via Confirmation Modal) */}
@@ -892,7 +1076,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setExpenseToDelete(exp);
                               setIsDeleteModalOpen(true);
                             }}
-                            className="p-1.5 rounded-md hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            className="w-7 h-7 rounded-xl bg-[#fff0f2] hover:bg-[#ffe2e6] text-[#e11d48] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
                             title="Move expense to Recycle Bin"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -905,15 +1089,17 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               )}
             </tbody>
             {filteredExpenses.length > 0 && (
-              <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs text-slate-900">
+              <tfoot className="bg-slate-50/70 border-t border-slate-200 text-xs text-slate-900">
                 <tr>
-                  <td colSpan={6} className="px-4 py-3 text-right uppercase tracking-wider text-slate-500">
-                    Filtered Total:
+                  <td colSpan={6} className="px-4 py-3 text-right uppercase tracking-wider text-slate-500 font-bold text-[11px]">
+                    FILTERED TOTAL:
                   </td>
-                  <td className="px-4 py-3 text-right text-purple-900 text-sm">
-                    {formatINR(filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0))}
+                  <td className="px-4 py-3 text-right">
+                    <span className="inline-block px-4 py-1.5 rounded-xl bg-[#6338eb] text-white text-xs font-black shadow-xs font-numeric">
+                      {formatINR(filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0))}
+                    </span>
                   </td>
-                  <td colSpan={2} className="px-4 py-3 text-left text-slate-400 font-normal">
+                  <td colSpan={2} className="px-4 py-3 text-left text-slate-400 font-medium">
                     ({filteredExpenses.length} records)
                   </td>
                 </tr>

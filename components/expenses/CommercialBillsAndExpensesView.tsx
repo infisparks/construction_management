@@ -63,84 +63,63 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
   };
 
   return (
-    <div className="w-full space-y-4 animate-in fade-in duration-150">
-      {/* Unified Top Commercial Navigation Tabs (1 Single Page for Bills & Expenses) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Tab Buttons */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 w-full sm:w-auto">
-          {/* Tab 1: Site Daily Bills & Expenses */}
-          <button
-            type="button"
-            onClick={() => handleSelectTab('expenses')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'expenses'
-                ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-            }`}
-          >
-            <Receipt className={`w-4 h-4 ${activeTab === 'expenses' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
-            <span>Site Daily Bills & Expenses</span>
-            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-              activeTab === 'expenses' 
-                ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
-                : 'bg-slate-200/80 text-slate-600'
-            }`}>
-              Daily Burn & Petty Cash
-            </span>
-          </button>
-
-          {/* Tab 2: Sub-Contractor Bills (RA) - Hidden per request; kept preserved in code for future use */}
-          {false && (
+    <div className="w-full space-y-3 animate-in fade-in duration-150">
+      {/* If not on site expenses, render the commercial tabs toolbar */}
+      {activeTab !== 'expenses' && (
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Tab Buttons */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 w-full sm:w-auto">
+            {/* Tab 1: Site Daily Bills & Expenses */}
             <button
               type="button"
-              onClick={() => handleSelectTab('subcontractor-bills')}
+              onClick={() => handleSelectTab('expenses')}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'subcontractor-bills'
+                activeTab === 'expenses'
                   ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'subcontractor-bills' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
-              <span>Sub-Contractor Bills (RA)</span>
+              <Receipt className={`w-4 h-4 ${activeTab === 'expenses' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
+              <span>Site Daily Bills & Expenses</span>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-                activeTab === 'subcontractor-bills' 
+                activeTab === 'expenses' 
                   ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
                   : 'bg-slate-200/80 text-slate-600'
               }`}>
-                RA Invoicing
+                Daily Burn & Petty Cash
               </span>
             </button>
-          )}
 
-          {/* Tab 3: Contractor Work Orders & Khata */}
-          <button
-            type="button"
-            onClick={() => handleSelectTab('contractor-work-orders')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'contractor-work-orders'
-                ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-            }`}
-          >
-            <Wrench className={`w-4 h-4 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
-            <span>Work Orders & Khata</span>
-            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-              activeTab === 'contractor-work-orders' 
-                ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
-                : 'bg-slate-200/80 text-slate-600'
-            }`}>
-              Extra Work & Payouts
-            </span>
-          </button>
-        </div>
+            {/* Tab 3: Contractor Work Orders & Khata */}
+            <button
+              type="button"
+              onClick={() => handleSelectTab('contractor-work-orders')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'contractor-work-orders'
+                  ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <Wrench className={`w-4 h-4 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
+              <span>Work Orders & Khata</span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                activeTab === 'contractor-work-orders' 
+                  ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
+                  : 'bg-slate-200/80 text-slate-600'
+              }`}>
+                Extra Work & Payouts
+              </span>
+            </button>
+          </div>
 
-        {/* Project Context & Meta */}
-        <div className="hidden md:flex items-center gap-2 pr-2 text-xs text-slate-500">
-          <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
-          <span>Project Commercial:</span>
-          <strong className="text-slate-800 font-semibold">{project?.name || 'Noori Crest Tower'}</strong>
+          {/* Project Context & Meta */}
+          <div className="hidden md:flex items-center gap-2 pr-2 text-xs text-slate-500">
+            <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
+            <span>Project Commercial:</span>
+            <strong className="text-slate-800 font-semibold">{project?.name || 'Noori Crest Tower'}</strong>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tab Content Display */}
       {activeTab === 'expenses' ? (
@@ -150,6 +129,8 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
           userEmail={userEmail}
           showToast={showToast}
           externalActionTrigger={externalActionTrigger}
+          activeCommercialTab={activeTab}
+          onSelectCommercialTab={handleSelectTab}
         />
       ) : activeTab === 'contractor-work-orders' ? (
         <ContractorWorkOrdersView

@@ -40,7 +40,9 @@ import {
   ArchiveRestore,
   MoreVertical,
   ChevronDown,
-  MessageCircle
+  MessageCircle,
+  Users,
+  Box
 } from 'lucide-react';
 import {
   ConstructionMaterial,
@@ -1069,375 +1071,545 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   }, [vendorProfiles, vendorTypeFilter, searchQuery]);
 
   return (
-    <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-200 w-full">
-      {/* 1. Executive Top Header (Compact & Professional) */}
-      <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 sm:py-3 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shrink-0">
-            <Package className="w-4 h-4 stroke-[2.2]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Store & Site Inventory
+    <div className="space-y-2 sm:space-y-2.5 animate-in fade-in duration-200 w-full">
+      {/* 1. Executive Top Header (Compact & Shifted Up, Matching Image 2 with Transparent 3D Cube & Warehouse Hero) */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_8px_30px_rgb(0,0,0,0.03)] overflow-hidden transition-all duration-300 hover:shadow-[0_12px_40px_rgb(101,62,241,0.06)] relative group">
+        
+        {/* Soft Ambient Backdrop Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-50/30 via-white to-indigo-50/20 pointer-events-none" />
+
+        {/* Delicate Fluid Aurora Wave Ribbon (Matching Reference Image 2) */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden opacity-35"
+          preserveAspectRatio="none"
+          viewBox="0 0 1200 160"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M-50 140 C 200 160, 320 60, 550 80 C 780 100, 920 20, 1250 50"
+            stroke="url(#auroraGradient1)"
+            strokeWidth="36"
+            strokeLinecap="round"
+            className="filter blur-[16px]"
+          />
+          <path
+            d="M-30 110 C 240 130, 380 40, 620 60 C 860 80, 1020 10, 1260 30"
+            stroke="url(#auroraGradient2)"
+            strokeWidth="18"
+            strokeLinecap="round"
+            className="filter blur-[8px]"
+          />
+          <defs>
+            <linearGradient id="auroraGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.4" />
+              <stop offset="35%" stopColor="#ec4899" stopOpacity="0.25" />
+              <stop offset="70%" stopColor="#6366f1" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.3" />
+            </linearGradient>
+            <linearGradient id="auroraGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.6" />
+              <stop offset="50%" stopColor="#c084fc" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.5" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Top Hero Section: Logo, Title, 3D Warehouse Illustration & Squircle Action Buttons (Compact Padding) */}
+        <div className="relative px-4 sm:px-5 py-2.5 sm:py-3 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          
+          {/* Left: 3D Transparent Floating Purple Glass Cube (Direct on card) & Title Block */}
+          <div className="flex items-center gap-3 sm:gap-3.5 shrink-0 z-10">
+            <img
+              src="/inventry/Glowing Purple Glass Cube.png"
+              alt="Store & Site Inventory"
+              className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0 animate-float-slow select-none pointer-events-none drop-shadow-[0_6px_16px_rgba(101,62,241,0.3)]"
+            />
+            <div>
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                Store & Site
+              </span>
+              <h1 className="text-2xl sm:text-[25px] font-extrabold text-[#6338eb] tracking-tight leading-none mt-0.5">
+                Inventory
               </h1>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Sync
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                <Building2 className="w-3 h-3 text-purple-600" />
-                Common for All Sites
-              </span>
+              <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs sm:max-w-sm leading-snug">
+                Centralized inventory & stock ledger shared across all construction sites
+              </p>
             </div>
-            <p className="text-xs text-slate-500">
-              Centralized inventory & stock ledger shared across all construction sites
-            </p>
+          </div>
+
+          {/* Center: 3D Warehouse Storefront with Forklift (Enlarged to fill space beautifully) */}
+          <div className="hidden lg:flex items-end justify-center relative flex-1 max-w-xl xl:max-w-2xl mx-auto px-3 pointer-events-none select-none z-10">
+            {/* Luminous Glow Behind Warehouse */}
+            <div className="absolute inset-x-8 bottom-1 h-20 bg-gradient-to-r from-purple-400/20 via-pink-400/15 to-cyan-400/20 rounded-full blur-2xl" />
+            
+            <img
+              src="/inventry/3D Warehouse Storefront with Forklift.png"
+              alt="Central Site Store & Warehouse"
+              className="w-full max-w-[560px] h-28 sm:h-32 xl:h-36 object-contain relative z-10 drop-shadow-[0_8px_20px_rgba(0,0,0,0.1)] transition-transform duration-500 hover:scale-[1.02]"
+            />
+          </div>
+
+          {/* Right: 5 Tactile Squircle Action Buttons with Colored Glows (Matching Image 2) */}
+          <div className="flex items-center flex-wrap sm:flex-nowrap gap-2 shrink-0 z-10">
+            {/* + Product Button with Purple Glow */}
+            <button
+              type="button"
+              onClick={() => setIsProductDrawerOpen(true)}
+              className="shine-container shine-hover h-[58px] sm:h-[60px] min-w-[66px] sm:min-w-[68px] px-2.5 py-1.5 rounded-2xl bg-gradient-to-b from-[#875cf6] to-[#6338eb] hover:from-[#9366fa] hover:to-[#572be0] text-white flex flex-col items-center justify-center gap-1 shadow-[0_6px_16px_rgba(99,56,235,0.32)] hover:shadow-[0_8px_22px_rgba(99,56,235,0.45)] cursor-pointer active:scale-95 transition-all group"
+              title="Create new product profile"
+            >
+              <Box className="w-4 h-4 stroke-[2] text-white group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold text-white tracking-tight">+ Product</span>
+            </button>
+
+            {/* Vendor Button with Blue Glow */}
+            <button
+              type="button"
+              onClick={() => {
+                setVendorDrawerDefaultType('vendor');
+                setIsVendorDrawerOpen(true);
+              }}
+              className="h-[58px] sm:h-[60px] min-w-[66px] sm:min-w-[68px] px-2.5 py-1.5 rounded-2xl bg-[#edf3ff] hover:bg-[#e4edff] border border-[#d6e4ff] text-[#2563eb] flex flex-col items-center justify-center gap-1 shadow-[0_6px_14px_rgba(37,99,235,0.14)] hover:shadow-[0_8px_18px_rgba(37,99,235,0.22)] cursor-pointer active:scale-95 group transition-all"
+              title="Create new vendor / contractor profile"
+            >
+              <Users className="w-4 h-4 stroke-[2] text-[#2563eb] group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold text-[#2563eb] tracking-tight">Vendor</span>
+            </button>
+
+            {/* Return Button with Amber Glow */}
+            <button
+              type="button"
+              onClick={() => openActionModal('return')}
+              className="h-[58px] sm:h-[60px] min-w-[66px] sm:min-w-[68px] px-2.5 py-1.5 rounded-2xl bg-[#fff7ea] hover:bg-[#ffeed3] border border-[#ffe4be] text-[#d97706] flex flex-col items-center justify-center gap-1 shadow-[0_6px_14px_rgba(217,119,6,0.14)] hover:shadow-[0_8px_18px_rgba(217,119,6,0.22)] cursor-pointer active:scale-95 group transition-all"
+              title="Log return of material to supplier"
+            >
+              <RotateCcw className="w-4 h-4 stroke-[2.2] text-[#d97706] group-hover:rotate-[-30deg] transition-transform" />
+              <span className="text-[11px] font-bold text-[#d97706] tracking-tight">Return</span>
+            </button>
+
+            {/* Defect Button with Rose Glow */}
+            <button
+              type="button"
+              onClick={() => openActionModal('damage')}
+              className="h-[58px] sm:h-[60px] min-w-[66px] sm:min-w-[68px] px-2.5 py-1.5 rounded-2xl bg-[#fff0f2] hover:bg-[#ffe2e6] border border-[#ffd2d8] text-[#e11d48] flex flex-col items-center justify-center gap-1 shadow-[0_6px_14px_rgba(225,29,72,0.14)] hover:shadow-[0_8px_18px_rgba(225,29,72,0.22)] cursor-pointer active:scale-95 group transition-all"
+              title="Log damaged / spoiled material"
+            >
+              <AlertTriangle className="w-4 h-4 stroke-[2.2] text-[#e11d48] group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold text-[#e11d48] tracking-tight">Defect</span>
+            </button>
+
+            {/* Issue (MIN) Button with Sky Blue Glow */}
+            <button
+              type="button"
+              onClick={() => openActionModal('check_out')}
+              className="h-[58px] sm:h-[60px] min-w-[70px] sm:min-w-[72px] px-2.5 py-1.5 rounded-2xl bg-[#eef4ff] hover:bg-[#e4edff] border border-[#d6e4ff] text-[#3b82f6] flex flex-col items-center justify-center gap-1 shadow-[0_6px_14px_rgba(59,130,246,0.14)] hover:shadow-[0_8px_18px_rgba(59,130,246,0.22)] cursor-pointer active:scale-95 group transition-all"
+              title="Issue material to site contractor (Material Issue Note)"
+            >
+              <ArrowUpRight className="w-4 h-4 stroke-[2.4] text-[#3b82f6] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              <span className="text-[11px] font-bold text-[#3b82f6] tracking-tight">Issue (MIN)</span>
+            </button>
           </div>
         </div>
 
-        {/* Clean, Organized Button Toolbar */}
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Quick Refresh */}
-          <button
-            type="button"
-            onClick={loadDataFromSupabase}
-            className="h-9 px-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Refresh stock and ledger"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDb ? 'animate-spin text-purple-600' : 'text-slate-400'}`} />
-            <span>Sync</span>
-          </button>
+        {/* Bottom Strip / Ribbon (Pill Badges on Left, WhatsApp & Inward GRN Shifted Right Next to Each Other) */}
+        <div className="px-4 sm:px-5 py-2 border-t border-slate-100 bg-gradient-to-r from-slate-50/90 via-purple-50/15 to-slate-50/90 flex flex-wrap items-center justify-between gap-2 relative z-10">
+          
+          {/* Left Pill Group: System & Export Badges */}
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Live Sync Pill */}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#e6f9ed] text-[#16a34a] border border-[#b8f0ca] shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16a34a] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#16a34a]" />
+              </span>
+              Live Sync
+            </span>
 
-          {/* Export */}
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="h-9 px-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Export full ledger as CSV"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
-            <span>Export</span>
-          </button>
+            {/* Common for All Sites Pill */}
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs">
+              <Building2 className="w-3.5 h-3.5 text-[#6338eb]" />
+              Common for All Sites
+            </span>
 
-          {/* Preview Stock Balance PDF (Opens Blob URL in new tab & viewer) */}
-          <button
-            type="button"
-            onClick={() => {
-              viewInventoryStockSummaryPdfInNewTab(materials, project?.name || 'Noori Crest Tower');
-              setIsStockPdfModalOpen(true);
-            }}
-            className="h-9 px-3 rounded-xl border border-purple-200 bg-purple-50/50 hover:bg-purple-100/70 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Preview all inventory stock as PDF statement (opens Blob URL)"
-          >
-            <Printer className="w-3.5 h-3.5 text-purple-600" />
-            <span>Preview PDF</span>
-          </button>
+            <span className="text-slate-300 hidden md:inline mx-0.5 font-light">|</span>
 
-          {/* Share Inventory Status via WhatsApp */}
-          <button
-            type="button"
-            onClick={handleShareInventoryStatusToWhatsApp}
-            className="h-9 px-3 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Share full live inventory valuation & stock report via WhatsApp"
-          >
-            <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/20" />
-            <span className="hidden sm:inline">WhatsApp Status</span>
-            <span className="sm:hidden">WhatsApp</span>
-          </button>
+            {/* Quick Refresh */}
+            <button
+              type="button"
+              onClick={loadDataFromSupabase}
+              className="h-7.5 px-3 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:border-slate-300"
+              title="Refresh stock and ledger"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDb ? 'animate-spin text-purple-600' : 'text-slate-500'}`} />
+              <span>Sync</span>
+            </button>
 
-          <div className="h-4 w-[1px] bg-slate-200 mx-0.5 shrink-0 hidden sm:block" />
+            {/* Export */}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="h-7.5 px-3 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:border-slate-300"
+              title="Export full ledger as CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
+              <span>Export</span>
+            </button>
 
-          {/* Master Profile Form Drawers */}
-          <button
-            type="button"
-            onClick={() => setIsProductDrawerOpen(true)}
-            className="h-9 px-3 rounded-xl border border-purple-200/80 bg-purple-50/70 hover:bg-purple-100 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Create new product profile"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Product</span>
-          </button>
+            {/* Preview Stock Balance PDF */}
+            <button
+              type="button"
+              onClick={() => {
+                viewInventoryStockSummaryPdfInNewTab(materials, project?.name || 'Noori Crest Tower');
+                setIsStockPdfModalOpen(true);
+              }}
+              className="h-7.5 px-3 rounded-full border border-[#e3d8ff] bg-[#f4f0ff] hover:bg-[#ebe3ff] text-[#6338eb] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+              title="Preview all inventory stock as PDF statement"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#6338eb]" />
+              <span>Preview PDF</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setVendorDrawerDefaultType('vendor');
-              setIsVendorDrawerOpen(true);
-            }}
-            className="h-9 px-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Create new vendor / contractor profile"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-slate-400" />
-            <span>Vendor</span>
-          </button>
+          {/* Right Action Group: WhatsApp Status & Shiny Inward GRN Shifted Right Next to Each Other! */}
+          <div className="flex items-center gap-2 relative">
+            {/* Share Inventory Status via WhatsApp (Shifted here to eliminate empty gap) */}
+            <button
+              type="button"
+              onClick={handleShareInventoryStatusToWhatsApp}
+              className="h-8 px-3.5 rounded-full border border-[#b8f0ca] bg-[#e6f9ed] hover:bg-[#d5f7de] text-[#16a34a] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs hover:scale-[1.02] active:scale-95"
+              title="Share full live inventory valuation & stock report via WhatsApp"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-[#16a34a] fill-[#16a34a]/20" />
+              <span>WhatsApp Status</span>
+            </button>
 
-          <div className="h-4 w-[1px] bg-slate-200 mx-0.5 shrink-0 hidden sm:block" />
-
-          {/* Return & Defect Quick Actions */}
-          <button
-            type="button"
-            onClick={() => openActionModal('return')}
-            className="h-9 px-3 rounded-xl border border-amber-200/80 bg-amber-50/70 hover:bg-amber-100/80 text-amber-800 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Log return of material to supplier"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
-            <span>Return</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => openActionModal('damage')}
-            className="h-9 px-3 rounded-xl border border-rose-200/80 bg-rose-50/70 hover:bg-rose-100/80 text-rose-800 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Log damaged / spoiled material"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-            <span>Defect</span>
-          </button>
-
-          {/* Issue to Site */}
-          <button
-            type="button"
-            onClick={() => openActionModal('check_out')}
-            className="h-9 px-3.5 rounded-xl border border-[#653ef1]/25 bg-[#653ef1]/5 hover:bg-[#653ef1]/10 text-[#653ef1] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            title="Issue material to site contractor"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5 text-[#653ef1] stroke-[2.2]" />
-            <span>Issue (MIN)</span>
-          </button>
-
-          {/* Primary Action: Inward Delivery */}
-          <button
-            type="button"
-            onClick={() => openActionModal('check_in')}
-            className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm shadow-[#653ef1]/25 hover:shadow-md hover:shadow-[#653ef1]/35 cursor-pointer active:scale-95"
-            title="Record inward delivery from supplier"
-          >
-            <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.2]" />
-            <span>Inward (GRN)</span>
-          </button>
+            {/* Radiant Inward (GRN) Button with Continuous Shine Beam & Purple Glow */}
+            <button
+              type="button"
+              onClick={() => openActionModal('check_in')}
+              className="shine-container shine-infinite h-8 px-5 rounded-full bg-gradient-to-r from-[#7b46f8] via-[#6338eb] to-[#5a24ea] hover:from-[#8855fa] hover:to-[#501fe0] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-[0_4px_16px_rgba(99,56,235,0.4)] hover:shadow-[0_6px_22px_rgba(99,56,235,0.55)] cursor-pointer active:scale-95"
+              title="Record inward delivery from supplier (Goods Receipt Note)"
+            >
+              <ArrowDownLeft className="w-4 h-4 stroke-[2.4]" />
+              <span>Inward (GRN)</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 2. KPI Metrics Ribbon (5 Compact Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3.5">
-        {/* Card 1: Total Stock */}
+      {/* 2. KPI Metrics Ribbon (5 Ultra-Modern Cards with Full-Card Tinted Gradients Matching 3D Icons) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+        
+        {/* Card 1: Total Stock with Full-Card Sky Blue Gradient */}
         <div 
           onClick={() => setActiveTab('catalog')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-purple-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          className="shine-container shine-hover bg-gradient-to-br from-[#f2f8ff] via-[#e8f2ff] to-[#d9ebfe] p-3 sm:p-3.5 rounded-3xl border border-[#bedbfe] shadow-[0_4px_16px_rgba(37,99,235,0.05)] cursor-pointer hover:border-[#93c5fd] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(59,130,246,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Stock</span>
-            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+          {/* Vibrant Cyan / Sky Blue Floor Glow Pool under Pallet */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.7)_0%,rgba(59,130,246,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title + SKU Badge */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#1e3a8a] uppercase tracking-wider block">
+              Total Stock
+            </span>
+            <span className="text-[10.5px] font-bold text-[#1d4ed8] bg-[#dbeafe] border border-[#bfdbfe] px-2.5 py-0.5 rounded-full font-mono">
               {metrics.totalItems} SKUs
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900 font-numeric">
-              {metrics.totalCurrentStock.toLocaleString()}
-            </span>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-              Units
-            </span>
+
+          {/* Bottom Row: Number/Subtitle on left, 3D render with Blue Shadow on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                {metrics.totalCurrentStock.toLocaleString()}
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                Live store inventory
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/inventry/Stacked Shipping Boxes on Blue Pallet.png"
+                alt="Total Stock"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(59,130,246,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block truncate">Live store inventory</span>
         </div>
 
-        {/* Card 2: Low Stock Alerts */}
+        {/* Card 2: Low Stock Alerts with Full-Card Warm Amber/Rose Gradient (No line/ring under siren) */}
         <div 
           onClick={() => setActiveTab('low_stock')}
-          className={`p-4 rounded-2xl border shadow-xs cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+          className={`shine-container shine-hover p-3 sm:p-3.5 rounded-3xl border shadow-[0_4px_16px_rgba(244,63,94,0.05)] cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(239,68,68,0.16)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden ${
             metrics.lowStockCount > 0
-              ? 'bg-amber-50/50 border-amber-300 hover:bg-amber-50'
-              : 'bg-white border-slate-200/80 hover:border-amber-300'
+              ? 'bg-gradient-to-br from-[#fffdf5] via-[#fff5ea] to-[#ffe4db] border-[#fecdd3] hover:border-[#fda4af]'
+              : 'bg-gradient-to-br from-[#f0fdf4] via-[#e6f9ee] to-[#d1fae5] border-[#bbf7d0] hover:border-[#86efac]'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Low Stock Alerts</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+          {/* Smooth, Natural Red / Amber Glow Pool (Clean without any hard line or border) */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(239,68,68,0.75)_0%,rgba(245,158,11,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title + Reorder Badge */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className={`text-[11px] font-bold uppercase tracking-wider block ${
+              metrics.lowStockCount > 0 ? 'text-[#9f1239]' : 'text-[#065f46]'
+            }`}>
+              Low Stock Alerts
+            </span>
+            <span className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border ${
               metrics.lowStockCount > 0
-                ? 'text-amber-800 bg-amber-100 border-amber-300'
-                : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                ? 'text-[#b91c1c] bg-[#fee2e2] border-[#fca5a5]'
+                : 'text-[#047857] bg-[#d1fae5] border-[#a7f3d0]'
             }`}>
               <AlertTriangle className="w-3 h-3" />
               {metrics.lowStockCount > 0 ? 'Reorder' : 'Healthy'}
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <span className={`text-xl font-bold font-numeric ${metrics.lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'}`}>
-              {metrics.lowStockCount}
-            </span>
-            <span className="text-[11px] text-slate-500 font-medium">Items</span>
+
+          {/* Bottom Row: Number on left, 3D Siren Beacon on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div className="flex items-baseline">
+              <span className={`text-2xl sm:text-[26px] font-black font-numeric tracking-tight leading-none ${metrics.lowStockCount > 0 ? 'text-[#e11d48]' : 'text-slate-900'}`}>
+                {metrics.lowStockCount}
+              </span>
+              <span className="text-[10.5px] font-medium text-slate-500 ml-1.5">Items</span>
+            </div>
+            <div className="w-16 h-13 sm:w-18 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/inventry/Glossy Red Emergency Siren Beacon.png"
+                alt="Low Stock Warning Siren"
+                className={`w-full h-full object-contain drop-shadow-[0_8px_18px_rgba(239,68,68,0.55)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none ${
+                  metrics.lowStockCount > 0 ? 'animate-pulse' : ''
+                }`}
+              />
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block truncate">Below alert buffer</span>
         </div>
 
-        {/* Card 3: Inward Deliveries */}
+        {/* Card 3: Inward Receipts with Full-Card Mint/Emerald Gradient */}
         <div 
           onClick={() => setActiveTab('inward')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-purple-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          className="shine-container shine-hover bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] p-3 sm:p-3.5 rounded-3xl border border-[#baf2cf] shadow-[0_4px_16px_rgba(16,185,129,0.05)] cursor-pointer hover:border-[#86efac] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(16,185,129,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Inward Receipts</span>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-0.5">
-              <ArrowDownLeft className="w-3 h-3" /> (+) GRN
+          {/* Brilliant Emerald Green Floor Glow Pool under Open Box */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.75)_0%,rgba(16,185,129,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title + GRN Badge */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#065f46] uppercase tracking-wider block">
+              Inward Receipts
+            </span>
+            <span className="inline-flex items-center gap-0.5 text-[10.5px] font-bold text-[#047857] bg-[#d1fae5] border border-[#a7f3d0] px-2.5 py-0.5 rounded-full">
+              <ArrowDownLeft className="w-3 h-3 stroke-[2.2]" /> GRN
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900 font-numeric">{metrics.totalInwardCount}</span>
-            <span className="text-[11px] text-slate-500 font-medium">Deliveries</span>
+
+          {/* Bottom Row: Number on left, 3D Open Box with Green Shadow on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                {metrics.totalInwardCount}
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                Material deliveries logged
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/inventry/Open Box with Green Downward Arrow.png"
+                alt="Inward Delivery Receipts"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(16,185,129,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block truncate">Added to store</span>
         </div>
 
-        {/* Card 4: Site Dispatches */}
+        {/* Card 4: Site Dispatches with Full-Card Lavender/Purple Gradient */}
         <div 
           onClick={() => setActiveTab('outward')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-indigo-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          className="shine-container shine-hover bg-gradient-to-br from-[#faf7ff] via-[#f3eeff] to-[#ebe0ff] p-3 sm:p-3.5 rounded-3xl border border-[#ddd3fe] shadow-[0_4px_16px_rgba(109,40,217,0.05)] cursor-pointer hover:border-[#c4b5fd] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(147,51,234,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Site Dispatches</span>
-            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200 flex items-center gap-0.5">
-              <ArrowUpRight className="w-3 h-3" /> (-) MIN
+          {/* Radiant Lavender / Purple Ground Glow under Truck */}
+          <div className="absolute -bottom-2 -right-1 w-32 h-12 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.7)_0%,rgba(99,102,241,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title + MIN Badge */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#37246e] uppercase tracking-wider block">
+              Site Dispatches
+            </span>
+            <span className="inline-flex items-center gap-0.5 text-[10.5px] font-bold text-[#5b21b6] bg-[#ece5ff] border border-[#d8c5fd] px-2.5 py-0.5 rounded-full">
+              <ArrowUpRight className="w-3 h-3 stroke-[2.2]" /> MIN
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900 font-numeric">{metrics.totalOutwardCount}</span>
-            <span className="text-[11px] text-slate-500 font-medium">Issues</span>
+
+          {/* Bottom Row: Number on left, 3D Truck with Purple Underglow on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div className="flex items-baseline">
+              <span className="text-2xl sm:text-[26px] font-black text-[#6338eb] font-numeric tracking-tight leading-none">
+                {metrics.totalOutwardCount}
+              </span>
+              <span className="text-[10.5px] font-medium text-slate-500 ml-1.5">Issues</span>
+            </div>
+            <div className="w-20 h-13 sm:w-22 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/inventry/Glowing Lavender Delivery Truck.png"
+                alt="Site Material Dispatches"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(147,51,234,0.45)] group-hover:scale-110 group-hover:translate-x-1 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block truncate">Issued to site work</span>
         </div>
 
-        {/* Card 5: Returns & Defects */}
+        {/* Card 5: Returns & Defects with Full-Card Coral/Amber-Peach Gradient */}
         <div 
           onClick={() => setActiveTab('returns_damages')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-amber-300 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          className="shine-container shine-hover bg-gradient-to-br from-[#fff8f6] via-[#fff0ed] to-[#ffe2dc] p-3 sm:p-3.5 rounded-3xl border border-[#fecaca] shadow-[0_4px_16px_rgba(239,68,68,0.05)] cursor-pointer hover:border-[#fca5a5] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(244,63,94,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Returns & Defects</span>
-            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+          {/* Warm Amber / Coral Floor Glow Pool under Damaged Box */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.6)_0%,rgba(245,158,11,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title + Deductions Badge */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#991b1b] uppercase tracking-wider block">
+              Returns & Defects
+            </span>
+            <span className="text-[10.5px] font-bold text-[#c2410c] bg-[#ffedd5] border border-[#fed7aa] px-2.5 py-0.5 rounded-full">
               Deductions
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-slate-900 font-numeric">{metrics.totalReturnsDamagesCount}</span>
-            <span className="text-[11px] text-slate-500 font-medium">Logs</span>
+
+          {/* Bottom Row: Number/Subtitle on left, 3D Damaged Box with Red Shadow on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                {metrics.totalReturnsDamagesCount}
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                {metrics.totalReturnCount} Ret + {metrics.totalDefectCount} Defect
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/inventry/Damaged Shipping Box with Red X.png"
+                alt="Returns and Damaged Materials"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(244,63,94,0.4)] group-hover:scale-110 group-hover:rotate-2 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block truncate">
-            {metrics.totalReturnCount} Ret • {metrics.totalDefectCount} Defect
-          </span>
         </div>
       </div>
 
-      {/* 3. Navigation Tabs (Clean & Professional - Current Stock is Tab #1) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-xs flex items-center gap-1.5 overflow-x-auto">
+      {/* 3. Navigation Tabs (Modern Rounded Pill Tabs with Vibrant Active States) */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 p-1.5 shadow-2xs flex items-center gap-1.5 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('catalog')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'catalog'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <Layers className="w-3.5 h-3.5" />
+          <Layers className="w-4 h-4" />
           <span>Current Stock ({materials.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('products')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'products'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <Package className="w-3.5 h-3.5" />
+          <Package className="w-4 h-4" />
           <span>Products Master ({materials.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('vendors')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'vendors'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <Building2 className="w-3.5 h-3.5" />
+          <Building2 className="w-4 h-4" />
           <span>Vendors & Parties ({vendorProfiles.length})</span>
         </button>
 
-        <div className="h-4 w-[1px] bg-slate-200 mx-1 shrink-0" />
+        <div className="h-5 w-[1px] bg-slate-200 mx-1 shrink-0" />
 
         <button
           type="button"
           onClick={() => setActiveTab('inward')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'inward'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <ArrowDownLeft className="w-3.5 h-3.5" />
+          <ArrowDownLeft className="w-4 h-4" />
           <span>Inward GRN ({inwardTransactions.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('outward')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'outward'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <ArrowUpRight className="w-3.5 h-3.5" />
+          <ArrowUpRight className="w-4 h-4" />
           <span>Site Issues ({outwardTransactions.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('returns_damages')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'returns_damages'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw className="w-4 h-4" />
           <span>Returns & Defects ({returnsAndDamagesTransactions.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('ledger')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'ledger'
-              ? 'bg-[#653ef1] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <History className="w-3.5 h-3.5" />
+          <History className="w-4 h-4" />
           <span>Stock Ledger ({transactions.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('low_stock')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
             activeTab === 'low_stock'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+              ? 'bg-gradient-to-r from-amber-600 to-rose-600 text-white shadow-md shadow-amber-500/25'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
           }`}
         >
-          <AlertTriangle className={`w-3.5 h-3.5 ${metrics.lowStockCount > 0 ? 'text-amber-500' : ''}`} />
+          <AlertTriangle className={`w-4 h-4 ${metrics.lowStockCount > 0 ? 'text-amber-500 animate-pulse' : ''}`} />
           <span>Low Stock ({metrics.lowStockCount})</span>
         </button>
 
-        <div className="h-4 w-[1px] bg-slate-200 mx-1 shrink-0" />
+        <div className="h-5 w-[1px] bg-slate-200 mx-1 shrink-0" />
 
         <button
           type="button"
@@ -1445,23 +1617,23 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             setActiveTab('bin');
             loadDeletedProducts();
           }}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
             activeTab === 'bin'
-              ? 'bg-rose-600 text-white shadow-2xs'
-              : 'text-rose-700 hover:bg-rose-50 border border-rose-200'
+              ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25'
+              : 'text-rose-700 hover:bg-rose-50 border border-rose-200/90'
           }`}
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-4 h-4" />
           <span>Recycle Bin ({deletedProducts.length + deletedTransactions.length})</span>
         </button>
       </div>
 
-      {/* 4. Filter & Search Toolbar (Compact Single Bar) */}
+      {/* 4. Filter & Search Toolbar (Matching Image 1 with Rounded-2xl Search & Filters) */}
       {!['products', 'vendors', 'bin'].includes(activeTab) && (
-      <div className="bg-white rounded-xl border border-slate-200/80 p-2 sm:p-2.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search */}
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-[#6338eb] absolute left-3.5 top-3 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
@@ -1477,18 +1649,18 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 ? 'Search return reason, damage reason, or voucher...'
                 : 'Search transactions, slip codes, vehicles, reasons...'
             }
-            className="w-full h-8.5 pl-9 pr-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 bg-slate-50/50"
+            className="w-full h-10 pl-10 pr-4 rounded-2xl border border-slate-200/90 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-[#6338eb] focus:ring-2 focus:ring-purple-500/10 bg-white shadow-2xs transition-all"
           />
         </div>
 
         {/* Filter Selectors based on tab */}
-        <div className="flex items-center flex-wrap gap-2">
+        <div className="flex items-center flex-wrap gap-2.5">
           {activeTab === 'catalog' && (
             <>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="h-8.5 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600"
+                className="h-10 px-3.5 rounded-2xl border border-slate-200/90 text-xs font-semibold text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] shadow-2xs cursor-pointer"
               >
                 <option value="all">All Categories</option>
                 {categories.map((c) => (
@@ -1501,7 +1673,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="h-8.5 px-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600"
+                className="h-10 px-3.5 rounded-2xl border border-slate-200/90 text-xs font-semibold text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] shadow-2xs cursor-pointer"
               >
                 <option value="all">All Statuses</option>
                 <option value="in_stock">In Stock</option>
@@ -1516,10 +1688,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   viewInventoryStockSummaryPdfInNewTab(materials, project?.name || 'Noori Crest Tower');
                   setIsStockPdfModalOpen(true);
                 }}
-                className="h-8.5 px-3 rounded-lg border border-purple-200 bg-white hover:bg-purple-50 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                className="h-10 px-4 rounded-2xl border border-purple-200 bg-white hover:bg-purple-50 text-[#6338eb] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 title="Preview all inventory with stock as PDF statement"
               >
-                <Printer className="w-3.5 h-3.5 text-purple-600" />
+                <Printer className="w-3.5 h-3.5 text-[#6338eb]" />
                 <span>Preview PDF</span>
               </button>
             </>

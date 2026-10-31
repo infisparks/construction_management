@@ -400,16 +400,65 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
   const getFileIcon = (type: FileType) => {
     switch (type) {
-      case 'pdf':
-        return <FileText className="w-5 h-5 text-rose-600" />;
-      case 'image':
-        return <ImageIcon className="w-5 h-5 text-purple-600" />;
-      case 'spreadsheet':
-        return <FileSpreadsheet className="w-5 h-5 text-emerald-600" />;
       case 'dwg':
-        return <FileCode className="w-5 h-5 text-amber-600" />;
+        return (
+          <img
+            src="/document/Glossy Orange DWG File Icon.png"
+            alt="DWG Drawing"
+            className="w-full h-full object-contain drop-shadow-[0_4px_8px_rgba(245,158,11,0.4)] select-none pointer-events-none"
+          />
+        );
+      case 'pdf':
+        return (
+          <img
+            src="/document/Glossy Red PDF Document Icon.png"
+            alt="PDF Document"
+            className="w-full h-full object-contain drop-shadow-[0_4px_8px_rgba(239,68,68,0.4)] select-none pointer-events-none"
+          />
+        );
       default:
-        return <FileText className="w-5 h-5 text-blue-600" />;
+        return (
+          <img
+            src="/document/Glossy Blue Document File Icon.png"
+            alt="Document File"
+            className="w-full h-full object-contain drop-shadow-[0_4px_8px_rgba(59,130,246,0.4)] select-none pointer-events-none"
+          />
+        );
+    }
+  };
+
+  const getFileBadge = (type: FileType) => {
+    switch (type) {
+      case 'dwg':
+        return (
+          <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center select-none group-hover:scale-110 transition-transform duration-200">
+            <img
+              src="/document/Glossy Orange DWG File Icon.png"
+              alt="DWG Drawing"
+              className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(245,158,11,0.45)] select-none pointer-events-none"
+            />
+          </div>
+        );
+      case 'pdf':
+        return (
+          <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center select-none group-hover:scale-110 transition-transform duration-200">
+            <img
+              src="/document/Glossy Red PDF Document Icon.png"
+              alt="PDF Document"
+              className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(239,68,68,0.45)] select-none pointer-events-none"
+            />
+          </div>
+        );
+      default:
+        return (
+          <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center select-none group-hover:scale-110 transition-transform duration-200">
+            <img
+              src="/document/Glossy Blue Document File Icon.png"
+              alt="Document File"
+              className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(59,130,246,0.45)] select-none pointer-events-none"
+            />
+          </div>
+        );
     }
   };
 
@@ -565,7 +614,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const activeProjectDef = availableProjects.find(p => p.id === projectFilter);
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#F5F6F8] min-h-[calc(100vh-64px)] pb-12">
+    <div className="flex-1 flex flex-col min-w-0 bg-[#F5F6F8] min-h-[calc(100vh-64px)] p-3 sm:p-5 space-y-3 sm:space-y-4 pb-16">
       
       {/* Toast Notification */}
       {toastMessage && (
@@ -591,132 +640,264 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         </div>
       )}
 
-      {/* Top Banner & Stats Section */}
-      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-6 w-full">
-        <div className="w-full">
-          
-          {/* Header Row */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
-            <div>
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#653ef1]" />
-                <span className="text-xs font-bold text-[#653ef1] uppercase tracking-wider">
-                  Module 3 • Project Documents Vault
+      {/* 1. Top Executive Header Banner with Central 3D Vault Illustration & Actions */}
+      <div className="relative rounded-3xl bg-white border border-slate-200/90 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden p-4 sm:p-5">
+        {/* Soft Violet/Lavender Ambient Radial Gradients */}
+        <div className="absolute top-0 right-1/4 w-96 h-48 bg-gradient-to-b from-purple-500/[0.07] via-indigo-500/[0.04] to-transparent rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-10 right-10 w-80 h-36 bg-gradient-to-t from-indigo-500/[0.06] to-transparent rounded-full blur-xl pointer-events-none" />
+
+        {/* Ambient Wave SVG Ribbon in background */}
+        <svg
+          className="absolute -right-16 -top-12 w-[520px] h-[260px] text-purple-600/[0.05] pointer-events-none"
+          viewBox="0 0 600 300"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M0 120C120 70 240 180 360 130C480 80 540 160 600 120V300H0V120Z"
+            fill="currentColor"
+          />
+        </svg>
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Left Column: Module Pill, Title & Subtitle */}
+          <div className="max-w-xl">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200/80 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-[#653ef1] animate-pulse" />
+                <span className="text-[11px] font-bold text-[#653ef1] uppercase tracking-wider font-mono">
+                  MODULE 3 • PROJECT DOCUMENTS VAULT
                 </span>
-                
-                {/* Active Filter Project Pill */}
-                <div className="flex items-center gap-1 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25">
-                  <Link2 className="w-3 h-3 text-[#653ef1]" />
-                  <span>
-                    {activeProjectDef ? `Site #${activeProjectDef.serial_no} — ${activeProjectDef.name}` : 'All Projects (Multi-Site)'}
-                  </span>
-                </div>
               </div>
 
-              <h1 className="text-22px md:text-24px font-bold text-slate-900 tracking-tight">
-                Project Files & Documents Archive
-              </h1>
-              <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-                Centralized document repository with instant in-app preview, foreign key isolation, and recycle bin restore.
-              </p>
+              {/* Active Filter Project Pill */}
+              <div className="flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25">
+                <Link2 className="w-3 h-3 text-[#653ef1]" />
+                <span>
+                  {activeProjectDef ? `Site #${activeProjectDef.serial_no} — ${activeProjectDef.name}` : 'All Projects (Multi-Site)'}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={loadAllFiles}
-                className="p-2.5 text-slate-500 hover:text-[#653ef1] hover:bg-[#653ef1]/10 rounded-xl border border-slate-200/90 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
-                title="Refresh Documents"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#653ef1]' : ''}`} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsContactsManagerOpen(true)}
-                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:border-emerald-500/50 hover:bg-emerald-50/40 hover:text-emerald-700 transition-all shadow-2xs hover:shadow-xs cursor-pointer"
-                title="Manage WhatsApp Directory & Saved Contacts"
-              >
-                <MessageCircle className="w-4 h-4 text-emerald-600 fill-emerald-600/10" />
-                <span className="hidden sm:inline">WhatsApp Contacts</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsUploadModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 hover:shadow-md hover:shadow-[#653ef1]/35 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-              >
-                <Upload className="w-4 h-4 stroke-[2.2]" />
-                <span>Upload Document</span>
-              </button>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight flex items-center gap-2 flex-wrap">
+              <span>Files &</span>
+              <span className="bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#8b5cf6] bg-clip-text text-transparent">Documents</span>
+              <span>Archive</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-xl font-medium mt-1 leading-relaxed">
+              Centralized document repository with instant in-app preview, foreign key isolation, and recycle bin restore.
+            </p>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Active Documents</span>
-              <div className="text-xl font-bold text-slate-900 mt-1 tabular-nums">{activeFiles.length}</div>
-            </div>
-
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Vault Storage</span>
-              <div className="text-xl font-bold text-[#653ef1] font-mono mt-1 tabular-nums">
-                {formatFileSize(totalStorageBytes)}
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Drawings & Technical</span>
-              <div className="text-xl font-bold text-slate-900 mt-1 tabular-nums">
-                {activeFiles.filter(f => f.category.includes('drawings')).length}
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">In Recycle Bin</span>
-              <div className={`text-xl font-bold mt-1 tabular-nums ${deletedFiles.length > 0 ? 'text-rose-600 font-mono' : 'text-slate-400'}`}>
-                {deletedFiles.length} files
-              </div>
-            </div>
+          {/* Center Column: Grand 3D Purple Vault with File Badges */}
+          <div className="hidden lg:flex items-center justify-center relative w-72 h-32 xl:w-80 xl:h-36 shrink-0 pointer-events-none select-none">
+            {/* Ambient Purple Underglow Halo */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(147,51,234,0.3)_0%,rgba(99,102,241,0.15)_50%,transparent_75%)] rounded-full blur-xl" />
+            <img
+              src="/document/Glossy Purple Vault with File Badges.png"
+              alt="Project Documents Vault"
+              className="w-full h-full object-contain drop-shadow-[0_14px_28px_rgba(101,62,241,0.28)] hover:scale-105 transition-transform duration-500"
+            />
           </div>
 
-          {/* Vault vs Recycle Bin Tabs Switcher */}
-          <div className="flex items-center gap-2 mt-5 pt-3 border-t border-slate-100">
-            <div className="flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
-              <button
-                type="button"
-                onClick={() => setActiveTab('vault')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'vault'
-                    ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <FolderKanban className={`w-3.5 h-3.5 ${activeTab === 'vault' ? 'text-[#653ef1]' : 'text-slate-400'}`} />
-                <span>Active Vault ({activeFiles.length})</span>
-              </button>
+          {/* Right Column: Actions (Refresh, WhatsApp, + Upload Document) */}
+          <div className="flex items-center gap-2.5 shrink-0 self-start lg:self-center">
+            <button
+              type="button"
+              onClick={loadAllFiles}
+              className="w-9 h-9 rounded-full bg-white border border-slate-200/90 hover:border-purple-300 text-slate-600 hover:text-[#653ef1] flex items-center justify-center shadow-2xs hover:shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+              title="Refresh Documents"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#653ef1]' : ''}`} />
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('bin')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'bin'
-                    ? 'bg-white text-rose-600 shadow-2xs border border-rose-200/60 font-bold'
-                    : 'text-slate-600 hover:text-rose-600'
-                }`}
-              >
-                <Trash2 className={`w-3.5 h-3.5 ${activeTab === 'bin' ? 'text-rose-600' : 'text-slate-400'}`} />
-                <span>Recycle Bin ({deletedFiles.length})</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsContactsManagerOpen(true)}
+              className="h-9 px-4 rounded-full text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:border-emerald-500/50 hover:bg-emerald-50/40 hover:text-emerald-700 transition-all shadow-2xs hover:shadow-xs cursor-pointer flex items-center gap-2"
+              title="Manage WhatsApp Directory & Saved Contacts"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-600 fill-emerald-600/10" />
+              <span className="hidden sm:inline">WhatsApp Contacts</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="shine-container shine-infinite h-9 px-5 rounded-full bg-gradient-to-r from-[#7b46f8] via-[#6338eb] to-[#5a24ea] hover:from-[#8855fa] hover:to-[#501fe0] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-[0_4px_16px_rgba(99,56,235,0.4)] hover:shadow-[0_6px_22px_rgba(99,56,235,0.55)] cursor-pointer active:scale-95"
+            >
+              <Upload className="w-4 h-4 stroke-[2.4]" />
+              <span>Upload Document</span>
+            </button>
           </div>
-
         </div>
       </div>
 
+      {/* 2. Top Summary KPI Cards (4 Ultra-Modern Cards with Full-Card Tinted Gradients Matching 3D Icons) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* Card 1: Active Documents with Full-Card Lavender/Purple Gradient */}
+        <div className="shine-container shine-hover bg-gradient-to-br from-[#faf7ff] via-[#f3eeff] to-[#ebe0ff] p-3 sm:p-3.5 rounded-3xl border border-[#ddd3fe] shadow-[0_4px_16px_rgba(109,40,217,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#c4b5fd] hover:shadow-[0_10px_24px_rgba(147,51,234,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
+          {/* Vibrant Purple Floor Glow Pool */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.7)_0%,rgba(99,102,241,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#37246e] uppercase tracking-wider block">
+              Active Documents
+            </span>
+          </div>
+
+          {/* Bottom Row: Number on left, 3D Purple Stacked Folders on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                {activeFiles.length}
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                Project files in vault
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/document/Glossy Purple Stacked Folders.png"
+                alt="Active Documents"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(147,51,234,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Vault Storage with Full-Card Sky Blue Gradient */}
+        <div className="shine-container shine-hover bg-gradient-to-br from-[#f2f8ff] via-[#e8f2ff] to-[#d9ebfe] p-3 sm:p-3.5 rounded-3xl border border-[#bedbfe] shadow-[0_4px_16px_rgba(37,99,235,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#93c5fd] hover:shadow-[0_10px_24px_rgba(59,130,246,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
+          {/* Vibrant Sky Blue Floor Glow Pool */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.7)_0%,rgba(59,130,246,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#1e3a8a] uppercase tracking-wider block">
+              Vault Storage
+            </span>
+          </div>
+
+          {/* Bottom Row: Number on left, 3D Neon Database Stack on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-[#1d4ed8] font-mono tracking-tight leading-none">
+                {formatFileSize(totalStorageBytes)}
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                Total space used
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/document/Glossy Neon Database Stack.png"
+                alt="Vault Storage"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(59,130,246,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Drawings & Technical with Full-Card Warm Amber/Peach Gradient */}
+        <div className="shine-container shine-hover bg-gradient-to-br from-[#fffdf5] via-[#fff5ea] to-[#ffe5d0] p-3 sm:p-3.5 rounded-3xl border border-[#fed7aa] shadow-[0_4px_16px_rgba(245,158,11,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#fdba74] hover:shadow-[0_10px_24px_rgba(245,158,11,0.18)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden">
+          {/* Vibrant Warm Amber Floor Glow Pool */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.7)_0%,rgba(239,68,68,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#9a3412] uppercase tracking-wider block">
+              Drawings & Technical
+            </span>
+          </div>
+
+          {/* Bottom Row: Number on left, 3D Geometry Compass on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                {activeFiles.filter(f => f.category.includes('drawings') || f.file_type === 'dwg').length}
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                DWG, Plans & Technical Files
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/document/Glossy Orange and Purple Geometry Compass.png"
+                alt="Drawings & Technical"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(245,158,11,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: In Recycle Bin with Full-Card Mint/Emerald Gradient */}
+        <div 
+          onClick={() => setActiveTab('bin')}
+          className="shine-container shine-hover bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] p-3 sm:p-3.5 rounded-3xl border border-[#baf2cf] shadow-[0_4px_16px_rgba(16,185,129,0.05)] cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:border-[#86efac] hover:shadow-[0_10px_24px_rgba(16,185,129,0.15)] flex flex-col justify-between min-h-[116px] sm:min-h-[120px] group relative overflow-hidden"
+        >
+          {/* Brilliant Emerald Green Floor Glow Pool */}
+          <div className="absolute -bottom-2 -right-1 w-28 h-12 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.75)_0%,rgba(16,185,129,0.35)_45%,transparent_75%)] rounded-full blur-md pointer-events-none group-hover:scale-110 transition-transform" />
+
+          {/* Top Row: Title */}
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[11px] font-bold text-[#065f46] uppercase tracking-wider block">
+              In Recycle Bin
+            </span>
+          </div>
+
+          {/* Bottom Row: Number on left, 3D Green Recycling Bin on right */}
+          <div className="flex items-end justify-between gap-1.5 mt-1.5 relative z-10">
+            <div>
+              <div className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none font-numeric">
+                {deletedFiles.length} Files
+              </div>
+              <span className="text-[10.5px] text-slate-500 mt-1 block font-medium truncate">
+                Deleted files (restore anytime)
+              </span>
+            </div>
+            <div className="w-18 h-13 sm:w-20 sm:h-14 shrink-0 flex items-end justify-end">
+              <img
+                src="/document/Glossy Green Recycling Bin Icon.png"
+                alt="In Recycle Bin"
+                className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(16,185,129,0.45)] group-hover:scale-110 transition-transform duration-300 select-none pointer-events-none"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Navigation Sub-Tabs Ribbon */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('vault')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'vault'
+              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
+              : 'bg-white text-slate-700 hover:text-slate-900 border border-slate-200/90 shadow-2xs hover:bg-slate-50'
+          }`}
+        >
+          <FolderKanban className="w-3.5 h-3.5" />
+          <span>Active Vault ({activeFiles.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('bin')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'bin'
+              ? 'bg-gradient-to-r from-rose-600 to-rose-700 text-white shadow-md shadow-rose-500/25'
+              : 'bg-white text-slate-700 hover:text-rose-600 border border-slate-200/90 shadow-2xs hover:bg-rose-50/50'
+          }`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Recycle Bin ({deletedFiles.length})</span>
+        </button>
+      </div>
+
       {/* Main Content Area - 100% Full Width */}
-      <div className="w-full px-4 sm:px-6 py-5 space-y-4">
+      <div className="w-full space-y-3 sm:space-y-4">
         
         {/* Recycle Bin Notice Banner when on Bin Tab */}
         {activeTab === 'bin' && (
@@ -746,7 +927,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         )}
 
         {/* Controls: Search, Project Foreign Key Filter, Category & View Toggle Bar */}
-        <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
           
           {/* 1. Search Input */}
           <div className="relative flex-1 min-w-[200px]">
@@ -756,18 +937,18 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by file name, doc code, project, tags..."
-              className="w-full text-xs pl-9 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all placeholder:text-slate-400"
+              className="w-full text-xs pl-9 pr-4 py-2 rounded-xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] transition-all placeholder:text-slate-400"
             />
           </div>
 
           {/* 2. Project Foreign Key Selector Filter */}
           <div className="shrink-0">
-            <div className="flex items-center gap-1.5 border border-[#653ef1]/20 bg-[#653ef1]/5 rounded-lg px-2.5 py-1">
-              <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+            <div className="flex items-center gap-1.5 border border-[#ddd4ff] bg-[#f0ecff] text-[#6338eb] rounded-xl px-3 py-1.5 shadow-2xs">
+              <Building2 className="w-3.5 h-3.5 text-[#6338eb] shrink-0" />
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="text-xs bg-transparent font-bold text-[#653ef1] focus:outline-none cursor-pointer"
+                className="text-xs bg-transparent font-bold text-[#6338eb] focus:outline-none cursor-pointer"
                 title="Filter documents by construction project foreign key"
               >
                 <option value="all">🏢 All Projects (Vault)</option>
@@ -785,7 +966,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             <select
               value={selectedCategory}
               onChange={(e) => handleCategorySelect(e.target.value as FileCategory | 'all')}
-              className="w-full md:w-auto text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] cursor-pointer"
+              className="w-full md:w-auto text-xs px-3 py-2 rounded-xl border border-slate-200/90 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] cursor-pointer"
             >
               {categoryOptions.map(c => (
                 <option key={c.value} value={c.value}>
@@ -811,10 +992,10 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 key={type}
                 type="button"
                 onClick={() => setSelectedFileType(type)}
-                className={`text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all shrink-0 cursor-pointer ${
+                className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
                   selectedFileType === type
-                    ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
                 }`}
               >
                 {type === 'all' ? 'All Types' : type.toUpperCase()}
@@ -826,7 +1007,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <button
                 type="button"
                 onClick={() => setOnlyStarred(!onlyStarred)}
-                className={`p-1.5 rounded-lg border transition-colors shrink-0 cursor-pointer ${
+                className={`p-1.5 rounded-xl border transition-colors shrink-0 cursor-pointer ${
                   onlyStarred
                     ? 'bg-amber-50 text-amber-500 border-amber-200'
                     : 'text-slate-400 hover:text-slate-700 border-slate-200'
@@ -839,14 +1020,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           </div>
 
           {/* 5. View Mode Toggle (Folder vs Grid vs Table) */}
-          <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-50 shrink-0 self-end md:self-auto gap-0.5">
+          <div className="flex items-center border border-slate-200/90 rounded-xl p-0.5 bg-slate-50 shrink-0 self-end md:self-auto gap-0.5">
             <button
               type="button"
               onClick={() => {
                 setViewMode('folder');
                 setActiveFolderCategory(null);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all cursor-pointer text-xs ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-xs ${
                 viewMode === 'folder'
                   ? 'bg-white text-[#653ef1] shadow-2xs font-bold border border-[#653ef1]/20'
                   : 'text-slate-500 hover:text-slate-800'
@@ -859,8 +1040,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === 'grid' ? 'bg-white text-[#653ef1] shadow-2xs' : 'text-slate-400 hover:text-slate-700'
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'grid' ? 'bg-white text-[#653ef1] shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Grid Cards View"
             >
@@ -869,8 +1050,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === 'table' ? 'bg-white text-[#653ef1] shadow-2xs' : 'text-slate-400 hover:text-slate-700'
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'table' ? 'bg-white text-[#653ef1] shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
               }`}
               title="Compact Table View"
             >
@@ -929,7 +1110,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 <div className="p-4 pb-3">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 shrink-0 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                         {getFileIcon(file.file_type)}
                       </div>
                       <div className="min-w-0">
@@ -1195,8 +1376,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
                       {/* Project Foreign Key */}
                       <td className="py-3 px-4 font-semibold text-slate-700">
-                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 font-mono">
-                          <Building2 className="w-3 h-3 text-[#653ef1]" />
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 font-mono">
+                          <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
                           <span>{file.project ? `Site #${file.project.serial_no}` : 'Site #1'}</span>
                         </span>
                       </td>
@@ -1204,9 +1385,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       {/* Title & File Name */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                            {getFileIcon(file.file_type)}
-                          </div>
+                          {getFileBadge(file.file_type)}
                           <div className="min-w-0">
                             <span className="font-bold text-slate-900 block truncate group-hover:text-[#653ef1] transition-colors">
                               {file.title}
@@ -1220,8 +1399,9 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
                       {/* Category */}
                       <td className="py-3 px-4 text-slate-600 font-medium">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px]">
-                          {file.category}
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-[11px] font-bold text-slate-700">
+                          <Layers className="w-3.5 h-3.5 text-[#653ef1]" />
+                          <span>{file.category}</span>
                         </span>
                       </td>
 
@@ -1237,12 +1417,13 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
                       {/* Status */}
                       <td className="py-3 px-4">
-                        <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full capitalize ${
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
                           file.status === 'approved' 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                            ? 'bg-[#e6f9ed] text-[#16a34a] border border-[#b8f0ca]' 
                             : 'bg-amber-50 text-amber-800 border border-amber-200'
                         }`}>
-                          {file.status}
+                          {file.status === 'approved' && <CheckCircle2 className="w-3 h-3 stroke-[2.2]" />}
+                          <span>{file.status || 'Approved'}</span>
                         </span>
                       </td>
 
@@ -1747,7 +1928,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                             /* Non-image File Header */
                             <div className="p-4 pb-2">
                               <div className="flex items-start justify-between gap-2 mb-2.5">
-                                <div className="w-11 h-11 rounded-xl bg-purple-50/80 border border-purple-100 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                <div className="w-11 h-11 shrink-0 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                                   {getFileIcon(file.file_type)}
                                 </div>
                                 <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 truncate">

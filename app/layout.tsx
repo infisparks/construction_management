@@ -24,7 +24,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full flex flex-col bg-[#F5F6F8] text-[#111827] font-sans text-xs sm:text-sm antialiased selection:bg-blue-100 selection:text-blue-900">
+      <body 
+        className="min-h-full flex flex-col bg-[#F5F6F8] text-[#111827] font-sans text-xs sm:text-sm antialiased selection:bg-blue-100 selection:text-blue-900"
+        suppressHydrationWarning
+      >
         <GlobalNumberInputScrollDisabler />
         <AuthProvider>
           {children}

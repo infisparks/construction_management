@@ -1567,6 +1567,7 @@ export default function ConstructionPlanningPage() {
             <>
               <ProjectSummaryCards
                 metrics={metrics}
+                project={project}
                 plannedCompletionDate={project.plannedCompletionDate}
                 forecastCompletionDate={project.forecastCompletionDate}
                 activeFilter={summaryFilter}
