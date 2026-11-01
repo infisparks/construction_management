@@ -73,19 +73,11 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
             <button
               type="button"
               onClick={() => handleSelectTab('expenses')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'expenses'
-                  ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-              }`}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             >
-              <Receipt className={`w-4 h-4 ${activeTab === 'expenses' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
+              <Receipt className="w-4 h-4 text-slate-400" />
               <span>Site Daily Bills & Expenses</span>
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-                activeTab === 'expenses' 
-                  ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
-                  : 'bg-slate-200/80 text-slate-600'
-              }`}>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-slate-200/80 text-slate-600">
                 Daily Burn & Petty Cash
               </span>
             </button>
