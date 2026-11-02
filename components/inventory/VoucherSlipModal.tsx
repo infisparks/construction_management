@@ -393,36 +393,44 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
             </div>
 
             {/* Signatures & Authorizations Footer */}
-            <div className="pt-8 border-t border-slate-200 grid grid-cols-3 gap-4 text-center">
-              <div className="border-t border-slate-300 pt-2">
-                <span className="text-[11px] font-bold text-slate-800 block">
-                  {transaction.receivedOrIssuedBy || 'Ravi Kumar'}
-                </span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
-                  Storekeeper
-                </span>
-              </div>
+            {(() => {
+              const engName = (transaction.engineerName || transaction.authorizedBy || '').trim();
+              const hasEngineer = Boolean(engName);
+              return (
+                <div className={`pt-8 border-t border-slate-200 grid ${hasEngineer ? 'grid-cols-3' : 'grid-cols-2'} gap-4 text-center`}>
+                  <div className="border-t border-slate-300 pt-2">
+                    <span className="text-[11px] font-bold text-slate-800 block">
+                      {transaction.receivedOrIssuedBy || 'Site Storekeeper'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
+                      Storekeeper
+                    </span>
+                  </div>
 
-              <div className="border-t border-slate-300 pt-2">
-                <span className="text-[11px] font-bold text-slate-800 block">
-                  {isCheckIn 
-                    ? transaction.driverName || 'Authorized Driver' 
-                    : transaction.foremanName || 'Receiving Supervisor'}
-                </span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
-                  {isCheckIn ? 'Driver / Transporter' : 'Receiving Subcontractor'}
-                </span>
-              </div>
+                  <div className="border-t border-slate-300 pt-2">
+                    <span className="text-[11px] font-bold text-slate-800 block">
+                      {isCheckIn 
+                        ? transaction.driverName || 'Authorized Driver' 
+                        : transaction.foremanName || 'Receiving Supervisor'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
+                      {isCheckIn ? 'Driver / Transporter' : 'Receiving Subcontractor'}
+                    </span>
+                  </div>
 
-              <div className="border-t border-slate-300 pt-2">
-                <span className="text-[11px] font-bold text-slate-800 block">
-                  {transaction.authorizedBy || 'Er. Amit Verma'}
-                </span>
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
-                  Project Engineer / PM
-                </span>
-              </div>
-            </div>
+                  {hasEngineer && (
+                    <div className="border-t border-slate-300 pt-2">
+                      <span className="text-[11px] font-bold text-slate-800 block">
+                        {engName}
+                      </span>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
+                        Project Engineer / PM
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

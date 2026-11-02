@@ -180,6 +180,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
   // General fields (default empty / null)
   const [recordedBy, setRecordedBy] = useState<string>('');
+  const [engineerName, setEngineerName] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Optional Bill/File Attachment (PNG, JPG, PDF)
@@ -210,6 +211,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       setChallanNumber('');
       setVehicleNumber('');
       setRecordedBy('');
+      setEngineerName('');
       setAuthorizedBy('');
       setReturnSlipNo('');
       setReturnCustomNote('');
@@ -362,9 +364,13 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       date: date || new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       receivedOrIssuedBy: recordedBy,
+      engineerName: engineerName.trim() || undefined,
+      authorizedBy: engineerName.trim() || authorizedBy.trim() || undefined,
       fileUrl: uploadedFileUrl,
       fileName: uploadedFileName,
     };
+
+    const finalEngineer = engineerName.trim() || authorizedBy.trim() || undefined;
 
     if (actionType === 'check_in') {
       baseTx.supplierId = selectedSupplier?.id;
@@ -372,6 +378,8 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       baseTx.challanNumber = challanNumber;
       baseTx.vehicleNumber = vehicleNumber;
       baseTx.unloadingLocation = finalStorage;
+      baseTx.engineerName = finalEngineer;
+      baseTx.authorizedBy = finalEngineer;
       baseTx.notes = `Inward delivery received in good condition. Unloaded in ${finalStorage}.`;
     } else if (actionType === 'check_out') {
       baseTx.subcontractorId = selectedSub?.id;
@@ -379,19 +387,22 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
       baseTx.foremanName = foremanName;
       baseTx.floorZone = floorZone;
       baseTx.purpose = purpose;
-      baseTx.authorizedBy = authorizedBy;
+      baseTx.engineerName = finalEngineer;
+      baseTx.authorizedBy = finalEngineer;
       baseTx.notes = `Dispatched to ${selectedSub?.name || 'contractor'} for ${purpose}.`;
     } else if (actionType === 'return') {
       baseTx.supplierId = selectedSupplier?.id;
       baseTx.supplierName = selectedSupplier?.name || 'Authorized Site Supplier';
       baseTx.challanNumber = returnSlipNo;
       baseTx.returnReason = returnReason;
-      baseTx.authorizedBy = authorizedBy;
+      baseTx.engineerName = finalEngineer;
+      baseTx.authorizedBy = finalEngineer;
       baseTx.notes = `Returned to vendor: ${returnReason}. Note: ${returnCustomNote}`;
     } else if (actionType === 'damage') {
       baseTx.damageReason = damageReason;
       baseTx.floorZone = damageLocation;
-      baseTx.authorizedBy = authorizedBy;
+      baseTx.engineerName = finalEngineer;
+      baseTx.authorizedBy = finalEngineer;
       baseTx.notes = `Material damage / scrap write-off: ${damageReason}. Note: ${damageCustomNote}`;
     }
 
@@ -1100,29 +1111,48 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
           <hr className="border-slate-100" />
 
-          {/* Section 3: Sign-Off */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-medium text-slate-700 mb-1">
-                Storekeeper / Logged By (Optional)
-              </label>
-              <input
-                type="text"
-                value={recordedBy}
-                onChange={(e) => setRecordedBy(e.target.value)}
-                placeholder="e.g. Ravi Kumar (Storekeeper)"
-                className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
-              />
+          {/* Section 3: Sign-Off & Verification */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Site / Project Engineer Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={engineerName}
+                  onChange={(e) => setEngineerName(e.target.value)}
+                  placeholder="Enter engineer name (e.g. Er. Amit Verma)"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 transition-colors"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Leave empty if not required (will not appear on the PDF voucher).
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Storekeeper / Logged By (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={recordedBy}
+                  onChange={(e) => setRecordedBy(e.target.value)}
+                  placeholder="e.g. Ravi Kumar"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 transition-colors"
+                />
+              </div>
             </div>
+
             <div>
-              <label className="block font-medium text-slate-700 mb-1">
-                Date
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Transaction Date
               </label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden"
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 transition-colors"
               />
             </div>
           </div>

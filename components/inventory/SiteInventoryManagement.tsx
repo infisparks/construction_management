@@ -638,6 +638,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           location: txData.unloadingLocation || (txData as any).storageLocation || txData.floorZone,
           reason: txData.returnReason || txData.damageReason || txData.purpose,
           person_name: txData.receivedOrIssuedBy || txData.foremanName || txData.authorizedBy,
+          engineer_name: txData.engineerName || txData.authorizedBy || undefined,
           notes: txData.notes,
           file_url: txData.fileUrl,
           file_name: txData.fileName,

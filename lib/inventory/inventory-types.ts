@@ -74,6 +74,7 @@ export interface InventoryTransaction {
   floorZone?: string;
   purpose?: string;
   authorizedBy?: string;
+  engineerName?: string;
   isReturnable?: boolean;
 
   // Audit attributes

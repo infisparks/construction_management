@@ -132,6 +132,10 @@ export function generateInventoryVoucherPdf(
   doc.setDrawColor(226, 232, 240); // slate-200
   doc.roundedRect(margin, currentY, pageWidth - margin * 2, 24, 2, 2, 'FD');
 
+  const rawEngineer = (transaction.engineerName || transaction.authorizedBy || '').trim();
+  const hasEngineer = Boolean(rawEngineer);
+  const engineerDisplayName = rawEngineer;
+
   const colWidth = (pageWidth - margin * 2) / 4;
   
   // Row 1
@@ -167,22 +171,40 @@ export function generateInventoryVoucherPdf(
     currentY + 10.5
   );
 
-  // Row 2
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text('STOREKEEPER', margin + 3, currentY + 16.5);
-  doc.text('AUTHORIZED BY', margin + colWidth + 3, currentY + 16.5);
-  doc.text('LINKED WBS TASK', margin + colWidth * 2 + 3, currentY + 16.5);
-  doc.text('QC / AUDIT STATUS', margin + colWidth * 3 + 3, currentY + 16.5);
+  // Row 2 (If engineer not entered, completely omit engineer field)
+  if (hasEngineer) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('STOREKEEPER', margin + 3, currentY + 16.5);
+    doc.text('PROJECT ENGINEER', margin + colWidth + 3, currentY + 16.5);
+    doc.text('LINKED WBS TASK', margin + colWidth * 2 + 3, currentY + 16.5);
+    doc.text('QC / AUDIT STATUS', margin + colWidth * 3 + 3, currentY + 16.5);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(30, 41, 59);
-  doc.text(transaction.receivedOrIssuedBy || 'Ravi Kumar', margin + 3, currentY + 21);
-  doc.text(transaction.authorizedBy || 'Er. Amit Verma', margin + colWidth + 3, currentY + 21);
-  doc.text(transaction.wbsTaskCode || 'SITE-GENERAL', margin + colWidth * 2 + 3, currentY + 21);
-  doc.text(transaction.qcStatus || 'VERIFIED ON-SITE', margin + colWidth * 3 + 3, currentY + 21);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 3, currentY + 21);
+    doc.text(engineerDisplayName.slice(0, 24), margin + colWidth + 3, currentY + 21);
+    doc.text(transaction.wbsTaskCode || 'SITE-GENERAL', margin + colWidth * 2 + 3, currentY + 21);
+    doc.text(transaction.qcStatus || 'VERIFIED ON-SITE', margin + colWidth * 3 + 3, currentY + 21);
+  } else {
+    // 3 columns when engineer is not provided - omit the engineer field
+    const colWidth3 = (pageWidth - margin * 2) / 3;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('STOREKEEPER', margin + 3, currentY + 16.5);
+    doc.text('LINKED WBS TASK', margin + colWidth3 + 3, currentY + 16.5);
+    doc.text('QC / AUDIT STATUS', margin + colWidth3 * 2 + 3, currentY + 16.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 3, currentY + 21);
+    doc.text(transaction.wbsTaskCode || 'SITE-GENERAL', margin + colWidth3 + 3, currentY + 21);
+    doc.text(transaction.qcStatus || 'VERIFIED ON-SITE', margin + colWidth3 * 2 + 3, currentY + 21);
+  }
 
   currentY += 28;
 
@@ -313,58 +335,88 @@ export function generateInventoryVoucherPdf(
     currentY += 12;
   }
 
-  // --- 7. Triple Sign-Off Block ---
+  // --- 7. Sign-Off Block ---
   const signBlockY = Math.max(currentY + 10, pageHeight - margin - 28);
 
-  const signColWidth = (pageWidth - margin * 2) / 3;
+  const receiverLabel = isCheckIn
+    ? transaction.driverName || 'Driver / Transporter'
+    : isReturn
+    ? transaction.supplierName || 'Vendor Representative'
+    : transaction.foremanName || 'Receiving Supervisor';
 
-  // Sign 1: Storekeeper
-  doc.setDrawColor(203, 213, 225);
-  doc.line(margin + 5, signBlockY, margin + signColWidth - 10, signBlockY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(17, 24, 39);
-  doc.text(transaction.receivedOrIssuedBy || 'Ravi Kumar', margin + 5, signBlockY + 4);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text('Storekeeper / Dispatch Incharge', margin + 5, signBlockY + 7.5);
+  const receiverSubtext = isCheckIn
+    ? 'Driver Signature'
+    : isReturn
+    ? 'Vendor Acknowledgment'
+    : 'Contractor Foreman Signature';
 
-  // Sign 2: Receiver / Transporter
-  const sign2X = margin + signColWidth + 5;
-  doc.line(sign2X, signBlockY, sign2X + signColWidth - 15, signBlockY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(17, 24, 39);
-  doc.text(
-    isCheckIn
-      ? transaction.driverName || 'Driver / Transporter'
-      : isReturn
-      ? transaction.supplierName || 'Vendor Representative'
-      : transaction.foremanName || 'Receiving Supervisor',
-    sign2X,
-    signBlockY + 4
-  );
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text(
-    isCheckIn ? 'Driver Signature' : isReturn ? 'Vendor Acknowledgment' : 'Contractor Foreman Signature',
-    sign2X,
-    signBlockY + 7.5
-  );
+  if (hasEngineer) {
+    // 3 Signatures: Storekeeper, Receiver, Project Engineer
+    const signColWidth = (pageWidth - margin * 2) / 3;
 
-  // Sign 3: Project Engineer
-  const sign3X = margin + signColWidth * 2 + 5;
-  doc.line(sign3X, signBlockY, sign3X + signColWidth - 15, signBlockY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(17, 24, 39);
-  doc.text(transaction.authorizedBy || 'Er. Amit Verma', sign3X, signBlockY + 4);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text('Project Engineer / Site PM', sign3X, signBlockY + 7.5);
+    // Sign 1: Storekeeper
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin + 5, signBlockY, margin + signColWidth - 10, signBlockY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 5, signBlockY + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Storekeeper / Dispatch Incharge', margin + 5, signBlockY + 7.5);
+
+    // Sign 2: Receiver / Transporter
+    const sign2X = margin + signColWidth + 5;
+    doc.line(sign2X, signBlockY, sign2X + signColWidth - 15, signBlockY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(receiverLabel, sign2X, signBlockY + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(receiverSubtext, sign2X, signBlockY + 7.5);
+
+    // Sign 3: Project Engineer
+    const sign3X = margin + signColWidth * 2 + 5;
+    doc.line(sign3X, signBlockY, sign3X + signColWidth - 15, signBlockY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(engineerDisplayName, sign3X, signBlockY + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Project Engineer / Site PM', sign3X, signBlockY + 7.5);
+  } else {
+    // 2 Signatures only: Storekeeper & Receiver (Engineer omitted completely)
+    const signColWidth = (pageWidth - margin * 2) / 2;
+
+    // Sign 1: Storekeeper
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin + 5, signBlockY, margin + signColWidth - 20, signBlockY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 5, signBlockY + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Storekeeper / Dispatch Incharge', margin + 5, signBlockY + 7.5);
+
+    // Sign 2: Receiver / Transporter
+    const sign2X = margin + signColWidth + 10;
+    doc.line(sign2X, signBlockY, sign2X + signColWidth - 15, signBlockY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(17, 24, 39);
+    doc.text(receiverLabel, sign2X, signBlockY + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(receiverSubtext, sign2X, signBlockY + 7.5);
+  }
 
   // Footer Disclaimer
   doc.setFont('helvetica', 'normal');

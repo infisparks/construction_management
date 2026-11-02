@@ -183,6 +183,7 @@ export const CheckOutModal: React.FC<CheckOutModalProps> = ({
         floorZone,
         purpose,
         authorizedBy,
+        engineerName: authorizedBy.trim() || undefined,
         receivedOrIssuedBy: issuedBy,
         isReturnable,
         notes,

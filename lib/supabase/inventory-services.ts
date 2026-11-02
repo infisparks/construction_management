@@ -118,6 +118,7 @@ export interface InventoryTransactionRecord {
   location?: string;
   reason?: string;
   person_name?: string;
+  engineer_name?: string | null;
   notes?: string;
   file_url?: string;
   file_name?: string;
@@ -227,39 +228,53 @@ export async function createInventoryTransaction(
         .eq('id', tx.product_id);
     }
 
-    const { data, error } = await supabase
+    const insertPayload: any = {
+      voucher_no: tx.voucher_no,
+      type: tx.type,
+      product_id: tx.product_id || null,
+      product_name: tx.product_name,
+      product_code: tx.product_code || null,
+      category: tx.category || null,
+      brand: tx.brand || null,
+      quantity: tx.quantity,
+      unit: tx.unit,
+      stock_after: calculatedStockAfter,
+      unit_rate: tx.unit_rate ?? null,
+      total_amount: tx.total_amount ?? null,
+      vendor_id: tx.vendor_id || null,
+      vendor_name: tx.vendor_name || null,
+      reference_no: tx.reference_no || null,
+      location: tx.location || null,
+      reason: tx.reason || null,
+      person_name: tx.person_name || null,
+      engineer_name: tx.engineer_name || null,
+      notes: tx.notes || null,
+      file_url: tx.file_url || null,
+      file_name: tx.file_name || null,
+      transaction_date: tx.transaction_date || new Date().toISOString().split('T')[0],
+      transaction_time:
+        tx.transaction_time ||
+        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    };
+
+    let { data, error } = await supabase
       .from('inventory_transactions')
-      .insert([
-        {
-          voucher_no: tx.voucher_no,
-          type: tx.type,
-          product_id: tx.product_id || null,
-          product_name: tx.product_name,
-          product_code: tx.product_code || null,
-          category: tx.category || null,
-          brand: tx.brand || null,
-          quantity: tx.quantity,
-          unit: tx.unit,
-          stock_after: calculatedStockAfter,
-          unit_rate: tx.unit_rate ?? null,
-          total_amount: tx.total_amount ?? null,
-          vendor_id: tx.vendor_id || null,
-          vendor_name: tx.vendor_name || null,
-          reference_no: tx.reference_no || null,
-          location: tx.location || null,
-          reason: tx.reason || null,
-          person_name: tx.person_name || null,
-          notes: tx.notes || null,
-          file_url: tx.file_url || null,
-          file_name: tx.file_name || null,
-          transaction_date: tx.transaction_date || new Date().toISOString().split('T')[0],
-          transaction_time:
-            tx.transaction_time ||
-            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        },
-      ])
+      .insert([insertPayload])
       .select()
       .single();
+
+    // Graceful fallback if engineer_name column has not yet been migrated in Supabase
+    if (error && error.message && error.message.includes('engineer_name')) {
+      console.warn('engineer_name column pending in Supabase; retrying insert without column:', error.message);
+      delete insertPayload.engineer_name;
+      const retry = await supabase
+        .from('inventory_transactions')
+        .insert([insertPayload])
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     return { data: data as InventoryTransactionRecord, error };
   } catch (err) {
@@ -487,7 +502,8 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
     floorZone: isCheckOut ? row.location : undefined,
     purpose: isCheckOut ? row.reason : undefined,
     foremanName: isCheckOut ? row.person_name : undefined,
-    authorizedBy: isCheckOut ? row.person_name : undefined,
+    engineerName: row.engineer_name || undefined,
+    authorizedBy: row.engineer_name || (isCheckOut ? row.person_name : undefined),
     receivedOrIssuedBy: row.person_name || 'Storekeeper',
     notes: row.notes ? row.notes.replace(/^\[DELETED\]\s*/, '') : undefined,
     remarks: row.notes ? row.notes.replace(/^\[DELETED\]\s*/, '') : undefined,

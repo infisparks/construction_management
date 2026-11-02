@@ -60,6 +60,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   const [storageLocation, setStorageLocation] = useState<string>('');
   const [qcStatus, setQcStatus] = useState<'Passed' | 'Conditional' | 'Rejected'>('Passed');
   const [receivedBy, setReceivedBy] = useState<string>('');
+  const [engineerName, setEngineerName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState<string>('10:30 AM');
@@ -81,6 +82,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       setDriverPhone('');
       setStorageLocation('');
       setReceivedBy('');
+      setEngineerName('');
       setNotes('');
       setSelectedFile(null);
       setIsUploading(false);
@@ -156,6 +158,8 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         qcStatus,
         unloadingLocation: storageLocation,
         receivedOrIssuedBy: receivedBy,
+        engineerName: engineerName.trim() || undefined,
+        authorizedBy: engineerName.trim() || undefined,
         notes,
         fileUrl: uploadedFileUrl,
         fileName: uploadedFileName,
@@ -451,6 +455,19 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                   placeholder="Enter receiving person name (e.g. Ravi Kumar)"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Site / Project Engineer (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={engineerName}
+                  onChange={(e) => setEngineerName(e.target.value)}
+                  placeholder="e.g. Er. Amit Verma (leave blank to hide from PDF)"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
                 />
               </div>
             </div>
