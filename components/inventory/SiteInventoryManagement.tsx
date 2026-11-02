@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Package,
   ArrowDownLeft,
@@ -151,27 +151,36 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       const mappedMaterials: ConstructionMaterial[] = (prodList || []).map((p) => {
         // Find latest rate from inward transactions if available
         const relatedTxs = (txList || []).filter(
-          (t) => t.product_id === p.id && (t.type === 'in' || t.type === 'check_in') && Number(t.unit_rate) > 0
+          (t) => (t.product_id === p.id || (p.code && t.product_code === p.code)) &&
+                 (t.type === 'in' || t.type === 'check_in') &&
+                 Number(t.unit_rate) > 0 &&
+                 !t.is_deleted &&
+                 !(t.notes && t.notes.startsWith('[DELETED]'))
         );
         const latestRate = relatedTxs.length > 0 ? Number(relatedTxs[0].unit_rate) : 0;
 
         // Calculate live stock balance directly from inventory_transactions ledger
         // Inward (+), Outward / Defect / Return (-)
         const productTxs = (txList || []).filter(
-          (t) => t.product_id === p.id && !t.is_deleted && !(t.notes && t.notes.startsWith('[DELETED]'))
+          (t) => (t.product_id === p.id || (p.code && t.product_code === p.code)) &&
+                 !t.is_deleted &&
+                 !(t.notes && t.notes.startsWith('[DELETED]'))
         );
-        let liveStockBalance = 0;
-        for (const t of productTxs) {
-          const type = (t.type || '').toLowerCase();
-          const qty = Number(t.quantity) || 0;
-          if (type === 'in' || type === 'check_in') {
-            liveStockBalance += qty;
-          } else {
-            liveStockBalance = Math.max(0, liveStockBalance - qty);
+        
+        let effectiveStock = Number(p.current_stock ?? 0);
+        if (productTxs.length > 0) {
+          let liveStockBalance = 0;
+          for (const t of productTxs) {
+            const type = (t.type || '').toLowerCase();
+            const qty = Number(t.quantity) || 0;
+            if (type === 'in' || type === 'check_in') {
+              liveStockBalance += qty;
+            } else {
+              liveStockBalance = Math.max(0, liveStockBalance - qty);
+            }
           }
+          effectiveStock = liveStockBalance;
         }
-
-        const effectiveStock = txList !== null && txList !== undefined ? liveStockBalance : Number(p.current_stock ?? 0);
 
         return {
           id: p.id,
@@ -276,6 +285,28 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   const [deletedVendors, setDeletedVendors] = useState<ProfileVendor[]>([]);
   const [isLoadingBin, setIsLoadingBin] = useState(false);
 
+  // Fast lookups for soft-deleted items in the Recycle Bin
+  const deletedProductIds = useMemo(() => new Set(deletedProducts.map((p) => p.id)), [deletedProducts]);
+  const deletedProductCodes = useMemo(
+    () => new Set(deletedProducts.map((p) => (p.code || '').toLowerCase()).filter(Boolean)),
+    [deletedProducts]
+  );
+  const deletedProductNames = useMemo(
+    () => new Set(deletedProducts.map((p) => (p.name || '').toLowerCase().trim()).filter(Boolean)),
+    [deletedProducts]
+  );
+
+  // Helper: check if a transaction belongs to a soft-deleted product in the bin
+  const isTransactionOfDeletedProduct = useCallback(
+    (t: InventoryTransaction) => {
+      if (t.materialId && deletedProductIds.has(t.materialId)) return true;
+      if (t.materialCode && deletedProductCodes.has(t.materialCode.toLowerCase())) return true;
+      if (t.materialName && deletedProductNames.has(t.materialName.toLowerCase().trim())) return true;
+      return false;
+    },
+    [deletedProductIds, deletedProductCodes, deletedProductNames]
+  );
+
   const loadDeletedProducts = async () => {
     setIsLoadingBin(true);
     try {
@@ -301,22 +332,47 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     if (!window.confirm(`Are you sure you want to delete "${name}"? It will be moved to the Recycle Bin and can be restored anytime.`)) {
       return;
     }
+    // Optimistic removal: remove immediately from active materials and add to deletedProducts
+    const targetMat = materials.find((m) => m.id === id);
+    setMaterials((prev) => prev.filter((m) => m.id !== id));
+    if (targetMat) {
+      setDeletedProducts((prev) => [
+        {
+          id: targetMat.id,
+          name: targetMat.name,
+          code: targetMat.code,
+          category: targetMat.category,
+          unit: targetMat.unit,
+          current_stock: targetMat.currentStock,
+          minimum_alert_stock: targetMat.minimumAlertStock,
+          is_deleted: true,
+          updated_at: new Date().toISOString(),
+        } as ProfileProduct,
+        ...prev.filter((p) => p.id !== id),
+      ]);
+    }
+
     const { error } = await deleteProfileProduct(id);
     if (!error) {
       showToast?.(`Product "${name}" moved to Recycle Bin.`, 'info');
       await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
     } else {
       showToast?.('Failed to delete product', 'error');
+      await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
     }
   };
 
   const handleRestoreMaterial = async (id: string, name: string) => {
+    // Optimistically remove from deletedProducts
+    setDeletedProducts((prev) => prev.filter((p) => p.id !== id));
+
     const { error } = await restoreProfileProduct(id);
     if (!error) {
       showToast?.(`Product "${name}" restored to Active Inventory!`, 'success');
       await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
     } else {
       showToast?.('Failed to restore product', 'error');
+      await Promise.all([loadDataFromSupabase(), loadDeletedProducts()]);
     }
   };
 
@@ -389,36 +445,51 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     fileUrl: null,
   });
 
-  // KPI Calculations (combines instantaneous Supabase quick summary with local state)
+  // KPI Calculations strictly derived from active materials & transactions (soft-deleted items totally ignored)
   const metrics = useMemo(() => {
     const totalItems = materials.length;
     const totalCurrentStock = materials.reduce((sum, m) => sum + (Number(m.currentStock) || 0), 0);
-    const totalValuation = materials.reduce((sum, m) => sum + m.currentStock * m.averageUnitRate, 0);
-    const lowStockItems = materials.filter((m) => m.currentStock <= m.minimumAlertStock);
-    const activeTransactions = transactions.filter((t) => !t.isDeleted);
+    const totalValuation = materials.reduce(
+      (sum, m) => sum + (Number(m.currentStock) || 0) * (Number(m.averageUnitRate) || 0),
+      0
+    );
+    const lowStockItems = materials.filter(
+      (m) => Number(m.minimumAlertStock || 0) > 0 && Number(m.currentStock || 0) <= Number(m.minimumAlertStock || 0)
+    );
+
+    // Active transactions: strictly NOT deleted AND parent product is NOT deleted / in the bin
+    const activeTransactions = transactions.filter((t) => {
+      if (t.isDeleted) return false;
+      if (isTransactionOfDeletedProduct(t)) return false;
+      return true;
+    });
+
     const inwardTxs = activeTransactions.filter((t) => t.type === 'check_in');
     const outwardTxs = activeTransactions.filter((t) => t.type === 'check_out');
     const returnTxs = activeTransactions.filter((t) => t.type === 'return');
     const damageTxs = activeTransactions.filter((t) => t.type === 'damage');
 
+    const totalInQty = inwardTxs.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const totalOutQty = outwardTxs.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const totalReturnQty = returnTxs.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const totalDefectQty = damageTxs.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+
     return {
-      totalItems: dbSummary ? dbSummary.total_products : totalItems,
-      totalCurrentStock: dbSummary ? dbSummary.total_current_stock : totalCurrentStock,
+      totalItems,
+      totalCurrentStock,
       totalValuation,
-      lowStockCount: dbSummary ? dbSummary.low_stock_count : lowStockItems.length,
-      totalInwardCount: dbSummary ? dbSummary.total_in_count : inwardTxs.length,
-      totalOutwardCount: dbSummary ? dbSummary.total_out_count : outwardTxs.length,
-      totalReturnsDamagesCount: dbSummary
-        ? dbSummary.total_return_count + dbSummary.total_defect_count
-        : returnTxs.length + damageTxs.length,
-      totalReturnCount: dbSummary ? dbSummary.total_return_count : returnTxs.length,
-      totalDefectCount: dbSummary ? dbSummary.total_defect_count : damageTxs.length,
-      totalInQuantity: dbSummary?.total_in_quantity ?? 0,
-      totalOutQuantity: dbSummary?.total_out_quantity ?? 0,
-      totalReturnQuantity: dbSummary?.total_return_quantity ?? 0,
-      totalDefectQuantity: dbSummary?.total_defect_quantity ?? 0,
+      lowStockCount: lowStockItems.length,
+      totalInwardCount: inwardTxs.length,
+      totalOutwardCount: outwardTxs.length,
+      totalReturnsDamagesCount: returnTxs.length + damageTxs.length,
+      totalReturnCount: returnTxs.length,
+      totalDefectCount: damageTxs.length,
+      totalInQuantity: totalInQty,
+      totalOutQuantity: totalOutQty,
+      totalReturnQuantity: totalReturnQty,
+      totalDefectQuantity: totalDefectQty,
     };
-  }, [materials, transactions, dbSummary]);
+  }, [materials, transactions, isTransactionOfDeletedProduct]);
 
   // Unique Categories
   const categories = useMemo(() => {
@@ -440,7 +511,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
       let matchesStatus = true;
       if (statusFilter === 'low_stock') {
-        matchesStatus = m.currentStock > 0 && m.currentStock <= m.minimumAlertStock;
+        matchesStatus = Number(m.minimumAlertStock || 0) > 0 && m.currentStock > 0 && m.currentStock <= m.minimumAlertStock;
       } else if (statusFilter === 'depleted') {
         matchesStatus = m.currentStock <= 0;
       } else if (statusFilter === 'in_stock') {
@@ -451,10 +522,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     });
   }, [materials, searchQuery, selectedCategory, statusFilter]);
 
-  // Filtered Inward Transactions
+  // Filtered Inward Transactions (strictly ignores soft-deleted vouchers & deleted products)
   const inwardTransactions = useMemo(() => {
     return transactions.filter((t) => {
       if (t.isDeleted) return false;
+      if (isTransactionOfDeletedProduct(t)) return false;
       if (t.type !== 'check_in') return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       if (searchQuery) {
@@ -469,12 +541,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       }
       return true;
     });
-  }, [transactions, dateFilter, searchQuery]);
+  }, [transactions, isTransactionOfDeletedProduct, dateFilter, searchQuery]);
 
-  // Filtered Outward Transactions
+  // Filtered Outward Transactions (strictly ignores soft-deleted vouchers & deleted products)
   const outwardTransactions = useMemo(() => {
     return transactions.filter((t) => {
       if (t.isDeleted) return false;
+      if (isTransactionOfDeletedProduct(t)) return false;
       if (t.type !== 'check_out') return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       if (searchQuery) {
@@ -489,12 +562,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       }
       return true;
     });
-  }, [transactions, dateFilter, searchQuery]);
+  }, [transactions, isTransactionOfDeletedProduct, dateFilter, searchQuery]);
 
-  // Filtered Returns & Damages
+  // Filtered Returns & Damages (strictly ignores soft-deleted vouchers & deleted products)
   const returnsAndDamagesTransactions = useMemo(() => {
     return transactions.filter((t) => {
       if (t.isDeleted) return false;
+      if (isTransactionOfDeletedProduct(t)) return false;
       if (t.type !== 'return' && t.type !== 'damage') return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       if (searchQuery) {
@@ -509,12 +583,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       }
       return true;
     });
-  }, [transactions, dateFilter, searchQuery]);
+  }, [transactions, isTransactionOfDeletedProduct, dateFilter, searchQuery]);
 
-  // Filtered Ledger Transactions
+  // Filtered Ledger Transactions (strictly ignores soft-deleted vouchers & deleted products)
   const filteredLedger = useMemo(() => {
     return transactions.filter((t) => {
       if (t.isDeleted) return false;
+      if (isTransactionOfDeletedProduct(t)) return false;
       if (!matchesDateFilter(t.date, dateFilter)) return false;
       const matchesSearch =
         searchQuery === '' ||
@@ -532,16 +607,18 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
       return matchesSearch && matchesType;
     });
-  }, [transactions, searchQuery, ledgerTypeFilter, dateFilter]);
+  }, [transactions, isTransactionOfDeletedProduct, searchQuery, ledgerTypeFilter, dateFilter]);
 
-  // Soft-deleted transactions list for Bin
+  // Soft-deleted transactions list for Bin (individual deleted vouchers OR transactions belonging to deleted products)
   const deletedTransactions = useMemo(() => {
-    return transactions.filter((t) => t.isDeleted);
-  }, [transactions]);
+    return transactions.filter((t) => t.isDeleted || isTransactionOfDeletedProduct(t));
+  }, [transactions, isTransactionOfDeletedProduct]);
 
-  // Low Stock Items
+  // Low Stock Items (strictly active materials only where minimum alert stock > 0)
   const lowStockMaterials = useMemo(() => {
-    return materials.filter((m) => m.currentStock <= m.minimumAlertStock);
+    return materials.filter(
+      (m) => Number(m.minimumAlertStock || 0) > 0 && Number(m.currentStock || 0) <= Number(m.minimumAlertStock || 0)
+    );
   }, [materials]);
 
   // Handle external trigger from sidebar
@@ -702,8 +779,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   // WhatsApp Share Handlers
   const handleShareInventoryStatusToWhatsApp = () => {
     const totalValuation = materials.reduce((acc, m) => acc + (m.currentStock * (m.averageUnitRate || 0)), 0);
-    const lowStockCount = materials.filter(m => m.currentStock <= m.minimumAlertStock).length;
+    const lowStockCount = materials.filter(m => Number(m.minimumAlertStock || 0) > 0 && m.currentStock <= m.minimumAlertStock).length;
     const criticalStockCount = materials.filter(m => m.currentStock === 0).length;
+    const activeTxCount = transactions.filter(t => !t.isDeleted && !isTransactionOfDeletedProduct(t)).length;
 
     const summaryText = [
       `*SITE INVENTORY STATUS & VALUATION REPORT*`,
@@ -715,7 +793,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       `• Total Live Valuation: *₹${totalValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}*`,
       `• Low Stock Alert: *${lowStockCount} items*`,
       `• Critical Out of Stock: *${criticalStockCount} items*`,
-      `• Total Recorded Transactions: *${transactions.length}*`,
+      `• Total Recorded Transactions: *${activeTxCount}*`,
       ``,
       `_Automated report generated from Armee Enterprises Construction ERP._`
     ].join('\n');
@@ -813,10 +891,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     }
   };
 
-  // Export CSV
+  // Export CSV (only active transactions)
   const handleExportCSV = () => {
     const headers = ['Voucher No', 'Type', 'Date', 'Time', 'Material Code', 'Material Name', 'Quantity', 'Unit', 'Rate', 'Total', 'Party / Reason', 'Vehicle / Task', 'Storekeeper'];
-    const rows = transactions.map((t) => [
+    const activeExportTxs = transactions.filter((t) => !t.isDeleted && !isTransactionOfDeletedProduct(t));
+    const rows = activeExportTxs.map((t) => [
       t.voucherNumber,
       t.type,
       t.date,
@@ -874,6 +953,10 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
   // Soft Delete a Movement Voucher (sets is_deleted = true, adjusts stock)
   const handleDeleteTransaction = async (tx: InventoryTransaction) => {
+    if (!window.confirm(`Are you sure you want to move voucher "${tx.voucherNumber}" to the Recycle Bin? Stock will be adjusted.`)) {
+      return;
+    }
+
     // 1. Optimistic update
     setTransactions((prev) =>
       prev.map((t) =>
@@ -904,9 +987,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     // 3. Persist to Supabase
     try {
       await softDeleteInventoryTransaction(tx.id, tx.notes);
-      fetchQuickStockSummary().then((s) => s && setDbSummary(s));
+      await loadDataFromSupabase();
       if (showToast) {
-        showToast(`Voucher ${tx.voucherNumber} moved to Bin (is_deleted: true). Stock adjusted.`, 'info');
+        showToast(`Voucher ${tx.voucherNumber} moved to Bin. Stock adjusted.`, 'info');
       }
     } catch (err) {
       console.error('Failed to soft delete transaction in Supabase:', err);
@@ -945,7 +1028,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     // 3. Persist to Supabase
     try {
       await restoreInventoryTransaction(tx.id, tx.notes);
-      fetchQuickStockSummary().then((s) => s && setDbSummary(s));
+      await loadDataFromSupabase();
       if (showToast) {
         showToast(`Voucher ${tx.voucherNumber} restored to active ledger.`, 'success');
       }
@@ -1594,7 +1677,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           }`}
         >
           <History className="w-4 h-4" />
-          <span>Stock Ledger ({transactions.length})</span>
+          <span>Stock Ledger ({transactions.filter((t) => !t.isDeleted && !isTransactionOfDeletedProduct(t)).length})</span>
         </button>
 
         <button
@@ -2172,6 +2255,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             <FileText className="w-3 h-3 text-slate-500" />
                             <span>Preview</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTransaction(tx)}
+                            className="px-2 py-1 rounded-md border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                            title="Move voucher to Recycle Bin"
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-500" />
+                            <span>Bin</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -2325,6 +2417,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             title="Preview voucher in-app"
                           >
                             <FileText className="w-3 h-3 text-slate-500" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTransaction(tx)}
+                            className="px-2 py-1 rounded-md border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                            title="Move voucher to Recycle Bin"
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-500" />
+                            <span>Bin</span>
                           </button>
                         </div>
                       </td>
@@ -2492,6 +2593,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                               <FileText className="w-3 h-3 text-slate-500" />
                               <span>Preview</span>
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTransaction(tx)}
+                              className="px-2 py-1 rounded-md border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Move voucher to Recycle Bin"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-500" />
+                              <span>Bin</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -2658,6 +2768,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                               title="Preview voucher in-app"
                             >
                               <FileText className="w-3 h-3 text-slate-500" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTransaction(tx)}
+                              className="px-2 py-1 rounded-md border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title="Move voucher to Recycle Bin"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-500" />
+                              <span>Bin</span>
                             </button>
                           </div>
                         </td>
@@ -2968,9 +3087,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             {tx.purpose || tx.returnReason || tx.damageReason || tx.notes || '—'}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              is_deleted = true
-                            </span>
+                            {isTransactionOfDeletedProduct(tx) ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Product in Bin
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                Voucher in Bin
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -2983,15 +3108,41 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                                 <ExternalLink className="w-3 h-3 text-purple-600" />
                                 <span>PDF</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRestoreTransaction(tx)}
-                                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                                title="Restore voucher and reactivate in ledger"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Restore Voucher</span>
-                              </button>
+                              {isTransactionOfDeletedProduct(tx) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const prod = deletedProducts.find(
+                                      (p) =>
+                                        p.id === tx.materialId ||
+                                        (p.code && tx.materialCode && p.code.toLowerCase() === tx.materialCode.toLowerCase()) ||
+                                        p.name.toLowerCase().trim() === tx.materialName.toLowerCase().trim()
+                                    );
+                                    if (prod) {
+                                      handleRestoreMaterial(prod.id, prod.name);
+                                    } else if (tx.materialId) {
+                                      handleRestoreMaterial(tx.materialId, tx.materialName);
+                                    } else {
+                                      handleRestoreTransaction(tx);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                  title="Restore parent product and reactivate all its movements"
+                                >
+                                  <ArchiveRestore className="w-3.5 h-3.5" />
+                                  <span>Restore Product</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreTransaction(tx)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                  title="Restore voucher and reactivate in ledger"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <span>Restore Voucher</span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

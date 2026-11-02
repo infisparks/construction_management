@@ -328,7 +328,9 @@ export async function fetchQuickStockAlerts(): Promise<ProfileProduct[]> {
     }
 
     return (data || []).filter(
-      (p: ProfileProduct) => Number(p.current_stock ?? 0) <= Number(p.minimum_alert_stock ?? 0)
+      (p: ProfileProduct) =>
+        Number(p.minimum_alert_stock ?? 0) > 0 &&
+        Number(p.current_stock ?? 0) <= Number(p.minimum_alert_stock ?? 0)
     ) as ProfileProduct[];
   } catch (err) {
     console.error('Failed to fetch quick stock alerts:', err);
@@ -340,10 +342,11 @@ export async function fetchQuickStockAlerts(): Promise<ProfileProduct[]> {
  * Quick load inventory KPI summary using indexed table queries (zero SQL functions/RPCs).
  * - profile_product uses index idx_profile_prod_alert
  * - inventory_transactions uses index idx_inv_tx_type_qty
+ * Strictly excludes soft-deleted records and transactions belonging to deleted products.
  */
 export async function fetchQuickStockSummary(): Promise<InventoryQuickSummary | null> {
   try {
-    // 1. Indexed query on profile_product
+    // 1. Indexed query on profile_product (only active non-deleted products)
     const { data: products, error: prodErr } = await supabase
       .from('profile_product')
       .select('id, current_stock, minimum_alert_stock')
@@ -355,6 +358,7 @@ export async function fetchQuickStockSummary(): Promise<InventoryQuickSummary | 
     }
 
     const prodList = products || [];
+    const activeProdIds = new Set(prodList.map((p) => p.id));
     const totalProducts = prodList.length;
     let totalCurrentStock = 0;
     let lowStockCount = 0;
@@ -372,16 +376,23 @@ export async function fetchQuickStockSummary(): Promise<InventoryQuickSummary | 
       }
     }
 
-    // 2. Indexed query on inventory_transactions
+    // 2. Query on inventory_transactions
     const { data: txs, error: txErr } = await supabase
       .from('inventory_transactions')
-      .select('type, quantity');
+      .select('type, quantity, product_id, notes');
 
     if (txErr) {
       console.error('Error querying inventory_transactions for stock summary:', txErr);
     }
 
-    const txList = txs || [];
+    // Filter out deleted transactions and transactions of deleted products
+    const txList = (txs || []).filter((t: any) => {
+      if (t.is_deleted === true) return false;
+      if (typeof t.notes === 'string' && t.notes.startsWith('[DELETED]')) return false;
+      if (t.product_id && !activeProdIds.has(t.product_id)) return false;
+      return true;
+    });
+
     let totalInCount = 0;
     let totalOutCount = 0;
     let totalDefectCount = 0;
@@ -431,18 +442,21 @@ export async function fetchQuickStockSummary(): Promise<InventoryQuickSummary | 
 
 /**
  * Quickly calculate total stock for a specific product using composite index (product_id, type, quantity)
+ * Strictly ignores soft-deleted transactions.
  */
 export async function fetchProductTotalStock(productId: string): Promise<number> {
   try {
     const { data, error } = await supabase
       .from('inventory_transactions')
-      .select('type, quantity')
+      .select('type, quantity, notes')
       .eq('product_id', productId);
 
     if (error || !data) return 0;
 
     let balance = 0;
     for (const row of data) {
+      if (row.notes && typeof row.notes === 'string' && row.notes.startsWith('[DELETED]')) continue;
+      if ((row as any).is_deleted === true) continue;
       const t = (row.type || '').toLowerCase();
       const qty = Number(row.quantity) || 0;
       if (t === 'in' || t === 'check_in') {
@@ -522,6 +536,7 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
 
 /**
  * Soft delete an inventory transaction record (moves it to the Bin).
+ * Reverses its stock effect in profile_product so stock balance strictly ignores deleted vouchers.
  * Gracefully tries is_deleted column first, then falls back to [DELETED] notes tag if column is pending.
  */
 export async function softDeleteInventoryTransaction(
@@ -530,7 +545,38 @@ export async function softDeleteInventoryTransaction(
 ): Promise<{ success: boolean; error?: any }> {
   try {
     const now = new Date().toISOString();
-    // 1. Try modern is_deleted column
+
+    // 1. Fetch transaction details to adjust product stock balance
+    const { data: tx } = await supabase
+      .from('inventory_transactions')
+      .select('product_id, type, quantity')
+      .eq('id', id)
+      .single();
+
+    if (tx && tx.product_id && tx.quantity) {
+      const isAddition = tx.type === 'in' || tx.type === 'check_in';
+      // Inward delivery deleted -> decrease stock; outward/deduction deleted -> restore stock
+      const delta = isAddition ? -Number(tx.quantity) : Number(tx.quantity);
+
+      const { data: prod } = await supabase
+        .from('profile_product')
+        .select('current_stock')
+        .eq('id', tx.product_id)
+        .single();
+
+      if (prod) {
+        const newStock = Math.max(0, Number(prod.current_stock ?? 0) + delta);
+        await supabase
+          .from('profile_product')
+          .update({
+            current_stock: newStock,
+            updated_at: now,
+          })
+          .eq('id', tx.product_id);
+      }
+    }
+
+    // 2. Try modern is_deleted column
     const { error: colErr } = await supabase
       .from('inventory_transactions')
       .update({ is_deleted: true, updated_at: now })
@@ -540,7 +586,7 @@ export async function softDeleteInventoryTransaction(
       return { success: true };
     }
 
-    // 2. Fallback if is_deleted column doesn't exist yet in remote schema
+    // 3. Fallback if is_deleted column doesn't exist yet in remote schema
     console.warn('softDeleteInventoryTransaction: is_deleted column update fallback:', colErr.message);
     const taggedNote = currentNotes ? `[DELETED] ${currentNotes}` : '[DELETED]';
     const { error: noteErr } = await supabase
@@ -560,6 +606,7 @@ export async function softDeleteInventoryTransaction(
 
 /**
  * Restore a soft-deleted inventory transaction record from the Bin.
+ * Re-applies its stock effect to profile_product so stock balance counts it again.
  */
 export async function restoreInventoryTransaction(
   id: string,
@@ -567,13 +614,44 @@ export async function restoreInventoryTransaction(
 ): Promise<{ success: boolean; error?: any }> {
   try {
     const now = new Date().toISOString();
-    // 1. Try modern is_deleted column
+
+    // 1. Fetch transaction details to re-apply product stock balance
+    const { data: tx } = await supabase
+      .from('inventory_transactions')
+      .select('product_id, type, quantity')
+      .eq('id', id)
+      .single();
+
+    if (tx && tx.product_id && tx.quantity) {
+      const isAddition = tx.type === 'in' || tx.type === 'check_in';
+      // Inward delivery restored -> add stock back; outward restored -> deduct stock
+      const delta = isAddition ? Number(tx.quantity) : -Number(tx.quantity);
+
+      const { data: prod } = await supabase
+        .from('profile_product')
+        .select('current_stock')
+        .eq('id', tx.product_id)
+        .single();
+
+      if (prod) {
+        const newStock = Math.max(0, Number(prod.current_stock ?? 0) + delta);
+        await supabase
+          .from('profile_product')
+          .update({
+            current_stock: newStock,
+            updated_at: now,
+          })
+          .eq('id', tx.product_id);
+      }
+    }
+
+    // 2. Try modern is_deleted column
     const { error: colErr } = await supabase
       .from('inventory_transactions')
       .update({ is_deleted: false, updated_at: now })
       .eq('id', id);
 
-    // 2. Also strip [DELETED] from notes if present
+    // 3. Also strip [DELETED] from notes if present
     const cleanNote = currentNotes ? currentNotes.replace(/^\[DELETED\]\s*/, '') : '';
     await supabase
       .from('inventory_transactions')

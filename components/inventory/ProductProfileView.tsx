@@ -384,7 +384,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Low Stock Alerts</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-xl font-bold text-amber-700">
-                {products.filter((p) => (Number(p.current_stock) || 0) <= (Number(p.minimum_alert_stock) || 0)).length}
+                {products.filter((p) => Number(p.minimum_alert_stock || 0) > 0 && (Number(p.current_stock) || 0) <= (Number(p.minimum_alert_stock) || 0)).length}
               </span>
               <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 text-amber-600" />
