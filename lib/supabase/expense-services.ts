@@ -208,8 +208,6 @@ export async function createSiteExpense(
       receipt_file_name: payload.receipt_file_name || null,
       notes: payload.notes ? payload.notes.trim() : null,
       ...(payload.enterdby ? { enterdby: payload.enterdby } : {}),
-      ...(payload.created_by_user_id ? { created_by_user_id: payload.created_by_user_id } : {}),
-      ...(payload.created_by_email ? { created_by_email: payload.created_by_email } : {}),
       is_deleted: false,
     };
 

@@ -120,6 +120,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; amount?: boolean }>({});
 
   // Load Vendors & Categories on open
   useEffect(() => {
@@ -321,16 +322,29 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const errors: { title?: boolean; amount?: boolean } = {};
     if (!title.trim()) {
-      setErrorMessage('Please enter an expense title.');
-      return;
+      errors.title = true;
     }
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      setErrorMessage('Please enter a valid amount.');
+      errors.amount = true;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setErrorMessage(
+        errors.title && errors.amount
+          ? 'Please enter both an expense title and a valid amount.'
+          : errors.title
+          ? 'Please enter an expense title / description.'
+          : 'Please enter a valid amount greater than 0.'
+      );
       return;
     }
 
+    setFieldErrors({});
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -529,10 +543,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 type="text"
                 required
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: false }));
+                }}
                 placeholder="e.g. Site Labour Lunch & Evening Tea"
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium"
+                className={`w-full h-10 px-3 rounded-lg border bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden font-medium transition-colors ${
+                  fieldErrors.title
+                    ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/20'
+                    : 'border-slate-200 focus:border-purple-600 focus:ring-1 focus:ring-purple-600'
+                }`}
               />
+              {fieldErrors.title && (
+                <p className="text-[10px] text-rose-500 font-medium mt-1">Please enter an expense title / description.</p>
+              )}
             </div>
 
             {/* Amount & Date */}
@@ -548,11 +572,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     step="0.01"
                     required
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      if (fieldErrors.amount) setFieldErrors((prev) => ({ ...prev, amount: false }));
+                    }}
                     placeholder="0.00"
-                    className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-bold"
+                    className={`w-full h-10 pl-9 pr-3 rounded-lg border bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden font-bold transition-colors ${
+                      fieldErrors.amount
+                        ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/20'
+                        : 'border-slate-200 focus:border-purple-600 focus:ring-1 focus:ring-purple-600'
+                    }`}
                   />
                 </div>
+                {fieldErrors.amount && (
+                  <p className="text-[10px] text-rose-500 font-medium mt-1">Please enter an amount greater than 0.</p>
+                )}
               </div>
 
               <div>
