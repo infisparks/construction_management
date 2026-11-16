@@ -966,11 +966,18 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                             <span className="line-clamp-2">{exp.notes}</span>
                           </div>
                         )}
-                        {exp.paid_by && (
-                          <span className="text-[10px] text-slate-400 mt-0.5 block">
-                            Paid by: {exp.paid_by}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {exp.paid_by && (
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              Paid by: {exp.paid_by}
+                            </span>
+                          )}
+                          {(exp.created_by_email || exp.enterdby) && (
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              {exp.paid_by ? '• ' : ''}Entered by: {exp.created_by_email || (exp.enterdby === 'a72d7229-1476-4f82-b105-7d38de4e2af3' ? 'admin@gmail.com' : exp.enterdby)}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Category */}
@@ -1197,7 +1204,14 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                         </td>
                         <td className="px-4 py-3">
                           <span className="font-semibold text-slate-900 block">{exp.title}</span>
-                          {exp.paid_by && <span className="text-[10px] text-slate-400">Paid by: {exp.paid_by}</span>}
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {exp.paid_by && <span className="text-[10px] text-slate-400 font-normal">Paid by: {exp.paid_by}</span>}
+                            {(exp.created_by_email || exp.enterdby) && (
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {exp.paid_by ? '• ' : ''}Entered by: {exp.created_by_email || (exp.enterdby === 'a72d7229-1476-4f82-b105-7d38de4e2af3' ? 'admin@gmail.com' : exp.enterdby)}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">

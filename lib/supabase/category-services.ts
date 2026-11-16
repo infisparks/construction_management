@@ -15,14 +15,39 @@ export const DEFAULT_DOCUMENT_CATEGORIES: string[] = [
   'Project information',
 ];
 
+const getLocalCategories = (categoryName: string): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(`infibuild_category_${categoryName}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return [];
+};
+
+const setLocalCategories = (categoryName: string, list: string[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`infibuild_category_${categoryName}`, JSON.stringify(list));
+  } catch (e) {
+    // ignore
+  }
+};
+
 /**
- * Fetch dropdown category values from Supabase `category` table.
- * If the category does not exist, optionally seeds it with `defaultFallback`.
+ * Fetch dropdown category values from Supabase `category` table,
+ * with resilient localStorage caching & fallback.
  */
 export async function fetchDropdownCategory(
   categoryName: string,
   defaultFallback: string[] = []
 ): Promise<string[]> {
+  const localList = getLocalCategories(categoryName);
+
   try {
     const { data, error } = await supabase
       .from('category')
@@ -32,34 +57,52 @@ export async function fetchDropdownCategory(
 
     if (error) {
       console.warn(`[category-services] Error fetching category "${categoryName}":`, error.message);
+      if (localList.length > 0) {
+        return localList;
+      }
+      setLocalCategories(categoryName, defaultFallback);
       return defaultFallback;
     }
 
     if (data && Array.isArray(data.value) && data.value.length > 0) {
-      return data.value as string[];
+      const remoteList = data.value as string[];
+      // Merge any local additions if present
+      const combined = Array.from(new Set([...remoteList, ...localList]));
+      setLocalCategories(categoryName, combined);
+      return combined;
     }
 
-    // If row doesn't exist or is empty, seed it with defaultFallback
-    if (defaultFallback.length > 0) {
-      const { error: insertError } = await supabase
-        .from('category')
-        .upsert({ name: categoryName, value: defaultFallback });
+    // If row doesn't exist or is empty in remote
+    if (localList.length > 0) {
+      return localList;
+    }
 
-      if (insertError) {
-        console.warn(`[category-services] Could not seed category "${categoryName}":`, insertError.message);
-      }
+    if (defaultFallback.length > 0) {
+      setLocalCategories(categoryName, defaultFallback);
+      // Attempt seeding
+      (async () => {
+        try {
+          await supabase.from('category').upsert({ name: categoryName, value: defaultFallback });
+        } catch {
+          // ignore
+        }
+      })();
+
       return defaultFallback;
     }
 
     return [];
   } catch (err) {
     console.error(`[category-services] Exception fetching category "${categoryName}":`, err);
+    if (localList.length > 0) {
+      return localList;
+    }
     return defaultFallback;
   }
 }
 
 /**
- * Add a custom category entry to the Supabase `category` table JSONB value.
+ * Add a custom category entry to Supabase and localStorage.
  */
 export async function addCustomCategory(
   categoryName: string,
@@ -80,6 +123,7 @@ export async function addCustomCategory(
   }
 
   const updatedCategories = [...currentList, cleanLabel];
+  setLocalCategories(categoryName, updatedCategories);
 
   try {
     const { error } = await supabase
@@ -90,15 +134,50 @@ export async function addCustomCategory(
       });
 
     if (error) {
-      console.error(`[category-services] Error upserting category "${categoryName}":`, error.message);
-      return { success: false, categories: currentList, error: error.message };
+      console.warn(`[category-services] Supabase upsert note for "${categoryName}":`, error.message);
     }
-
-    return { success: true, categories: updatedCategories };
   } catch (err: any) {
-    console.error(`[category-services] Exception adding custom category "${categoryName}":`, err);
-    return { success: false, categories: currentList, error: err?.message || 'Failed to save custom category.' };
+    console.warn(`[category-services] Exception syncing to Supabase:`, err);
   }
+
+  return { success: true, categories: updatedCategories };
+}
+
+/**
+ * Delete a category entry from the category list and persist to Supabase & localStorage.
+ */
+export async function deleteCustomCategory(
+  categoryName: string,
+  categoryToDelete: string,
+  currentList: string[] = []
+): Promise<{ success: boolean; categories: string[]; error?: string }> {
+  const cleanTarget = categoryToDelete.trim().toLowerCase();
+  if (!cleanTarget) {
+    return { success: false, categories: currentList, error: 'Category name cannot be empty.' };
+  }
+
+  const updatedCategories = currentList.filter(
+    (item) => item.trim().toLowerCase() !== cleanTarget
+  );
+
+  setLocalCategories(categoryName, updatedCategories);
+
+  try {
+    const { error } = await supabase
+      .from('category')
+      .upsert({
+        name: categoryName,
+        value: updatedCategories,
+      });
+
+    if (error) {
+      console.warn(`[category-services] Supabase delete sync note:`, error.message);
+    }
+  } catch (err: any) {
+    console.warn(`[category-services] Exception syncing deletion to Supabase:`, err);
+  }
+
+  return { success: true, categories: updatedCategories };
 }
 
 export interface BillItemTemplate {

@@ -23,6 +23,7 @@ import { ProfileVendor, fetchProfileVendors } from '@/lib/supabase/profile-servi
 import {
   fetchDropdownCategory,
   addCustomCategory,
+  deleteCustomCategory,
 } from '@/lib/supabase/category-services';
 import {
   createSiteExpense,
@@ -33,6 +34,7 @@ import {
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillUploader } from './ExpenseBillUploader';
 import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
+import { useAuth } from '@/lib/supabase/auth-context';
 
 interface ProjectOption {
   id: string;
@@ -73,6 +75,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onExpenseAdded,
   onExpenseUpdated,
 }) => {
+  const auth = useAuth();
+
   // Project / Site Selection state
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || '');
   const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
@@ -89,6 +93,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [isAddingCustomCategory, setIsAddingCustomCategory] = useState(false);
   const [newCustomCategoryInput, setNewCustomCategoryInput] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [categorySuccessToast, setCategorySuccessToast] = useState<string | null>(null);
+
+  // Category Deletion State
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -224,6 +234,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     ];
   }, [vendors]);
 
+  const categoryOptions: SearchableOption[] = useMemo(() => {
+    return [
+      ...categories.map((c) => ({
+        value: c,
+        label: c,
+      })),
+      {
+        value: '__add_new__',
+        label: '+ Add Custom Category...',
+        isAction: true,
+      },
+    ];
+  }, [categories]);
+
+  const handleCategorySelect = (val: string) => {
+    if (val === '__add_new__') {
+      setIsAddingCustomCategory(true);
+    } else {
+      setSelectedCategory(val);
+    }
+  };
+
   const handleVendorSelect = (val: string) => {
     if (val === '__custom__') {
       setIsCustomPayee(true);
@@ -240,8 +272,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
   };
 
-  const handleCreateCustomCategory = async () => {
-    const trimmed = newCustomCategoryInput.trim();
+  const handleCreateCustomCategory = async (customLabel?: string) => {
+    const trimmed = (typeof customLabel === 'string' ? customLabel : newCustomCategoryInput).trim();
     if (!trimmed) return;
     setIsSavingCategory(true);
     try {
@@ -251,9 +283,39 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         setSelectedCategory(trimmed);
         setNewCustomCategoryInput('');
         setIsAddingCustomCategory(false);
+        setCategorySuccessToast(`Category "${trimmed}" saved and updated!`);
+        setTimeout(() => setCategorySuccessToast(null), 3000);
       }
     } finally {
       setIsSavingCategory(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (categoryName: string) => {
+    if (!categoryName) return;
+    setCategoryToDelete(categoryName);
+    setDeleteConfirmInput('');
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    if (deleteConfirmInput.trim().toLowerCase() !== 'confirm') return;
+
+    setIsDeletingCategory(true);
+    try {
+      const res = await deleteCustomCategory('expense_category', categoryToDelete, categories);
+      if (res.success) {
+        setCategories(res.categories);
+        if (selectedCategory.trim().toLowerCase() === categoryToDelete.trim().toLowerCase()) {
+          setSelectedCategory(res.categories[0] || '');
+        }
+        setCategorySuccessToast(`Category "${categoryToDelete}" deleted successfully.`);
+        setTimeout(() => setCategorySuccessToast(null), 3000);
+        setCategoryToDelete(null);
+        setDeleteConfirmInput('');
+      }
+    } finally {
+      setIsDeletingCategory(false);
     }
   };
 
@@ -355,6 +417,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         receipt_url: uploadedReceiptUrl,
         receipt_file_name: uploadedReceiptFileName,
         notes: notes.trim() || null,
+        ...(auth.user?.id ? { enterdby: auth.user.id, created_by_user_id: auth.user.id } : {}),
+        ...(auth.user?.email ? { created_by_email: auth.user.email } : {}),
       };
 
       const res = await createSiteExpense(payload);
@@ -511,63 +575,81 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 <label className="text-[11px] font-semibold text-slate-700">
                   Expense Category <span className="text-rose-500">*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingCustomCategory(!isAddingCustomCategory)}
-                  className="text-[10px] text-purple-700 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  <span>{isAddingCustomCategory ? 'Cancel' : '+ Category'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCustomCategory(!isAddingCustomCategory)}
+                    className="text-[10px] text-purple-700 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                    <span>{isAddingCustomCategory ? 'Cancel' : 'Add Category'}</span>
+                  </button>
+                </div>
               </div>
 
               {isAddingCustomCategory && (
-                <div className="flex items-center gap-1.5 mb-2">
-                  <input
-                    type="text"
-                    value={newCustomCategoryInput}
-                    onChange={(e) => setNewCustomCategoryInput(e.target.value)}
-                    placeholder="New category name"
-                    autoFocus
-                    className="flex-1 h-9 px-3 rounded-lg border border-purple-300 text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleCreateCustomCategory();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={isSavingCategory || !newCustomCategoryInput.trim()}
-                    onClick={handleCreateCustomCategory}
-                    className="h-9 px-3 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 cursor-pointer"
-                  >
-                    Save
-                  </button>
+                <div className="mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={newCustomCategoryInput}
+                      onChange={(e) => setNewCustomCategoryInput(e.target.value)}
+                      placeholder="New category name"
+                      autoFocus
+                      className="flex-1 h-9 px-3 rounded-lg border border-purple-300 text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateCustomCategory();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={isSavingCategory || !newCustomCategoryInput.trim()}
+                      onClick={() => handleCreateCustomCategory()}
+                      className="h-9 px-3.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 cursor-pointer flex items-center gap-1 transition-colors shadow-xs"
+                    >
+                      {isSavingCategory ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                      ) : null}
+                      <span>Save</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  if (e.target.value === '__add_new__') {
-                    setIsAddingCustomCategory(true);
-                  } else {
-                    setSelectedCategory(e.target.value);
-                  }
-                }}
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium cursor-pointer"
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-                <option value="__add_new__" className="font-bold text-purple-700 bg-purple-50">
-                  + Add Custom Category...
-                </option>
-              </select>
+              {categorySuccessToast && (
+                <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>{categorySuccessToast}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 min-w-0">
+                  <SearchableSelect
+                    options={categoryOptions}
+                    value={selectedCategory}
+                    onChange={handleCategorySelect}
+                    placeholder="Search or select category..."
+                    searchPlaceholder="Search categories..."
+                    onDeleteOption={handleOpenDeleteModal}
+                    onCreateOption={(newLabel) => handleCreateCustomCategory(newLabel)}
+                  />
+                </div>
+
+                {selectedCategory && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDeleteModal(selectedCategory)}
+                    title={`Delete category "${selectedCategory}"`}
+                    className="h-10 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-slate-400 hover:text-rose-600 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Notes / Remarks / Purpose */}
@@ -847,6 +929,72 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Delete Category Confirmation Dialog */}
+      {categoryToDelete && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden p-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0 text-rose-600">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-slate-900">Delete Category</h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Are you sure you want to delete <span className="font-semibold text-slate-900 break-words">&ldquo;{categoryToDelete}&rdquo;</span>? This will remove it from the list of available categories.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                Type <span className="text-rose-600 font-bold tracking-wide">confirm</span> to proceed:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmInput}
+                onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                placeholder='Type "confirm"'
+                autoFocus
+                className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-rose-500 focus:ring-1 focus:ring-rose-500 font-medium"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && deleteConfirmInput.trim().toLowerCase() === 'confirm') {
+                    e.preventDefault();
+                    handleConfirmDeleteCategory();
+                  }
+                }}
+              />
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoryToDelete(null);
+                  setDeleteConfirmInput('');
+                }}
+                disabled={isDeletingCategory}
+                className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteConfirmInput.trim().toLowerCase() !== 'confirm' || isDeletingCategory}
+                onClick={handleConfirmDeleteCategory}
+                className="h-8 px-3.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                {isDeletingCategory ? (
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>Delete Category</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

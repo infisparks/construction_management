@@ -105,6 +105,9 @@ export interface CreateExpensePayload {
   receipt_file_name?: string | null;
   notes?: string | null;
   project_id?: string | null;
+  enterdby?: string | null;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
 }
 
 export interface ExpenseSummaryStats {
@@ -204,6 +207,9 @@ export async function createSiteExpense(
       receipt_url: payload.receipt_url || null,
       receipt_file_name: payload.receipt_file_name || null,
       notes: payload.notes ? payload.notes.trim() : null,
+      ...(payload.enterdby ? { enterdby: payload.enterdby } : {}),
+      ...(payload.created_by_user_id ? { created_by_user_id: payload.created_by_user_id } : {}),
+      ...(payload.created_by_email ? { created_by_email: payload.created_by_email } : {}),
       is_deleted: false,
     };
 

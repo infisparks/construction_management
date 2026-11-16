@@ -52,6 +52,9 @@ export interface SiteExpense {
   receipt_file_name?: string | null;
   bill_number?: string | null;
   notes?: string | null;
+  enterdby?: string | null;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
   is_deleted: boolean;
   created_at: string;
   updated_at: string;

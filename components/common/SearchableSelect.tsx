@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, ChevronDown, X, Check } from 'lucide-react';
+import { Search, ChevronDown, X, Check, Trash2, Plus } from 'lucide-react';
 
 export interface SearchableOption {
   value: string;
@@ -25,6 +25,8 @@ export interface SearchableSelectProps {
   id?: string;
   allowClear?: boolean;
   required?: boolean;
+  onDeleteOption?: (value: string) => void;
+  onCreateOption?: (newLabel: string) => void;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -40,6 +42,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   id,
   allowClear = false,
   required = false,
+  onDeleteOption,
+  onCreateOption,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -183,7 +187,16 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (filteredOptions.length > 0) {
+                    const trimmed = query.trim();
+                    const exactMatch = options.find(
+                      (o) => !o.isAction && o.label.toLowerCase() === trimmed.toLowerCase()
+                    );
+                    if (exactMatch) {
+                      handleSelect(exactMatch.value);
+                    } else if (onCreateOption && trimmed) {
+                      onCreateOption(trimmed);
+                      setIsOpen(false);
+                    } else if (filteredOptions.length > 0) {
                       handleSelect(filteredOptions[0].value);
                     }
                   }
@@ -205,6 +218,28 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
           {/* Options Scrollable List */}
           <div className="max-h-56 overflow-y-auto p-1 divide-y divide-slate-50">
+            {/* Quick Add New from Search Input if not exists */}
+            {onCreateOption && query.trim() && !options.some((o) => !o.isAction && o.label.toLowerCase() === query.trim().toLowerCase()) && (
+              <div className="p-1 pb-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateOption(query.trim());
+                    setIsOpen(false);
+                  }}
+                  className="w-full px-2.5 py-2 rounded-lg flex items-center justify-between gap-2 text-left transition-colors cursor-pointer text-purple-700 bg-purple-50 hover:bg-purple-100 font-bold border border-dashed border-purple-300"
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Plus className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                    <span className="truncate text-xs">Add & Save &ldquo;{query.trim()}&rdquo;</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded border border-purple-200 shrink-0">
+                    Press Enter
+                  </span>
+                </button>
+              </div>
+            )}
+
             {filteredOptions.length === 0 ? (
               <div className="py-6 text-center text-slate-400 text-xs">
                 {emptyMessage}
@@ -226,17 +261,19 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 }
 
                 return (
-                  <button
+                  <div
                     key={opt.value}
-                    type="button"
-                    onClick={() => handleSelect(opt.value)}
-                    className={`w-full px-2.5 py-2 rounded-lg flex items-center justify-between gap-2 text-left transition-colors cursor-pointer ${
+                    className={`group/opt w-full px-2.5 py-2 rounded-lg flex items-center justify-between gap-2 text-left transition-colors ${
                       isSelected
                         ? 'bg-purple-50 text-purple-900 font-bold'
                         : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(opt.value)}
+                      className="min-w-0 flex-1 text-left cursor-pointer"
+                    >
                       <div className="flex items-center gap-1.5">
                         <span className="truncate">{opt.label}</span>
                         {opt.badge && (
@@ -250,15 +287,30 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                         )}
                       </div>
                       {opt.subtitle && (
-                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5 font-normal">
                           {opt.subtitle}
                         </p>
                       )}
+                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isSelected && (
+                        <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      )}
+                      {onDeleteOption && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteOption(opt.value);
+                          }}
+                          title={`Delete "${opt.label}"`}
+                          className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                    {isSelected && (
-                      <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                    )}
-                  </button>
+                  </div>
                 );
               })
             )}
