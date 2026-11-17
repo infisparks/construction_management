@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (typeof window !== 'undefined' && localStorage.getItem('infibuild_demo_auth') === 'true') {
         const demoUser = {
-          id: 'demo-admin-id',
+          id: 'a72d7229-1476-4f82-b105-7d38de4e2af3',
           email: 'admin@gmail.com',
           app_metadata: {},
           user_metadata: { name: 'Site Administrator' },
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(demoSession);
         setUserRole({
           id: 'role-demo',
-          user_id: 'demo-admin-id',
+          user_id: 'a72d7229-1476-4f82-b105-7d38de4e2af3',
           role: 'admin',
           email: 'admin@gmail.com',
           page: null,
@@ -234,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     const demoUser = {
-      id: 'demo-admin-id',
+      id: 'a72d7229-1476-4f82-b105-7d38de4e2af3',
       email: 'admin@gmail.com',
       app_metadata: {},
       user_metadata: { name: 'Site Administrator' },
@@ -253,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(demoSession);
     setUserRole({
       id: 'role-demo',
-      user_id: 'demo-admin-id',
+      user_id: 'a72d7229-1476-4f82-b105-7d38de4e2af3',
       role: 'admin',
       email: 'admin@gmail.com',
       page: null,

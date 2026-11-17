@@ -431,8 +431,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         receipt_url: uploadedReceiptUrl,
         receipt_file_name: uploadedReceiptFileName,
         notes: notes.trim() || null,
-        ...(auth.user?.id ? { enterdby: auth.user.id, created_by_user_id: auth.user.id } : {}),
-        ...(auth.user?.email ? { created_by_email: auth.user.email } : {}),
+        ...(auth.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auth.user.id)
+          ? { enterdby: auth.user.id }
+          : { enterdby: 'a72d7229-1476-4f82-b105-7d38de4e2af3' }),
       };
 
       const res = await createSiteExpense(payload);

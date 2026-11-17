@@ -181,6 +181,11 @@ export async function fetchSiteExpenses(projectId?: string): Promise<SiteExpense
   }
 }
 
+const isValidUUID = (id?: string | null): boolean => {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+};
+
 /**
  * Create a new expense record in Supabase site_expenses table.
  */
@@ -190,6 +195,11 @@ export async function createSiteExpense(
   try {
     const expenseCode = await generateNextExpenseCode();
     const todayStr = new Date().toISOString().split('T')[0];
+
+    const candidateUid = payload.enterdby || payload.created_by_user_id;
+    const finalEnterdby = isValidUUID(candidateUid)
+      ? candidateUid!
+      : 'a72d7229-1476-4f82-b105-7d38de4e2af3';
 
     const recordToInsert = {
       expense_code: expenseCode,
@@ -207,7 +217,7 @@ export async function createSiteExpense(
       receipt_url: payload.receipt_url || null,
       receipt_file_name: payload.receipt_file_name || null,
       notes: payload.notes ? payload.notes.trim() : null,
-      ...(payload.enterdby ? { enterdby: payload.enterdby } : {}),
+      enterdby: finalEnterdby,
       is_deleted: false,
     };
 
