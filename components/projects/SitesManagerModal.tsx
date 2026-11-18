@@ -17,11 +17,14 @@ import {
   AlertTriangle,
   FolderOpen,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Sparkles
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { DbProject } from '@/lib/supabase/types';
 import { useAuth } from '@/lib/supabase/auth-context';
+import { sortProjectsBySequence, updateSitesOrder } from '@/lib/supabase/site-storage';
 
 interface SitesManagerModalProps {
   isOpen: boolean;
@@ -59,6 +62,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
   const [personNumber, setPersonNumber] = useState('');
   const [safetyKey, setSafetyKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
 
   // Fetch Projects from Supabase
   const fetchProjects = async () => {
@@ -72,7 +76,8 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
       if (error) {
         console.error('Error fetching projects:', error);
       } else if (data) {
-        setProjects(data as DbProject[]);
+        const sorted = sortProjectsBySequence(data as DbProject[]);
+        setProjects(sorted);
       }
     } catch (err) {
       console.error(err);
@@ -88,7 +93,65 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
         setShowCreateForm(true);
       }
     }
+
+    const handleSync = () => {
+      fetchProjects();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('site-sequence-updated', handleSync);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('site-sequence-updated', handleSync);
+      }
+    };
   }, [isOpen, initialShowCreateForm]);
+
+  // Handle Move Site Up / Down
+  const handleMoveSite = async (currentIndex: number, direction: 'up' | 'down') => {
+    if (isReordering) return;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= filteredProjects.length) return;
+
+    // Work only on non-deleted active sites
+    const activeSites = projects.filter((p) => !p.is_deleted);
+    const currentItem = filteredProjects[currentIndex];
+    const targetItem = filteredProjects[targetIndex];
+
+    const realCurrentIdx = activeSites.findIndex((p) => p.id === currentItem.id);
+    const realTargetIdx = activeSites.findIndex((p) => p.id === targetItem.id);
+
+    if (realCurrentIdx === -1 || realTargetIdx === -1) return;
+
+    // Swap elements in active array
+    const reorderedActive = [...activeSites];
+    const temp = reorderedActive[realCurrentIdx];
+    reorderedActive[realCurrentIdx] = reorderedActive[realTargetIdx];
+    reorderedActive[realTargetIdx] = temp;
+
+    // Re-assign 1-based sequential sequence_order and serial_no
+    const updatedActive = reorderedActive.map((item, idx) => ({
+      ...item,
+      serial_no: idx + 1,
+      sequence_order: idx + 1,
+    }));
+
+    const deletedSites = projects.filter((p) => p.is_deleted);
+    const newAllProjects = [...updatedActive, ...deletedSites];
+
+    setProjects(newAllProjects);
+    setIsReordering(true);
+
+    try {
+      await updateSitesOrder(updatedActive);
+      showToast?.(`Moved "${currentItem.name}" ${direction}`, 'info');
+    } catch (err) {
+      console.error('Failed to save reordered sites:', err);
+      showToast?.('Failed to save site sequence', 'error');
+    } finally {
+      setIsReordering(false);
+    }
+  };
 
   // Handle Create New Site
   const handleCreateSite = async (e: React.FormEvent) => {
@@ -244,7 +307,7 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                 className="inline-flex items-center gap-1.5 h-8.5 px-3.5 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] text-white text-xs font-semibold shadow-xs shadow-[#653ef1]/25 transition-all cursor-pointer active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>+ New Site</span>
+                <span>New Site</span>
               </button>
             )}
 
@@ -459,8 +522,11 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredProjects.map((p) => {
+              {filteredProjects.map((p, index) => {
                 const isActive = p.id === activeProjectId;
+                const isFirst = index === 0;
+                const isLast = index === filteredProjects.length - 1;
+                const canReorder = !showDeleted && searchQuery === '';
                 return (
                   <div
                     key={p.id}
@@ -472,8 +538,38 @@ export const SitesManagerModal: React.FC<SitesManagerModalProps> = ({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-[#653ef1]/10 border border-[#653ef1]/20 text-[#653ef1] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                          #{p.serial_no}
+                        <div className="flex flex-col items-center gap-1 shrink-0 mt-0.5">
+                          <div className="w-9 h-9 rounded-xl bg-[#653ef1]/10 border border-[#653ef1]/20 text-[#653ef1] flex items-center justify-center font-bold text-xs shrink-0">
+                            #{p.serial_no}
+                          </div>
+                          {canReorder && (
+                            <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200/80 rounded-lg p-0.5 shadow-2xs">
+                              <button
+                                type="button"
+                                disabled={isFirst || isReordering}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveSite(index, 'up');
+                                }}
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:text-[#653ef1] hover:bg-[#653ef1]/10 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-slate-400 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Move site up in sequence"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isLast || isReordering}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveSite(index, 'down');
+                                }}
+                                className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:text-[#653ef1] hover:bg-[#653ef1]/10 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-slate-400 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Move site down in sequence"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">

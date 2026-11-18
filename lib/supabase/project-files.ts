@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { ProjectFile } from '@/lib/construction-planning/types';
+import { sortProjectsBySequence } from './site-storage';
 
 export interface ProjectOption {
   id: string;
@@ -91,7 +92,8 @@ export async function fetchAvailableProjects(): Promise<ProjectOption[]> {
       console.error('Error fetching available projects:', error);
       return [];
     }
-    return (data || []) as ProjectOption[];
+    const rawList = (data || []) as ProjectOption[];
+    return sortProjectsBySequence(rawList);
   } catch (err) {
     console.error('Failed to fetch available projects:', err);
     return [];

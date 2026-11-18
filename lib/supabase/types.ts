@@ -1,6 +1,7 @@
 export interface DbProject {
   id: string;
   serial_no: number;
+  sequence_order?: number | null;
   name: string;
   code?: string | null;
   location?: string | null;
