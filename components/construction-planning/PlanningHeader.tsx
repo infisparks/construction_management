@@ -25,7 +25,8 @@ import {
   User,
   ShieldCheck,
   Sparkles,
-  MessageCircle
+  MessageCircle,
+  ArrowDownLeft
 } from 'lucide-react';
 import { ProjectInfo, ViewMode } from '@/lib/construction-planning/types';
 import { formatDisplayDate, calculateDurationDetails } from '@/lib/construction-planning/schedule-utils';

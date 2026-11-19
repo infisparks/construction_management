@@ -10,3 +10,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+export const getSupabaseClient = () => supabase;
+

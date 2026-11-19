@@ -33,6 +33,7 @@ import {
   ArchiveRestore,
   RotateCcw,
   Box,
+  ArrowDownLeft,
   FileText
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
@@ -434,34 +435,28 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
             <button
               type="button"
               onClick={() => onSelectCommercialTab?.('expenses')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeCommercialTab === 'expenses'
                   ? 'bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs'
                   : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
               }`}
             >
               <Receipt className="w-3.5 h-3.5 text-[#6338eb]" />
-              <span>Site Daily Bills & Expenses</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-[#6338eb] font-semibold border border-[#ddd4ff]">
-                Daily Burn & Petty Cash
-              </span>
+              <span>Daily Bills & Expenses</span>
             </button>
 
-            {/* Tab 2: Work Orders & Khata */}
+            {/* Tab 2: Work Orders */}
             <button
               type="button"
               onClick={() => onSelectCommercialTab?.('contractor-work-orders')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeCommercialTab === 'contractor-work-orders'
                   ? 'bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs'
                   : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
               }`}
             >
               <Wrench className="w-3.5 h-3.5 text-slate-500" />
-              <span>Work Orders & Khata</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
-                Extra Work & Payouts
-              </span>
+              <span>Work Orders</span>
             </button>
           </div>
 

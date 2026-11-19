@@ -8,7 +8,8 @@ import {
   Sparkles, 
   Layers,
   ArrowRight,
-  Wrench
+  Wrench,
+  ArrowDownLeft
 } from 'lucide-react';
 import { ProjectInfo, Party, ConstructionTask, SubcontractorBill } from '@/lib/construction-planning/types';
 import { SiteExpensesView } from './SiteExpensesView';
@@ -73,34 +74,24 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
             <button
               type="button"
               onClick={() => handleSelectTab('expenses')}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             >
-              <Receipt className="w-4 h-4 text-slate-400" />
-              <span>Site Daily Bills & Expenses</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-slate-200/80 text-slate-600">
-                Daily Burn & Petty Cash
-              </span>
+              <Receipt className="w-3.5 h-3.5 text-slate-400" />
+              <span>Daily Bills & Expenses</span>
             </button>
 
-            {/* Tab 3: Contractor Work Orders & Khata */}
+            {/* Tab 2: Contractor Work Orders */}
             <button
               type="button"
               onClick={() => handleSelectTab('contractor-work-orders')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'contractor-work-orders'
                   ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <Wrench className={`w-4 h-4 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
-              <span>Work Orders & Khata</span>
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-                activeTab === 'contractor-work-orders' 
-                  ? 'bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20' 
-                  : 'bg-slate-200/80 text-slate-600'
-              }`}>
-                Extra Work & Payouts
-              </span>
+              <Wrench className={`w-3.5 h-3.5 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
+              <span>Work Orders</span>
             </button>
           </div>
 

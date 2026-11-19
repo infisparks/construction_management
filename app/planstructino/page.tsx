@@ -415,6 +415,7 @@ export default function ConstructionPlanningPage() {
         'subcontractor-bills',
         'files-archive',
         'expenses',
+        'contractor-work-orders',
       ];
       if (urlView && validViews.includes(urlView as ViewMode)) {
         setCurrentView(urlView as ViewMode);

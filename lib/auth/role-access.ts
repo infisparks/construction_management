@@ -99,6 +99,8 @@ export function isViewAllowed(
       return true;
     }
 
+
+
     if (
       (allowed === 'progress' || allowed === 'execution' || allowed === 'site') &&
       target === 'progress'
