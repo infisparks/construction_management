@@ -62,20 +62,38 @@ interface ProjectOption {
 interface ContractorWorkOrdersViewProps {
   project?: ProjectInfo;
   projectId?: string;
+  onSelectProject?: (project: ProjectOption) => void;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> = ({
   project: initialProject,
   projectId: initialProjectId,
+  onSelectProject,
   showToast,
 }) => {
   // Active Project State (Default to currently selected site/project)
   const [activeProject, setActiveProject] = useState<ProjectOption | null>(initialProject || null);
   const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
-  const effectiveProjectId = activeProject?.id || initialProjectId || 'f0e510da-9530-468f-bb09-59920070d55e';
-  const effectiveProjectName = activeProject?.name || initialProject?.name || 'Noori Crest Tower';
-  const effectiveProjectCode = activeProject?.code || initialProject?.code || 'NC-2026';
+  
+  // Priority: 1. initialProjectId (from top header) -> 2. activeProject.id -> 3. initialProject.id
+  const effectiveProjectId =
+    (initialProjectId && initialProjectId !== 'active-site' ? initialProjectId : null) ||
+    (activeProject?.id && activeProject.id !== 'active-site' ? activeProject.id : null) ||
+    (initialProject?.id && initialProject.id !== 'active-site' ? initialProject.id : null) ||
+    'f0e510da-9530-468f-bb09-59920070d55e';
+
+  const matchedProject = availableProjects.find((p) => p.id === effectiveProjectId);
+  const effectiveProjectName =
+    matchedProject?.name ||
+    activeProject?.name ||
+    initialProject?.name ||
+    'Noori Crest Tower';
+  const effectiveProjectCode =
+    matchedProject?.code ||
+    activeProject?.code ||
+    initialProject?.code ||
+    'NC-2026';
 
   // Work Orders State
   const [workOrders, setWorkOrders] = useState<ContractorWorkOrder[]>([]);
@@ -101,26 +119,48 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
     async function loadSites() {
       try {
         const { activeProject: site, allProjects } = await resolveActiveSite();
-        if (site && !initialProject) {
-          setActiveProject(site);
-        }
         if (allProjects && allProjects.length > 0) {
           setAvailableProjects(allProjects);
+        }
+        const targetId = initialProjectId || (initialProject?.id !== 'active-site' ? initialProject?.id : null);
+        if (targetId && allProjects && allProjects.length > 0) {
+          const match = allProjects.find((p) => p.id === targetId);
+          if (match) {
+            setActiveProject(match);
+            return;
+          }
+        }
+        if (site && !initialProject) {
+          setActiveProject(site);
         }
       } catch (err) {
         console.warn('Could not resolve active site:', err);
       }
     }
     loadSites();
-  }, [initialProject]);
+  }, [initialProject, initialProjectId]);
 
   // Sync active project when parent changes active site (e.g. from top header)
   useEffect(() => {
-    if (initialProject) {
+    const targetId = initialProjectId || (initialProject?.id !== 'active-site' ? initialProject?.id : null);
+    if (targetId && availableProjects.length > 0) {
+      const match = availableProjects.find((p) => p.id === targetId);
+      if (match) {
+        setActiveProject(match);
+        return;
+      }
+    }
+    if (initialProject?.name && availableProjects.length > 0) {
+      const matchByName = availableProjects.find(
+        (p) => p.name.trim().toLowerCase() === initialProject.name.trim().toLowerCase()
+      );
+      if (matchByName) {
+        setActiveProject(matchByName);
+        return;
+      }
+    }
+    if (initialProject && initialProject.id && initialProject.id !== 'active-site') {
       setActiveProject(initialProject);
-    } else if (initialProjectId && availableProjects.length > 0) {
-      const match = availableProjects.find((p) => p.id === initialProjectId);
-      if (match) setActiveProject(match);
     }
   }, [initialProject, initialProjectId, availableProjects]);
 
@@ -149,8 +189,10 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
     const found = availableProjects.find((p) => p.id === newId);
     if (found) {
       setActiveProject(found);
+      onSelectProject?.(found);
     }
   };
+
 
   // Helper date calculators (initialized in useEffect to ensure stable SSR prerender)
   const [todayStr, setTodayStr] = useState('');

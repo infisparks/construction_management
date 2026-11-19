@@ -33,6 +33,7 @@ interface CommercialBillsAndExpensesViewProps {
   onSaveSubcontractorBill: (bill: SubcontractorBill) => void;
   onDeleteSubcontractorBill: (billId: string) => void;
   onTabChange?: (tab: CommercialTab) => void;
+  onSelectProject?: (project: any) => void;
 }
 
 export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpensesViewProps> = ({
@@ -49,6 +50,7 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
   onSaveSubcontractorBill,
   onDeleteSubcontractorBill,
   onTabChange,
+  onSelectProject,
 }) => {
   const [activeTab, setActiveTab] = useState<CommercialTab>(initialTab);
 
@@ -119,6 +121,7 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
         <ContractorWorkOrdersView
           project={project}
           projectId={projectId}
+          onSelectProject={onSelectProject}
           showToast={showToast}
         />
       ) : (

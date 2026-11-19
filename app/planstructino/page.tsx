@@ -173,6 +173,7 @@ export default function ConstructionPlanningPage() {
         setAllDbProjects(allProjects);
         setProject((prev) => ({
           ...prev,
+          id: activeProject.id,
           name: activeProject.name,
           code: activeProject.code || `SITE-${activeProject.serial_no}`,
           location: activeProject.location || activeProject.address || '',
@@ -204,6 +205,7 @@ export default function ConstructionPlanningPage() {
     setStoredActiveSite(dbProj);
     setProject((prev) => ({
       ...prev,
+      id: dbProj.id,
       name: dbProj.name,
       code: dbProj.code || `SITE-${dbProj.serial_no}`,
       location: dbProj.location || dbProj.address || '',
@@ -1704,6 +1706,7 @@ export default function ConstructionPlanningPage() {
                     onSaveSubcontractorBill={handleSaveSubcontractorBill}
                     onDeleteSubcontractorBill={handleDeleteSubcontractorBill}
                     onTabChange={(tab) => setCurrentView(tab)}
+                    onSelectProject={handleSelectDbProject}
                   />
                 )}
 
