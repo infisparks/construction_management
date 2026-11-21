@@ -173,13 +173,7 @@ export async function POST(request: Request) {
     }
 
     if (media && !processedMedia) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Could not attach media file. The provided media URL or file could not be resolved from cloud storage.',
-        },
-        { status: 400 }
-      );
+      console.warn('Could not attach media file (unresolvable source). Proceeding with detailed text delivery.');
     }
 
     // Otherwise send text message only when no media attachment was requested

@@ -114,8 +114,9 @@ export const QuotationsListView: React.FC<QuotationsListViewProps> = ({
         project_id: selectedProj ? selectedProj.id : (activeProjectId || null),
         project_name: selectedProj ? selectedProj.name : undefined,
         created_by_email: userEmail || 'admin@gmail.com',
-        letterhead_enabled: true,
-        letterhead_image_url: '/letterhead.png',
+        letterhead_enabled: false,
+        letterhead_image_url: '',
+        margin_top: 40,
       });
       setActiveQuotation(newQuote);
       if (showToast) showToast(`Created ${newQuote.quotation_number}`, 'success');

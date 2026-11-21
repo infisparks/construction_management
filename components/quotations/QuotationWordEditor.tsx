@@ -36,7 +36,8 @@ import {
   ShieldCheck,
   SplitSquareVertical,
   Box,
-  Heading
+  Heading,
+  Check
 } from 'lucide-react';
 import {
   QuotationRecord,
@@ -123,15 +124,17 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
   const [status, setStatus] = useState(quotation.status || 'draft');
   const [totalAmount, setTotalAmount] = useState<number>(quotation.total_amount || 0);
 
-  // Letterhead & Margins (Safe default 185px to never overlap letterhead banner)
-  const [letterheadEnabled, setLetterheadEnabled] = useState(quotation.letterhead_enabled ?? true);
+  // Letterhead & Margins (Default blank if not set, or 185px if letterhead attached)
+  const [letterheadEnabled, setLetterheadEnabled] = useState(
+    quotation.letterhead_enabled ?? Boolean(quotation.letterhead_image_url)
+  );
   const [letterheadImageUrl, setLetterheadImageUrl] = useState(
-    quotation.letterhead_image_url || '/letterhead.png'
+    quotation.letterhead_image_url || ''
   );
   const [marginTop, setMarginTop] = useState(
-    quotation.margin_top ? Math.max(quotation.margin_top, 175) : 185
+    quotation.margin_top ?? (quotation.letterhead_image_url ? 185 : 40)
   );
-  const [marginBottom, setMarginBottom] = useState(quotation.margin_bottom ?? 110);
+  const [marginBottom, setMarginBottom] = useState(quotation.margin_bottom ?? 80);
   const [marginLeft, setMarginLeft] = useState(quotation.margin_left ?? 48);
   const [marginRight, setMarginRight] = useState(quotation.margin_right ?? 48);
   const [showGuidelines, setShowGuidelines] = useState(true);
@@ -145,10 +148,12 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
   const [isMetaDrawerOpen, setIsMetaDrawerOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
-  // Dropdown menus states (Click-to-open, won't hide on hover)
+  // Dropdown menus states (Click-to-open, won't hide on hover or lose selection)
   const [isInsertBlockOpen, setIsInsertBlockOpen] = useState(false);
   const [isTextColorOpen, setIsTextColorOpen] = useState(false);
   const [isHighlightColorOpen, setIsHighlightColorOpen] = useState(false);
+  const [isFontFamilyOpen, setIsFontFamilyOpen] = useState(false);
+  const [isFontSizeOpen, setIsFontSizeOpen] = useState(false);
 
   // Multi-page detection
   const [pageCount, setPageCount] = useState<number>(1);
@@ -161,6 +166,29 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const letterheadFileInputRef = useRef<HTMLInputElement>(null);
   const inlineImageInputRef = useRef<HTMLInputElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+
+  // Save current text selection
+  const saveSelection = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef.current) {
+      const range = sel.getRangeAt(0);
+      if (editorRef.current.contains(range.commonAncestorContainer)) {
+        savedRangeRef.current = range.cloneRange();
+      }
+    }
+  }, []);
+
+  // Restore saved text selection
+  const restoreSelection = useCallback(() => {
+    if (typeof window === 'undefined' || !savedRangeRef.current) return;
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -175,6 +203,12 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
       if (!target.closest('.highlight-color-container')) {
         setIsHighlightColorOpen(false);
       }
+      if (!target.closest('.font-family-container')) {
+        setIsFontFamilyOpen(false);
+      }
+      if (!target.closest('.font-size-container')) {
+        setIsFontSizeOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -185,7 +219,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
     if (!editorRef.current) return;
     const scrollH = editorRef.current.scrollHeight;
     const printableHeight = A4_HEIGHT_PX - marginTop - marginBottom;
-    const computedPages = Math.max(1, Math.ceil(scrollH / printableHeight));
+    const computedPages = Math.max(1, Math.ceil(scrollH / Math.max(100, printableHeight)));
     setPageCount(computedPages);
   }, [marginTop, marginBottom]);
 
@@ -223,10 +257,15 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
     setHasUnsavedChanges(true);
   };
 
-  // Execute formatting command on contentEditable
+  // Execute formatting command on contentEditable preserving selection
   const executeCommand = (command: string, value: string | undefined = undefined) => {
     if (typeof document === 'undefined') return;
+    restoreSelection();
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+    } catch {}
     document.execCommand(command, false, value);
+    saveSelection();
     setHasUnsavedChanges(true);
     checkEditorContent();
     if (editorRef.current) {
@@ -234,25 +273,87 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
     }
   };
 
-  // Apply custom font size
+  // Apply custom font size to selected text only
   const applyFontSize = (sizeStr: string) => {
     setActiveSize(sizeStr);
+    restoreSelection();
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
-    if (range.collapsed) return;
 
-    const span = document.createElement('span');
-    span.style.fontSize = sizeStr;
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
+    if (range.collapsed) {
+      if (editorRef.current) editorRef.current.focus();
+      return;
+    }
+
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+      document.execCommand('fontSize', false, '7');
+      if (editorRef.current) {
+        const fontTags = editorRef.current.querySelectorAll(
+          'font[size="7"], span[style*="font-size: -webkit-xxx-large"], span[style*="font-size: xxx-large"]'
+        );
+        fontTags.forEach((el) => {
+          const span = document.createElement('span');
+          span.style.fontSize = sizeStr;
+          span.innerHTML = el.innerHTML;
+          el.parentNode?.replaceChild(span, el);
+        });
+      }
+    } catch (err) {
+      try {
+        const span = document.createElement('span');
+        span.style.fontSize = sizeStr;
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+      } catch {}
+    }
+
+    saveSelection();
     setHasUnsavedChanges(true);
+    checkEditorContent();
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
   };
 
-  // Apply custom font family
+  // Apply font family to selected text
   const applyFontFamily = (familyStr: string) => {
     setActiveFont(familyStr);
+    restoreSelection();
     executeCommand('fontName', familyStr);
+  };
+
+  // Apply text color to selected text only
+  const applyTextColor = (colorStr: string) => {
+    restoreSelection();
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+    } catch {}
+    document.execCommand('foreColor', false, colorStr);
+    saveSelection();
+    setIsTextColorOpen(false);
+    setHasUnsavedChanges(true);
+    checkEditorContent();
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+  };
+
+  // Apply highlight background to selected text only
+  const applyHighlightColor = (colorStr: string) => {
+    restoreSelection();
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+    } catch {}
+    document.execCommand('hiliteColor', false, colorStr);
+    saveSelection();
+    setIsHighlightColorOpen(false);
+    setHasUnsavedChanges(true);
+    checkEditorContent();
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
   };
 
   // Clean and parse text pasted from ChatGPT or external rich sources
@@ -490,6 +591,15 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
     e.target.value = '';
   };
 
+  // Set to clean blank page (no letterhead)
+  const handleSetBlankLetterhead = () => {
+    setLetterheadImageUrl('');
+    setLetterheadEnabled(false);
+    setMarginTop(40);
+    setHasUnsavedChanges(true);
+    if (showToast) showToast('Set to clean blank page (no letterhead)', 'info');
+  };
+
   // Reset to default /letterhead.png
   const handleResetDefaultLetterhead = () => {
     setLetterheadImageUrl('/letterhead.png');
@@ -711,6 +821,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           {/* Undo / Redo */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('undo')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Undo (Ctrl+Z)"
@@ -719,6 +830,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('redo')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Redo (Ctrl+Y)"
@@ -728,37 +840,97 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
 
           <div className="w-[1px] h-5 bg-slate-200 mx-1" />
 
-          {/* Font Family Dropdown */}
-          <select
-            value={activeFont}
-            onChange={(e) => applyFontFamily(e.target.value)}
-            className="h-7 px-2 border border-slate-200 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer focus:outline-hidden focus:border-[#653ef1]"
-          >
-            {FONT_FAMILIES.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+          {/* Font Family Dropdown (Custom to never drop text selection) */}
+          <div className="relative font-family-container">
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                saveSelection();
+                setIsFontFamilyOpen(!isFontFamilyOpen);
+                setIsFontSizeOpen(false);
+                setIsTextColorOpen(false);
+                setIsHighlightColorOpen(false);
+                setIsInsertBlockOpen(false);
+              }}
+              className="h-7 px-2 border border-slate-200 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer flex items-center gap-1.5 focus:outline-hidden focus:border-[#653ef1]"
+            >
+              <span className="truncate max-w-[90px]">
+                {FONT_FAMILIES.find((f) => f.value === activeFont)?.label || 'Inter'}
+              </span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+            {isFontFamilyOpen && (
+              <div className="absolute top-full left-0 mt-1 flex flex-col bg-white border border-slate-200 rounded-lg shadow-xl p-1 z-50 min-w-[140px] max-h-60 overflow-y-auto">
+                {FONT_FAMILIES.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      applyFontFamily(f.value);
+                      setIsFontFamilyOpen(false);
+                    }}
+                    className={`px-2 py-1 text-xs text-left rounded-sm hover:bg-purple-50 hover:text-[#653ef1] cursor-pointer flex items-center justify-between ${
+                      activeFont === f.value ? 'bg-purple-50 text-[#653ef1] font-bold' : 'text-slate-700'
+                    }`}
+                    style={{ fontFamily: f.value }}
+                  >
+                    <span>{f.label}</span>
+                    {activeFont === f.value && <Check className="w-3 h-3" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Font Size Dropdown */}
-          <select
-            value={activeSize}
-            onChange={(e) => applyFontSize(e.target.value)}
-            className="h-7 px-2 border border-slate-200 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer focus:outline-hidden focus:border-[#653ef1]"
-          >
-            {FONT_SIZES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          {/* Font Size Dropdown (Custom to never drop text selection) */}
+          <div className="relative font-size-container">
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                saveSelection();
+                setIsFontSizeOpen(!isFontSizeOpen);
+                setIsFontFamilyOpen(false);
+                setIsTextColorOpen(false);
+                setIsHighlightColorOpen(false);
+                setIsInsertBlockOpen(false);
+              }}
+              className="h-7 px-2 border border-slate-200 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer flex items-center gap-1.5 focus:outline-hidden focus:border-[#653ef1]"
+            >
+              <span>{FONT_SIZES.find((s) => s.value === activeSize)?.label || activeSize}</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+            {isFontSizeOpen && (
+              <div className="absolute top-full left-0 mt-1 flex flex-col bg-white border border-slate-200 rounded-lg shadow-xl p-1 z-50 min-w-[110px]">
+                {FONT_SIZES.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      applyFontSize(s.value);
+                      setIsFontSizeOpen(false);
+                    }}
+                    className={`px-2 py-1 text-xs text-left rounded-sm hover:bg-purple-50 hover:text-[#653ef1] cursor-pointer flex items-center justify-between ${
+                      activeSize === s.value ? 'bg-purple-50 text-[#653ef1] font-bold' : 'text-slate-700'
+                    }`}
+                  >
+                    <span>{s.label}</span>
+                    {activeSize === s.value && <Check className="w-3 h-3" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="w-[1px] h-5 bg-slate-200 mx-1" />
 
           {/* Text Styling */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('bold')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Bold (Ctrl+B)"
@@ -767,6 +939,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('italic')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Italic (Ctrl+I)"
@@ -775,6 +948,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('underline')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Underline (Ctrl+U)"
@@ -783,6 +957,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('strikeThrough')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Strikethrough"
@@ -794,10 +969,14 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           <div className="relative text-color-container">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                saveSelection();
                 setIsTextColorOpen(!isTextColorOpen);
                 setIsHighlightColorOpen(false);
                 setIsInsertBlockOpen(false);
+                setIsFontFamilyOpen(false);
+                setIsFontSizeOpen(false);
               }}
               className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
               title="Font Color"
@@ -813,10 +992,8 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
                   <button
                     key={tc.value}
                     type="button"
-                    onClick={() => {
-                      executeCommand('foreColor', tc.value);
-                      setIsTextColorOpen(false);
-                    }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyTextColor(tc.value)}
                     className="flex items-center gap-2 px-2 py-1 text-xs rounded-sm hover:bg-slate-50 text-left cursor-pointer"
                   >
                     <span
@@ -834,10 +1011,14 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           <div className="relative highlight-color-container">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                saveSelection();
                 setIsHighlightColorOpen(!isHighlightColorOpen);
                 setIsTextColorOpen(false);
                 setIsInsertBlockOpen(false);
+                setIsFontFamilyOpen(false);
+                setIsFontSizeOpen(false);
               }}
               className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
               title="Highlight Color"
@@ -853,10 +1034,8 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
                   <button
                     key={hc.value}
                     type="button"
-                    onClick={() => {
-                      executeCommand('hiliteColor', hc.value);
-                      setIsHighlightColorOpen(false);
-                    }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyHighlightColor(hc.value)}
                     className="flex items-center gap-2 px-2 py-1 text-xs rounded-sm hover:bg-slate-50 text-left cursor-pointer"
                   >
                     <span
@@ -875,6 +1054,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           {/* Alignments */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('justifyLeft')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Align Left"
@@ -883,6 +1063,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('justifyCenter')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Align Center"
@@ -891,6 +1072,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('justifyRight')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Align Right"
@@ -899,6 +1081,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('justifyFull')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Justify"
@@ -909,6 +1092,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           {/* Lists */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('insertUnorderedList')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Bulleted List"
@@ -917,6 +1101,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => executeCommand('insertOrderedList')}
             className="p-1.5 rounded-md hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
             title="Numbered List"
@@ -1156,8 +1341,8 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
               marginBottom: `${Math.max(60, (zoomLevel - 100) * 15)}px`,
             }}
           >
-            {/* Background Letterhead Layer */}
-            {letterheadEnabled && (
+            {/* Background Letterhead Layer (Only if enabled and image provided) */}
+            {letterheadEnabled && letterheadImageUrl && (
               <div
                 className="absolute inset-0 pointer-events-none z-0"
                 style={{
@@ -1170,24 +1355,26 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
               />
             )}
 
-            {/* PROTECTED LETTERHEAD HEADER REGION (Non-editable Top Shield) */}
-            <div
-              className="absolute left-0 right-0 top-0 pointer-events-none z-10 select-none print:hidden flex flex-col justify-end"
-              style={{ height: `${marginTop}px` }}
-            >
-              {showGuidelines && (
-                <div className="border-b-2 border-dashed border-purple-400/80 bg-purple-500/5 px-4 py-1 flex items-center justify-between text-[10px] text-purple-700 font-mono font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                    <span>🛡️ Letterhead Header Area (Protected Zone • Text Starts Below)</span>
-                  </span>
-                  <span>Top Margin: {marginTop}px</span>
-                </div>
-              )}
-            </div>
+            {/* PROTECTED LETTERHEAD HEADER REGION (Non-editable Top Shield - only when letterhead active) */}
+            {letterheadEnabled && letterheadImageUrl && (
+              <div
+                className="absolute left-0 right-0 top-0 pointer-events-none z-10 select-none print:hidden flex flex-col justify-end"
+                style={{ height: `${marginTop}px` }}
+              >
+                {showGuidelines && (
+                  <div className="border-b-2 border-dashed border-purple-400/80 bg-purple-500/5 px-4 py-1 flex items-center justify-between text-[10px] text-purple-700 font-mono font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                      <span>🛡️ Letterhead Header Area (Protected Zone • Text Starts Below)</span>
+                    </span>
+                    <span>Top Margin: {marginTop}px</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Visual Guideline for Bottom Margin (Footer Protection) */}
-            {showGuidelines && (
+            {showGuidelines && letterheadEnabled && letterheadImageUrl && (
               <div
                 className="absolute left-0 right-0 border-t-2 border-dashed border-amber-400/80 bg-amber-500/5 pointer-events-none z-10 select-none print:hidden flex items-center justify-between px-4 py-1 text-[10px] text-amber-800 font-mono font-bold"
                 style={{ bottom: `${marginBottom}px` }}
@@ -1215,7 +1402,11 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
               contentEditable
               suppressContentEditableWarning
               onPaste={handlePaste}
+              onMouseUp={saveSelection}
+              onKeyUp={saveSelection}
+              onSelect={saveSelection}
               onInput={() => {
+                saveSelection();
                 setHasUnsavedChanges(true);
                 checkEditorContent();
               }}
@@ -1250,95 +1441,154 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
               </button>
             </div>
 
-            {/* Quick Margin Presets */}
+            {/* Quick Margin Presets (Dynamic for Blank vs Letterhead) */}
             <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-100 flex flex-col gap-2">
-              <span className="text-[11px] font-bold text-purple-900">Header Margin Presets:</span>
+              <span className="text-[11px] font-bold text-purple-900">
+                {letterheadImageUrl ? 'Letterhead Margin Presets:' : 'Blank Page Margin Presets:'}
+              </span>
               <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMarginTop(160);
-                    setHasUnsavedChanges(true);
-                  }}
-                  className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                    marginTop === 160 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
-                  }`}
-                >
-                  Compact (160px)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMarginTop(185);
-                    setHasUnsavedChanges(true);
-                  }}
-                  className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                    marginTop === 185 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
-                  }`}
-                >
-                  Standard (185px)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMarginTop(215);
-                    setHasUnsavedChanges(true);
-                  }}
-                  className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                    marginTop === 215 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
-                  }`}
-                >
-                  Spacious (215px)
-                </button>
+                {letterheadImageUrl ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMarginTop(160);
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                        marginTop === 160 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      Compact (160px)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMarginTop(185);
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                        marginTop === 185 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      Armee (185px)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMarginTop(215);
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                        marginTop === 215 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      Spacious (215px)
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMarginTop(25);
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                        marginTop === 25 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      Compact (25px)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMarginTop(40);
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                        marginTop === 40 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      Standard (40px)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMarginTop(65);
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`py-1 px-1.5 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                        marginTop === 65 ? 'bg-[#653ef1] text-white border-[#653ef1]' : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      Spacious (65px)
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Letterhead Background Toggle */}
+            {/* Letterhead Background Toggle & Presets */}
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Letterhead Background</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={letterheadEnabled}
-                    onChange={(e) => {
-                      setLetterheadEnabled(e.target.checked);
-                      setHasUnsavedChanges(true);
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#653ef1]"></div>
-                </label>
+                <div>
+                  <div className="text-xs font-bold text-slate-700">Letterhead Mode</div>
+                  <div className="text-[10px] text-slate-400">
+                    {letterheadImageUrl ? 'Letterhead image active' : 'Clean blank canvas (no letterhead)'}
+                  </div>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  letterheadImageUrl ? 'bg-purple-100 text-purple-700' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {letterheadImageUrl ? 'Active' : 'Blank'}
+                </span>
               </div>
 
-              {/* Letterhead thumbnail */}
-              {letterheadEnabled && (
-                <div className="flex flex-col gap-2">
-                  <div className="w-full h-24 rounded-lg border border-slate-200 bg-white overflow-hidden relative shadow-2xs">
+              {/* 1-Click Fast Actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleSetBlankLetterhead}
+                  className={`py-1.5 px-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    !letterheadImageUrl
+                      ? 'bg-purple-50 text-[#653ef1] border-[#653ef1]'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>⬜ Keep Blank</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetDefaultLetterhead}
+                  className={`py-1.5 px-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    letterheadImageUrl === '/letterhead.png'
+                      ? 'bg-purple-50 text-[#653ef1] border-[#653ef1]'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🏢 Armee Header</span>
+                </button>
+              </div>
+
+              {/* Letterhead thumbnail if active */}
+              {letterheadImageUrl && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-200/60">
+                  <div className="w-full h-20 rounded-lg border border-slate-200 bg-white overflow-hidden relative shadow-2xs">
                     <img
                       src={letterheadImageUrl}
                       alt="Letterhead Preview"
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => letterheadFileInputRef.current?.click()}
-                      className="flex-1 py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Upload className="w-3 h-3" />
-                      <span>Upload Custom</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetDefaultLetterhead}
-                      className="py-1 px-2 rounded-lg bg-purple-50 border border-purple-100 text-[#653ef1] hover:bg-purple-100 text-[11px] font-semibold cursor-pointer"
-                      title="Reset to Armee Enterprises Letterhead"
-                    >
-                      Default
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => letterheadFileInputRef.current?.click()}
+                    className="w-full py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <span>Upload Custom Letterhead Image</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1346,12 +1596,12 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
             {/* Top Margin Slider */}
             <div>
               <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-bold text-slate-700">Top Margin (Header Offset)</span>
+                <span className="font-bold text-slate-700">Top Margin (Content Starts)</span>
                 <span className="font-mono font-bold text-[#653ef1]">{marginTop} px</span>
               </div>
               <input
                 type="range"
-                min="100"
+                min="10"
                 max="340"
                 value={marginTop}
                 onChange={(e) => {
@@ -1361,7 +1611,7 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
                 className="w-full accent-[#653ef1] cursor-pointer"
               />
               <span className="text-[10px] text-slate-400 mt-0.5 block">
-                Guarantees content starts cleanly below the header banner and logo.
+                Adjusts top clearance from the page edge or letterhead graphics.
               </span>
             </div>
 
@@ -1573,6 +1823,22 @@ export const QuotationWordEditor: React.FC<QuotationWordEditorProps> = ({
           margin: 10px 0;
           line-height: 1.6;
           color: #111827;
+        }
+        .quotation-word-canvas ul {
+          list-style-type: disc !important;
+          margin: 10px 0 !important;
+          padding-left: 28px !important;
+        }
+        .quotation-word-canvas ol {
+          list-style-type: decimal !important;
+          margin: 10px 0 !important;
+          padding-left: 28px !important;
+        }
+        .quotation-word-canvas li {
+          margin: 4px 0 !important;
+          line-height: 1.6 !important;
+          display: list-item !important;
+          list-style-position: outside !important;
         }
         .quotation-word-canvas h1 {
           font-size: 20px;
