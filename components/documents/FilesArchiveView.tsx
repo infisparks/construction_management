@@ -56,7 +56,8 @@ import {
   toggleStarProjectFile,
   fetchAvailableProjects,
   ProjectOption,
-  resolveFileUrl
+  resolveFileUrl,
+  downloadProjectFile
 } from '@/lib/supabase/project-files';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -517,7 +518,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           })
         : allCategoryFiles;
 
-      const imageFiles = matchingFiles.filter(f => f.file_type === 'image' && f.file_url);
+      const imageFiles = matchingFiles.filter(f => f.file_type === 'image' && f.file_url && !f.file_url.startsWith('blob:'));
       const dwgFiles = matchingFiles.filter(f => f.file_type === 'dwg');
       const pdfFiles = matchingFiles.filter(f => f.file_type === 'pdf');
       const spreadsheetFiles = matchingFiles.filter(f => f.file_type === 'spreadsheet');
@@ -551,7 +552,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
     const folder = categoryFolderList.find(f => f.value === activeFolderCategory);
     if (!folder) {
       const files = currentList.filter(f => f.category === activeFolderCategory);
-      const imageFiles = files.filter(f => f.file_type === 'image' && f.file_url);
+      const imageFiles = files.filter(f => f.file_type === 'image' && f.file_url && !f.file_url.startsWith('blob:'));
       return {
         label: activeFolderCategory,
         value: activeFolderCategory,
@@ -590,25 +591,13 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
     return files;
   }, [activeFolderData, folderSearchQuery, folderFileType]);
 
-  const handleDownloadFile = (file: ProjectFile) => {
-    const targetUrl = resolveFileUrl(file.file_url);
-    if (targetUrl) {
-      const link = document.createElement('a');
-      link.href = targetUrl;
-      link.download = file.file_name;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      const blob = new Blob([`Document No: ${file.document_no}\nTitle: ${file.title}\nCategory: ${file.category}\nProject: ${file.project?.name || project.name}`], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${file.file_name || file.document_no}.txt`;
-      link.click();
-      URL.revokeObjectURL(url);
-    }
+  const handleDownloadFile = async (file: ProjectFile) => {
+    await downloadProjectFile(file, (msg, type) => {
+      setToastMessage({
+        text: msg,
+        type: type === 'warning' || type === 'error' ? 'info' : 'success',
+      });
+    });
   };
 
   const activeProjectDef = availableProjects.find(p => p.id === projectFilter);
@@ -1248,14 +1237,21 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       }}
                       className="w-full h-36 bg-slate-100 rounded-lg overflow-hidden my-2 relative cursor-pointer border border-slate-200/60 flex items-center justify-center group/img"
                     >
-                      <img 
-                        src={resolveFileUrl(file.file_url)} 
-                        alt={file.title} 
-                        className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
+                      {file.file_url && !file.file_url.startsWith('blob:') ? (
+                        <img 
+                          src={resolveFileUrl(file.file_url)} 
+                          alt={file.title} 
+                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-3 text-slate-400">
+                          <ImageIcon className="w-8 h-8 text-purple-400 mb-1" />
+                          <span className="text-[10px] font-medium text-slate-500">Site Photo</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1844,14 +1840,21 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               }}
                               className="w-full aspect-[4/3] bg-slate-100 relative overflow-hidden cursor-pointer group/thumb"
                             >
-                              <img
-                                src={resolveFileUrl(file.file_url)}
-                                alt={file.title}
-                                className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
-                                onError={(e) => {
-                                  (e.target as HTMLElement).style.display = 'none';
-                                }}
-                              />
+                              {file.file_url && !file.file_url.startsWith('blob:') ? (
+                                <img
+                                  src={resolveFileUrl(file.file_url)}
+                                  alt={file.title}
+                                  className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                                  <ImageIcon className="w-10 h-10 text-purple-400 mb-1" />
+                                  <span className="text-xs font-semibold text-slate-600">Site Inspection Photo</span>
+                                </div>
+                              )}
 
                               {/* Gradient vignette overlay */}
                               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/20 opacity-60 group-hover/thumb:opacity-80 transition-opacity" />

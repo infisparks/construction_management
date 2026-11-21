@@ -288,9 +288,24 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         const uploadResult = await uploadFileToStorage(selectedFile, selectedProjectId || 'general');
         publicUrl = uploadResult.publicUrl;
         filePath = uploadResult.filePath;
-      } catch (uploadErr) {
-        console.warn('Storage bucket upload fallback:', uploadErr);
-        publicUrl = URL.createObjectURL(selectedFile);
+      } catch (uploadErr: any) {
+        console.warn('Storage bucket upload fallback to Base64:', uploadErr);
+        // If file is under 1.5MB, convert to persistent Base64 Data URL so it never expires!
+        if (selectedFile.size <= 1.5 * 1024 * 1024) {
+          publicUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedFile);
+          });
+          filePath = '';
+        } else {
+          setErrorMessage(
+            `Cloud storage upload failed (${uploadErr?.message || 'Bucket not found'}). Please create the 'project-documents' bucket in Supabase Storage.`
+          );
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // Auto-fallback for documentNo if empty

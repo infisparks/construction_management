@@ -57,6 +57,11 @@ export function extractStoragePath(pathOrUrl?: string | null): string {
  * When the user switches to self-hosted Supabase and updates NEXT_PUBLIC_SUPABASE_URL,
  * all URLs dynamically point to the new domain without needing database modifications.
  */
+export function isStaleBlobUrl(pathOrUrl?: string | null): boolean {
+  if (!pathOrUrl) return false;
+  return pathOrUrl.trim().startsWith('blob:');
+}
+
 export function resolveFileUrl(pathOrUrl?: string | null): string {
   if (!pathOrUrl) return '';
   const trimmed = pathOrUrl.trim();
@@ -342,4 +347,119 @@ export async function toggleStarProjectFile(
     console.error('Failed to toggle star:', err);
     return false;
   }
+}
+
+function triggerBrowserDownload(url: string, fileName: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Safely downloads a project file without triggering browser security blocks on dead blob URLs.
+ * Handles:
+ * 1. Base64 data URLs (data:...)
+ * 2. Active in-memory blob URLs (blob:...)
+ * 3. Remote cloud URLs (http/https) via CORS fetch and blob streaming
+ * 4. Graceful fallback generation for expired session blobs
+ */
+export async function downloadProjectFile(
+  file: ProjectFile,
+  onNotice?: (msg: string, type: 'info' | 'warning' | 'error') => void
+): Promise<boolean> {
+  const rawUrl = file.file_url?.trim() || '';
+  const resolvedUrl = resolveFileUrl(rawUrl);
+  const fileName = file.file_name || `${file.document_no || 'document'}.pdf`;
+
+  // 1. Data URL (Base64) - always valid
+  if (resolvedUrl.startsWith('data:')) {
+    triggerBrowserDownload(resolvedUrl, fileName);
+    return true;
+  }
+
+  // 2. Blob URL
+  if (resolvedUrl.startsWith('blob:')) {
+    try {
+      const resp = await fetch(resolvedUrl);
+      if (!resp.ok) throw new Error('Blob expired');
+      const blob = await resp.blob();
+      const freshUrl = URL.createObjectURL(blob);
+      triggerBrowserDownload(freshUrl, fileName);
+      URL.revokeObjectURL(freshUrl);
+      return true;
+    } catch {
+      // The blob is an expired session URL that cannot be loaded
+      console.warn('Expired in-memory blob URL detected, falling back to document record:', resolvedUrl);
+
+      try {
+        const { generateProjectDocumentPdf } = await import('@/lib/construction-planning/project-document-pdf');
+        const doc = generateProjectDocumentPdf(file);
+        const pdfBlob = doc.output('blob');
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const downloadName = `${fileName.replace(/\.[^/.]+$/, '')}_certificate.pdf`;
+        triggerBrowserDownload(pdfUrl, downloadName);
+        URL.revokeObjectURL(pdfUrl);
+
+        onNotice?.(
+          `Original image was not stored in cloud storage (expired session blob). Downloaded verified document certificate PDF.`,
+          'warning'
+        );
+        return true;
+      } catch {
+        const textContent = [
+          `DOCUMENT ARCHIVE RECORD`,
+          `=======================`,
+          `Document No : ${file.document_no}`,
+          `Title       : ${file.title}`,
+          `Category    : ${file.category}`,
+          `File Name   : ${file.file_name}`,
+          `Uploaded By : ${file.uploaded_by || 'System'}`,
+          `Date        : ${file.created_at}`,
+          `Project ID  : ${file.project_id || '-'}`,
+          ``,
+          `NOTE: The original file binary was uploaded before the Supabase 'project-documents' storage bucket was configured.`,
+        ].join('\n');
+        const textBlob = new Blob([textContent], { type: 'text/plain' });
+        const textUrl = URL.createObjectURL(textBlob);
+        triggerBrowserDownload(textUrl, `${file.document_no || 'document'}_details.txt`);
+        URL.revokeObjectURL(textUrl);
+
+        onNotice?.(
+          `Original binary expired with session. Downloaded document metadata record.`,
+          'info'
+        );
+        return true;
+      }
+    }
+  }
+
+  // 3. Remote URL (Supabase Storage or HTTP/HTTPS)
+  if (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://')) {
+    try {
+      const resp = await fetch(resolvedUrl, { mode: 'cors' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      triggerBrowserDownload(blobUrl, fileName);
+      URL.revokeObjectURL(blobUrl);
+      return true;
+    } catch (fetchErr) {
+      console.warn('CORS download failed, falling back to direct anchor navigation:', fetchErr);
+      try {
+        triggerBrowserDownload(resolvedUrl, fileName);
+        return true;
+      } catch (linkErr) {
+        onNotice?.('Failed to download file from cloud storage.', 'error');
+        return false;
+      }
+    }
+  }
+
+  // 4. Fallback if no URL exists
+  onNotice?.('No valid file link found for this document.', 'error');
+  return false;
 }

@@ -207,7 +207,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
  */
 export function getProjectDocumentPdfUrl(file: ProjectFile): string {
   const resolved = resolveFileUrl(file.file_url);
-  if (resolved && (resolved.startsWith('http') || resolved.startsWith('blob:'))) {
+  if (resolved && (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('data:'))) {
     return resolved;
   }
   const doc = generateProjectDocumentPdf(file);

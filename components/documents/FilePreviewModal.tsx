@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { ProjectFile } from '@/lib/construction-planning/types';
 import { getProjectDocumentPdfUrl } from '@/lib/construction-planning/project-document-pdf';
-import { resolveFileUrl, extractStoragePath } from '@/lib/supabase/project-files';
+import { resolveFileUrl, extractStoragePath, downloadProjectFile } from '@/lib/supabase/project-files';
 import * as XLSX from 'xlsx';
 
 interface FilePreviewModalProps {
@@ -463,25 +463,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     return `${bytes} B`;
   };
 
-  const handleDownload = () => {
-    const downloadUrl = pdfBlobUrl || resolveFileUrl(file.file_url);
-    if (downloadUrl) {
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = file.file_name;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      const blob = new Blob([`Document No: ${file.document_no}\nTitle: ${file.title}\nCategory: ${file.category}\nVersion: ${file.version}`], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${file.file_name || file.document_no}.txt`;
-      link.click();
-      URL.revokeObjectURL(url);
-    }
+  const handleDownload = async () => {
+    if (!file) return;
+    await downloadProjectFile(file);
   };
 
   return (
@@ -1073,7 +1057,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                       }}
                       className="flex items-center justify-center select-none"
                     >
-                      {file.file_url ? (
+                      {file.file_url && !file.file_url.startsWith('blob:') ? (
                         <img
                           src={resolveFileUrl(file.file_url)}
                           alt={file.title}
