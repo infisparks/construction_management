@@ -56,6 +56,7 @@ import { RevertTaskConfirmModal } from '@/components/construction-planning/Rever
 import { MaterialBillingDrawer } from '@/components/construction-planning/MaterialBillingDrawer';
 import { SubcontractorBillsView } from '@/components/construction-planning/SubcontractorBillsView';
 import { FilesArchiveView } from '@/components/documents/FilesArchiveView';
+import { QuotationsListView } from '@/components/quotations/QuotationsListView';
 import { SiteInventoryManagement } from '@/components/inventory/SiteInventoryManagement';
 import { SiteExpensesView } from '@/components/expenses/SiteExpensesView';
 import { CommercialBillsAndExpensesView } from '@/components/expenses/CommercialBillsAndExpensesView';
@@ -420,6 +421,7 @@ export default function ConstructionPlanningPage() {
         'expenses',
         'contractor-work-orders',
         'customer-purchases',
+        'quotations',
       ];
       if (urlView && validViews.includes(urlView as ViewMode)) {
         setCurrentView(urlView as ViewMode);
@@ -1740,6 +1742,7 @@ export default function ConstructionPlanningPage() {
                     onOpenSitesManager={() => setIsSitesManagerOpen(true)}
                     initialCategory={archiveCategoryFilter}
                     onCategoryChange={setArchiveCategoryFilter}
+                    onOpenQuotationBuilder={() => setCurrentView('quotations')}
                   />
                 )}
 
@@ -1750,6 +1753,16 @@ export default function ConstructionPlanningPage() {
                     initialTab={inventorySubTab}
                     showToast={showToast}
                     externalActionTrigger={triggerMaterialAction}
+                  />
+                )}
+
+                {currentView === 'quotations' && (
+                  <QuotationsListView
+                    userEmail={user.email || undefined}
+                    userRole={userRole?.role}
+                    availableProjects={allDbProjects.map((p) => ({ id: p.id, name: p.name }))}
+                    activeProjectId={activeProjectId}
+                    showToast={showToast}
                   />
                 )}
               </>

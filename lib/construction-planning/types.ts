@@ -141,7 +141,8 @@ export type ViewMode =
   | 'files-archive'
   | 'expenses'
   | 'contractor-work-orders'
-  | 'customer-purchases';
+  | 'customer-purchases'
+  | 'quotations';
 
 // Module 3 — Files Archive (Project Documents & Media Repository)
 export type FileCategory =

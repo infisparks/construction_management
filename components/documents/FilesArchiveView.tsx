@@ -58,8 +58,11 @@ import {
   fetchAvailableProjects,
   ProjectOption,
   resolveFileUrl,
+  extractStoragePath,
+  STORAGE_BUCKET,
   downloadProjectFile
 } from '@/lib/supabase/project-files';
+import { supabase } from '@/lib/supabase/client';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
 import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
@@ -83,6 +86,7 @@ interface FilesArchiveViewProps {
   onOpenSitesManager?: () => void;
   initialCategory?: FileCategory | 'all';
   onCategoryChange?: (category: FileCategory | 'all') => void;
+  onOpenQuotationBuilder?: () => void;
 }
 
 const BASE_CATEGORIES: { label: string; value: FileCategory | 'all' }[] = [
@@ -108,6 +112,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   onOpenSitesManager,
   initialCategory = 'all',
   onCategoryChange,
+  onOpenQuotationBuilder,
 }) => {
   // Main tab: Active Vault vs Recycle Bin
   const [activeTab, setActiveTab] = useState<'vault' | 'bin'>('vault');
@@ -199,12 +204,27 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [isContactsManagerOpen, setIsContactsManagerOpen] = useState(false);
 
   const handleShareToWhatsApp = (file: ProjectFile) => {
-    const fullUrl = file.file_url ? resolveFileUrl(file.file_url) : '';
+    let fullUrl = '';
+    const rawStorage = file.storage_path || file.file_url || '';
+    if (rawStorage && !rawStorage.startsWith('blob:') && !rawStorage.startsWith('data:')) {
+      const cleanPath = extractStoragePath(rawStorage);
+      if (cleanPath) {
+        const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(cleanPath);
+        fullUrl = data?.publicUrl || '';
+      }
+    }
+    if (!fullUrl && file.file_url && !file.file_url.startsWith('blob:') && !file.file_url.startsWith('data:')) {
+      fullUrl = resolveFileUrl(file.file_url);
+    }
+    if (!fullUrl && file.file_url) {
+      fullUrl = file.file_url;
+    }
+
     setWhatsAppPayload({
       title: file.title,
       documentNo: file.document_no,
       category: file.category,
-      projectName: project.name,
+      projectName: file.project?.name || project.name,
       mediaUrl: fullUrl,
       fileName: file.file_name,
       fileType: file.file_type,
@@ -707,6 +727,18 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <MessageCircle className="w-4 h-4 text-emerald-600 fill-emerald-600/10" />
               <span className="hidden sm:inline">WhatsApp Contacts</span>
             </button>
+
+            {onOpenQuotationBuilder && (
+              <button
+                type="button"
+                onClick={onOpenQuotationBuilder}
+                className="h-9 px-4 rounded-full text-xs font-bold text-[#653ef1] bg-purple-50 border border-purple-200/90 hover:bg-purple-100 transition-all shadow-2xs hover:shadow-xs cursor-pointer flex items-center gap-2"
+                title="Create Quotations on Letterhead in Word-like Builder"
+              >
+                <FileText className="w-4 h-4 text-[#653ef1]" />
+                <span className="hidden sm:inline">Quotation Builder</span>
+              </button>
+            )}
 
             <button
               type="button"

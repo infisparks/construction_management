@@ -8,6 +8,7 @@ import {
   Receipt, 
   Package, 
   FolderKanban, 
+  FileText,
   LogOut, 
   X,
   Sparkles
@@ -15,7 +16,7 @@ import {
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
 import { isModuleAllowed, isAccountRole } from '@/lib/auth/role-access';
 
-export type NavModuleId = 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'sites';
+export type NavModuleId = 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'sites' | 'quotations';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -90,6 +91,15 @@ const MODULES: NavModuleDef[] = [
     badgeColor: 'bg-purple-100 text-[#653ef1]',
     description: 'Central document repository',
   },
+  {
+    id: 'quotations',
+    label: 'Quotation Builder',
+    shortLabel: 'Quotes',
+    icon: FileText,
+    badge: 'Word',
+    badgeColor: 'bg-emerald-100 text-emerald-700',
+    description: 'Letterhead quotation builder & PDF generator',
+  },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -113,6 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Determine active module based on currentView
   const [activeModule, setActiveModule] = useState<NavModuleId>(() => {
+    if (currentView === 'quotations') return 'quotations';
     if (currentView === 'files-archive') return 'archive';
     if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
     if (currentView === 'materials') return 'materials';
@@ -122,7 +133,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Sync active module if currentView changes externally
   useEffect(() => {
-    if (currentView === 'files-archive') {
+    if (currentView === 'quotations') {
+      setActiveModule('quotations');
+    } else if (currentView === 'files-archive') {
       setActiveModule('archive');
     } else if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') {
       setActiveModule('commercial');
@@ -158,6 +171,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onSelectArchiveCategory('all');
       }
       onViewChange('files-archive');
+    } else if (modId === 'quotations') {
+      onViewChange('quotations');
     }
   };
 

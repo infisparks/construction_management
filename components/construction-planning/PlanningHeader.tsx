@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   Sparkles,
   MessageCircle,
-  ArrowDownLeft
+  ArrowDownLeft,
+  FileText
 } from 'lucide-react';
 import { ProjectInfo, ViewMode } from '@/lib/construction-planning/types';
 import { formatDisplayDate, calculateDurationDetails } from '@/lib/construction-planning/schedule-utils';
@@ -48,6 +49,7 @@ const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementT
   expenses: { title: 'Commercial Bills & Expenses', icon: Receipt },
   'contractor-work-orders': { title: 'Contractor Work Orders', icon: Wrench },
   'customer-purchases': { title: 'Client Purchases & Inflow', icon: ArrowDownLeft },
+  quotations: { title: 'Quotation Builder', icon: FileText },
 };
 
 interface PlanningHeaderProps {

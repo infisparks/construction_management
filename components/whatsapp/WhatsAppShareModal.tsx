@@ -27,6 +27,7 @@ import {
   formatPhoneDisplay
 } from '@/lib/supabase/whatsapp-contacts';
 import { WhatsAppContactsManagerModal } from './WhatsAppContactsManagerModal';
+import { supabase } from '@/lib/supabase/client';
 
 export interface WhatsAppSharePayload {
   title: string;
@@ -212,12 +213,44 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
     setIsSending(true);
     try {
+      let finalMedia = payload.mediaUrl?.trim() || undefined;
+
+      // If mediaUrl is a client-side in-memory blob: URL or data: URL, upload to Supabase Storage
+      // to obtain a guaranteed, permanent public HTTPS URL for Evolution API to deliver as an attached file
+      if (finalMedia && (finalMedia.startsWith('blob:') || finalMedia.startsWith('data:'))) {
+        try {
+          const blobResp = await fetch(finalMedia);
+          if (blobResp.ok) {
+            const blobData = await blobResp.blob();
+            const cleanName = (payload.fileName || 'document.pdf').replace(/[^a-zA-Z0-9.-]/g, '_');
+            const storagePath = `whatsapp_shares/${Date.now()}_${cleanName}`;
+            const { data: uploadRes, error: uploadErr } = await supabase.storage
+              .from('project-documents')
+              .upload(storagePath, blobData, {
+                contentType: payload.fileType === 'image' ? 'image/jpeg' : 'application/pdf',
+                upsert: true,
+              });
+
+            if (!uploadErr && uploadRes) {
+              const { data: urlData } = supabase.storage
+                .from('project-documents')
+                .getPublicUrl(uploadRes.path);
+              if (urlData?.publicUrl) {
+                finalMedia = urlData.publicUrl;
+              }
+            }
+          }
+        } catch (blobErr) {
+          console.warn('Failed to upload client blob to Supabase Storage:', blobErr);
+        }
+      }
+
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           number: recipientNumber,
-          media: payload.mediaUrl || undefined,
+          media: finalMedia || undefined,
           fileName: payload.fileName || `${payload.title.replace(/\s+/g, '_')}.pdf`,
           mediatype: payload.fileType === 'image' ? 'image' : 'document',
           mimetype: payload.fileType === 'image' ? 'image/jpeg' : 'application/pdf',
@@ -229,7 +262,12 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to send WhatsApp message.');
+        const errorText = Array.isArray(result.error)
+          ? result.error.join(', ')
+          : typeof result.error === 'object' && result.error !== null
+          ? JSON.stringify(result.error)
+          : result.error || 'Failed to send WhatsApp message.';
+        throw new Error(errorText);
       }
 
       const successText = `Sent to ${getRecipientName()} (${formatPhoneDisplay(recipientNumber)}) via WhatsApp!`;

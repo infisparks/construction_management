@@ -84,6 +84,10 @@ export function isViewAllowed(
     if (target === 'files-archive' || target === 'archive' || target === 'documents') {
       return true;
     }
+    // Quotations / Quote Builder
+    if (target === 'quotations' || target === 'quotes' || target === 'quote') {
+      return true;
+    }
     // All timeline views (list, gantt, critical, milestones, progress, planning) are disallowed
     return false;
   }
@@ -178,12 +182,13 @@ export function isModuleAllowed(
   role?: string | null,
   pageValue?: string | null
 ): boolean {
-  // 1. Account Role: allow only Bill ('commercial'), Store ('materials'), Document ('archive')
+  // 1. Account Role: allow only Bill ('commercial'), Store ('materials'), Document ('archive'), Quotations ('quotations')
   if (isAccountRole(role)) {
     const mod = moduleId.toLowerCase().trim();
     if (mod === 'commercial' || mod === 'expenses') return true; // Bill
     if (mod === 'materials') return true;                         // Store
     if (mod === 'archive') return true;                           // Document
+    if (mod === 'quotations' || mod === 'quotes') return true;    // Quotations
     // Timeline ('planning'), execution, controls are hidden
     return false;
   }
