@@ -22,6 +22,7 @@ import {
 import {
   WhatsAppContact,
   fetchWhatsAppContacts,
+  createWhatsAppContact,
   cleanWhatsAppNumber,
   formatPhoneDisplay
 } from '@/lib/supabase/whatsapp-contacts';
@@ -62,6 +63,14 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const [customPhone, setCustomPhone] = useState('');
   const [customName, setCustomName] = useState('');
 
+  // Inline Contact Creation State
+  const [isInlineCreateOpen, setIsInlineCreateOpen] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactRole, setNewContactRole] = useState('Client');
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
+
   // Caption state
   const [caption, setCaption] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -84,6 +93,43 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       console.error('Failed to load whatsapp contacts:', err);
     } finally {
       setIsLoadingContacts(false);
+    }
+  };
+
+  // Instant inline contact creation
+  const handleSaveInlineContact = async () => {
+    if (!newContactName.trim()) {
+      setContactError('Please enter contact name');
+      return;
+    }
+    const cleaned = cleanWhatsAppNumber(newContactPhone);
+    if (!cleaned) {
+      setContactError('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    setIsSavingContact(true);
+    setContactError(null);
+    try {
+      const created = await createWhatsAppContact({
+        name: newContactName.trim(),
+        phone: cleaned,
+        role: newContactRole,
+        is_favorite: true,
+      });
+
+      if (created) {
+        setContacts((prev) => [created, ...prev]);
+        setSelectedContactId(created.id);
+        setIsInlineCreateOpen(false);
+        setNewContactName('');
+        setNewContactPhone('');
+        setStatusMessage({ type: 'success', text: `Saved "${created.name}" and selected as recipient!` });
+      }
+    } catch (err: any) {
+      setContactError(err.message || 'Failed to create contact');
+    } finally {
+      setIsSavingContact(false);
     }
   };
 
@@ -335,26 +381,47 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             {/* Recipient Selection Section */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-slate-800 font-bold block">
+                <label className="text-slate-800 font-bold block text-xs">
                   Select WhatsApp Contact
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsContactsManagerOpen(true)}
-                  className="text-xs font-bold text-[#653ef1] hover:text-[#5022e3] flex items-center gap-1 cursor-pointer"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>+ Manage / Add Contacts</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineCreateOpen(!isInlineCreateOpen)}
+                    className="text-xs font-bold text-[#653ef1] hover:text-[#5022e3] flex items-center gap-1 cursor-pointer bg-purple-50 hover:bg-purple-100/70 border border-purple-200 px-2 py-0.5 rounded-lg transition-colors"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ Add Contact</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsContactsManagerOpen(true)}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
+                    title="Open full address book"
+                  >
+                    Manage All
+                  </button>
+                </div>
               </div>
 
               {/* Saved Contacts Dropdown */}
               <div className="relative">
                 <select
-                  value={selectedContactId}
-                  onChange={(e) => setSelectedContactId(e.target.value)}
+                  value={isInlineCreateOpen ? 'add_new' : selectedContactId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'add_new') {
+                      setIsInlineCreateOpen(true);
+                    } else {
+                      setIsInlineCreateOpen(false);
+                      setSelectedContactId(val);
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer text-xs"
                 >
+                  <option value="add_new" className="font-bold text-[#653ef1] bg-purple-50">
+                    ➕ + Create / Add New Contact...
+                  </option>
                   {contacts.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} ({c.role}) — {formatPhoneDisplay(c.phone)} {c.is_favorite ? '⭐' : ''}
@@ -364,8 +431,120 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                 </select>
               </div>
 
+              {/* Inline Create Contact Card */}
+              {isInlineCreateOpen && (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-50/90 via-white to-emerald-50/60 border border-purple-200 space-y-3 animate-in fade-in zoom-in-95 duration-150 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <UserPlus className="w-4 h-4 text-[#653ef1]" />
+                      <span className="text-xs font-bold text-slate-900">
+                        Create New WhatsApp Contact
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsInlineCreateOpen(false);
+                        if (contacts.length > 0) setSelectedContactId(contacts[0].id);
+                        else setSelectedContactId('custom');
+                      }}
+                      className="text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {contactError && (
+                    <div className="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{contactError}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Full Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newContactName}
+                        onChange={(e) => setNewContactName(e.target.value)}
+                        placeholder="e.g. Mudassir / Er. Shakir"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        WhatsApp Number <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={newContactPhone}
+                        onChange={(e) => setNewContactPhone(e.target.value)}
+                        placeholder="10-digit number or +91..."
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Role / Designation
+                    </label>
+                    <select
+                      value={newContactRole}
+                      onChange={(e) => setNewContactRole(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#653ef1]/20 focus:border-[#653ef1] cursor-pointer"
+                    >
+                      <option value="Client">Client / Buyer</option>
+                      <option value="Contractor">Contractor</option>
+                      <option value="Vendor">Vendor / Supplier</option>
+                      <option value="Site Engineer">Site Engineer</option>
+                      <option value="Site Supervisor">Site Supervisor</option>
+                      <option value="Admin">Admin / Management</option>
+                      <option value="Architect">Architect / Consultant</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsInlineCreateOpen(false);
+                        if (contacts.length > 0) setSelectedContactId(contacts[0].id);
+                        else setSelectedContactId('custom');
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingContact}
+                      onClick={handleSaveInlineContact}
+                      className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#653ef1] to-[#5022e3] text-white text-xs font-bold hover:shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isSavingContact ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Save & Select Contact</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Custom Number Entry if selected */}
-              {selectedContactId === 'custom' && (
+              {!isInlineCreateOpen && selectedContactId === 'custom' && (
                 <div className="p-3.5 rounded-xl bg-purple-50/50 border border-purple-200 space-y-2.5 animate-in fade-in duration-150">
                   <span className="text-[11px] font-bold text-[#653ef1] uppercase tracking-wider block">
                     Direct Recipient Details

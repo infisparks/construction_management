@@ -13,7 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
-import { isModuleAllowed } from '@/lib/auth/role-access';
+import { isModuleAllowed, isAccountRole } from '@/lib/auth/role-access';
 
 export type NavModuleId = 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'sites';
 
@@ -116,6 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (currentView === 'files-archive') return 'archive';
     if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
     if (currentView === 'materials') return 'materials';
+    if (isAccountRole(userRole)) return 'commercial';
     return 'planning';
   });
 

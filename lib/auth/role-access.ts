@@ -11,6 +11,23 @@ export function isOnlyAllowRole(role?: string | null): boolean {
 }
 
 /**
+ * Checks if the given role represents an "account" / "accountant" role.
+ * Matches "account", "accountant", "accounts", case-insensitively.
+ */
+export function isAccountRole(role?: string | null): boolean {
+  if (!role) return false;
+  const normalized = role.trim().toLowerCase().replace(/[\s\-_]/g, '');
+  return normalized === 'account' || normalized === 'accountant' || normalized === 'accounts';
+}
+
+/**
+ * Checks if the user role has restricted access (onlyallow or account).
+ */
+export function isRestrictedRole(role?: string | null): boolean {
+  return isOnlyAllowRole(role) || isAccountRole(role);
+}
+
+/**
  * Parses the raw string or JSON representation of the allowed page(s).
  * Supports comma/semicolon/newline-delimited values, e.g. "files-archive" or "files-archive, materials"
  * or JSON string arrays like '["files-archive"]'.
@@ -45,6 +62,32 @@ export function isViewAllowed(
   role?: string | null,
   pageValue?: string | null
 ): boolean {
+  // 1. Account Role: strictly allow Bill, Store, Document; disallow Timeline
+  if (isAccountRole(role)) {
+    const target = view.toLowerCase().trim();
+    // Bill / Commercial views
+    if (
+      target === 'expenses' ||
+      target === 'subcontractor-bills' ||
+      target === 'contractor-work-orders' ||
+      target === 'customer-purchases' ||
+      target === 'billing' ||
+      target === 'commercial'
+    ) {
+      return true;
+    }
+    // Store / Materials / Inventory
+    if (target === 'materials' || target === 'store' || target === 'inventory') {
+      return true;
+    }
+    // Document / Files Archive
+    if (target === 'files-archive' || target === 'archive' || target === 'documents') {
+      return true;
+    }
+    // All timeline views (list, gantt, critical, milestones, progress, planning) are disallowed
+    return false;
+  }
+
   if (!isOnlyAllowRole(role)) return true;
 
   const allowedList = parseAllowedPages(pageValue);
@@ -135,6 +178,16 @@ export function isModuleAllowed(
   role?: string | null,
   pageValue?: string | null
 ): boolean {
+  // 1. Account Role: allow only Bill ('commercial'), Store ('materials'), Document ('archive')
+  if (isAccountRole(role)) {
+    const mod = moduleId.toLowerCase().trim();
+    if (mod === 'commercial' || mod === 'expenses') return true; // Bill
+    if (mod === 'materials') return true;                         // Store
+    if (mod === 'archive') return true;                           // Document
+    // Timeline ('planning'), execution, controls are hidden
+    return false;
+  }
+
   if (!isOnlyAllowRole(role)) return true;
 
   const allowedList = parseAllowedPages(pageValue);
@@ -215,6 +268,11 @@ export function getFirstAllowedView(
   role?: string | null,
   pageValue?: string | null
 ): ViewMode | null {
+  // If user role is account, primary view is always Bill ('expenses')
+  if (isAccountRole(role)) {
+    return 'expenses';
+  }
+
   const allowedList = parseAllowedPages(pageValue);
 
   for (const item of allowedList) {

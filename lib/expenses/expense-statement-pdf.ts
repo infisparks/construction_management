@@ -15,7 +15,7 @@ export function formatINR(val: number): string {
   const formatted = otherNumbers !== ''
     ? otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree
     : lastThree;
-  return `Rs. ${formatted}`;
+  return `Rs.\u00A0${formatted}`;
 }
 
 /**

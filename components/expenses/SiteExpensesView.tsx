@@ -924,7 +924,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 <th className="px-3.5 py-2.5">Category</th>
                 <th className="px-3.5 py-2.5">Paid To / Vendor</th>
                 <th className="px-3.5 py-2.5 text-center">Mode</th>
-                <th className="px-3.5 py-2.5 text-right">Amount (Rs.)</th>
+                <th className="px-3.5 py-2.5 text-right whitespace-nowrap">Amount (Rs.)</th>
                 <th className="px-3.5 py-2.5 text-center">Status</th>
                 <th className="px-3.5 py-2.5 text-right">Actions</th>
               </tr>
@@ -1092,8 +1092,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                       </td>
 
                       {/* Amount */}
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-bold text-slate-900 text-sm">
+                      <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                        <span className="font-bold text-slate-900 text-sm whitespace-nowrap inline-block">
                           {formatINR(exp.amount)}
                         </span>
                       </td>
@@ -1309,8 +1309,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                         <td className="px-4 py-3 text-slate-700">
                           {exp.vendor_name || 'Direct Site Cash'}
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-slate-900">
-                          {formatINR(exp.amount)}
+                        <td className="px-3.5 py-2.5 text-right font-bold text-slate-900 whitespace-nowrap">
+                          <span className="whitespace-nowrap inline-block">
+                            {formatINR(exp.amount)}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">

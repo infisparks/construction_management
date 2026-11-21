@@ -542,18 +542,18 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
                       </td>
 
                       {/* Total Deal */}
-                      <td className="py-3 px-4 text-right font-extrabold text-slate-900">
-                        Rs. {deal.toLocaleString('en-IN')}
+                      <td className="py-2.5 px-3.5 text-right font-extrabold text-slate-900 whitespace-nowrap">
+                        <span className="whitespace-nowrap inline-block">Rs.&nbsp;{deal.toLocaleString('en-IN')}</span>
                       </td>
 
                       {/* Collected */}
-                      <td className="py-3 px-4 text-right font-extrabold text-emerald-700">
-                        Rs. {coll.toLocaleString('en-IN')}
+                      <td className="py-2.5 px-3.5 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+                        <span className="whitespace-nowrap inline-block">Rs.&nbsp;{coll.toLocaleString('en-IN')}</span>
                       </td>
 
                       {/* Balance Due */}
-                      <td className="py-3 px-4 text-right font-extrabold text-amber-700">
-                        Rs. {bal.toLocaleString('en-IN')}
+                      <td className="py-2.5 px-3.5 text-right font-extrabold text-amber-700 whitespace-nowrap">
+                        <span className="whitespace-nowrap inline-block">Rs.&nbsp;{bal.toLocaleString('en-IN')}</span>
                       </td>
 
                       {/* Status Badge */}

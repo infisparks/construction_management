@@ -36,6 +36,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!error && data) {
         setUserRole(data as UserRole);
       } else {
+        // Fallback: match by email in public.user_roles if available
+        if (userEmail) {
+          const { data: emailData, error: emailError } = await supabase
+            .from('user_roles')
+            .select('*')
+            .ilike('email', userEmail)
+            .maybeSingle();
+
+          if (!emailError && emailData) {
+            setUserRole(emailData as UserRole);
+            return;
+          }
+        }
+
         // Fallback default role
         setUserRole({
           id: 'role-temp',

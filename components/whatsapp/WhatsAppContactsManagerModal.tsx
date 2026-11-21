@@ -151,7 +151,7 @@ export const WhatsAppContactsManagerModal: React.FC<WhatsAppContactsManagerModal
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[80] overflow-hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div

@@ -34,6 +34,7 @@ import {
   setStoredActiveSite,
   fetchAllActiveSites,
 } from '@/lib/supabase/site-storage';
+import { isAccountRole } from '@/lib/auth/role-access';
 
 function SitesPageContent() {
   const router = useRouter();
@@ -158,7 +159,8 @@ function SitesPageContent() {
 
     if (andRedirect) {
       setTimeout(() => {
-        router.push(`/planstructino?site=${proj.id}&view=list`);
+        const defaultView = isAccountRole(userRole?.role) ? 'expenses' : 'list';
+        router.push(`/planstructino?site=${proj.id}&view=${defaultView}`);
       }, 400);
     }
   };
@@ -335,11 +337,14 @@ function SitesPageContent() {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => router.push('/planstructino?view=list')}
+            onClick={() => {
+              const defaultView = isAccountRole(userRole?.role) ? 'expenses' : 'list';
+              router.push(`/planstructino?view=${defaultView}`);
+            }}
             className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#653ef1] hover:bg-[#653ef1]/10 rounded-xl transition-all border border-slate-200/90 shadow-2xs hover:border-[#653ef1]/30 cursor-pointer group"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-            <span>Back to Planning & WBS</span>
+            <span>{isAccountRole(userRole?.role) ? 'Back to Bills & Expenses' : 'Back to Planning & WBS'}</span>
           </button>
 
           <div className="h-5 w-px bg-slate-200 hidden sm:block" />
@@ -700,7 +705,10 @@ function SitesPageContent() {
                     ) : isActive ? (
                       <button
                         type="button"
-                        onClick={() => router.push('/planstructino?view=list')}
+                        onClick={() => {
+                          const defaultView = isAccountRole(userRole?.role) ? 'expenses' : 'list';
+                          router.push(`/planstructino?view=${defaultView}`);
+                        }}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/30 text-xs font-bold hover:bg-[#653ef1]/20 transition-all cursor-pointer shadow-2xs"
                       >
                         <span>Open Workspace</span>
