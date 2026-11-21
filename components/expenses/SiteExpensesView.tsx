@@ -36,9 +36,11 @@ import {
   ArrowDownLeft,
   FileText
 } from 'lucide-react';
-import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
+import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus, DbProject } from '@/lib/supabase/types';
+import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
 import { ProjectInfo } from '@/lib/construction-planning/types';
+import { formatMumbaiDateTime } from '@/lib/common/date-format';
 import {
   fetchSiteExpenses,
   fetchDeletedSiteExpenses,
@@ -69,16 +71,18 @@ import { ExpenseVoucherModal } from './ExpenseVoucherModal';
 interface SiteExpensesViewProps {
   project?: ProjectInfo;
   projectId?: string;
+  allProjects?: DbProject[];
   userEmail?: string;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
   externalActionTrigger?: { action: string; timestamp: number } | null;
-  activeCommercialTab?: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders';
-  onSelectCommercialTab?: (tab: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders') => void;
+  activeCommercialTab?: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases';
+  onSelectCommercialTab?: (tab: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases') => void;
 }
 
 export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   project,
-  projectId = 'f0e510da-9530-468f-bb09-59920070d55e',
+  projectId = '',
+  allProjects = [],
   userEmail,
   showToast,
   externalActionTrigger,
@@ -88,6 +92,22 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   const [expenses, setExpenses] = useState<SiteExpense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Available Projects & Site Filter (Default: 'all' to show all construction sites & buildings)
+  const [availableProjects, setAvailableProjects] = useState<DbProject[]>(allProjects || []);
+  const [siteFilter, setSiteFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (allProjects && allProjects.length > 0) {
+      setAvailableProjects(allProjects);
+    } else {
+      fetchAllActiveSites(false).then((sites) => {
+        if (sites && sites.length > 0) {
+          setAvailableProjects(sites);
+        }
+      });
+    }
+  }, [allProjects]);
 
   // Voucher Slip Modal State
   const [viewingExpense, setViewingExpense] = useState<SiteExpense | null>(null);
@@ -126,11 +146,12 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load expenses from Supabase
+  // Load expenses from Supabase (supports 'all' for multi-site overview)
   const loadExpenses = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchSiteExpenses(projectId);
+      const target = siteFilter === 'all' ? 'all' : (siteFilter || projectId || 'all');
+      const data = await fetchSiteExpenses(target);
       setExpenses(data);
     } catch (err) {
       console.error('Failed to load expenses:', err);
@@ -143,7 +164,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   const loadDeletedExpenses = async () => {
     setIsLoadingBin(true);
     try {
-      const data = await fetchDeletedSiteExpenses(projectId);
+      const target = siteFilter === 'all' ? 'all' : (siteFilter || projectId || 'all');
+      const data = await fetchDeletedSiteExpenses(target);
       setDeletedExpenses(data);
     } catch (err) {
       console.error('Failed to load deleted expenses:', err);
@@ -155,7 +177,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   useEffect(() => {
     loadExpenses();
     loadDeletedExpenses();
-  }, [projectId]);
+  }, [projectId, siteFilter]);
 
   // Handle confirmed deletion (Soft Delete -> is_deleted = true in Supabase)
   const handleConfirmDelete = async () => {
@@ -211,6 +233,11 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         }
       }
 
+      // 1b. Site / Building Filter
+      if (siteFilter !== 'all' && exp.project_id && exp.project_id !== siteFilter) {
+        return false;
+      }
+
       // 2. Date Filter (Range or Exact Particular Date)
       if (!matchesDateFilter(exp.expense_date, dateFilter)) {
         return false;
@@ -232,8 +259,13 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       }
 
       return true;
+    }).sort((a, b) => {
+      const timeA = new Date(a.created_at || a.expense_date || 0).getTime();
+      const timeB = new Date(b.created_at || b.expense_date || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.serial_no || 0) - (a.serial_no || 0);
     });
-  }, [expenses, searchQuery, dateFilter, categoryFilter, paymentMethodFilter, statusFilter]);
+  }, [expenses, searchQuery, siteFilter, dateFilter, categoryFilter, paymentMethodFilter, statusFilter]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -420,7 +452,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 Project Commercial
               </span>
               <span className="text-xs sm:text-sm font-black text-[#6338eb] tracking-tight block">
-                {project?.name ? project.name.toUpperCase() : 'SITE OFFICE'}
+                {project?.name ? project.name.toUpperCase() : 'SELECTED SITE'}
               </span>
             </div>
           </div>
@@ -457,6 +489,20 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
             >
               <Wrench className="w-3.5 h-3.5 text-slate-500" />
               <span>Work Orders</span>
+            </button>
+
+            {/* Tab 3: Customer Purchases & Inflow */}
+            <button
+              type="button"
+              onClick={() => onSelectCommercialTab?.('customer-purchases')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeCommercialTab === 'customer-purchases'
+                  ? 'bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <ArrowDownLeft className="w-3.5 h-3.5 text-slate-500" />
+              <span>Purchases & Inflow</span>
             </button>
           </div>
 
@@ -781,6 +827,23 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
             {/* Filters Group */}
             <div className="flex items-center flex-wrap gap-2">
+              {/* Site / Building Selector Filter */}
+              <div className="flex items-center gap-1.5 px-3 h-9 bg-slate-50/80 rounded-xl border border-slate-200 text-xs">
+                <Building2 className="w-4 h-4 text-[#6338eb] shrink-0" />
+                <select
+                  value={siteFilter}
+                  onChange={(e) => setSiteFilter(e.target.value)}
+                  className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="all">🏢 All Construction Sites (All Bills)</option>
+                  {availableProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Universal Date Filter: Start & End Date (Range) + Particular Custom Date */}
               <DateFilterControl
                 value={dateFilter}
@@ -829,11 +892,12 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               </select>
 
               {/* Clear Filters (if any active) */}
-              {(searchQuery || isDateFilterActive(dateFilter) || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all') && (
+              {(searchQuery || siteFilter !== 'all' || isDateFilterActive(dateFilter) || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
+                    setSiteFilter('all');
                     setDateFilter(DEFAULT_DATE_FILTER);
                     setCategoryFilter('all');
                     setPaymentMethodFilter('all');
@@ -853,21 +917,22 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
-                <th className="px-4 py-3 text-center">S.No</th>
-                <th className="px-4 py-3">Expense Code & Date</th>
-                <th className="px-4 py-3">Expense Title & Purpose</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Paid To / Vendor</th>
-                <th className="px-4 py-3 text-center">Mode</th>
-                <th className="px-4 py-3 text-right">Amount (Rs.)</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-3.5 py-2.5 text-center">S.No</th>
+                <th className="px-3.5 py-2.5">Site / Building</th>
+                <th className="px-3.5 py-2.5">Expense Code & Time</th>
+                <th className="px-3.5 py-2.5">Expense Title & Purpose</th>
+                <th className="px-3.5 py-2.5">Category</th>
+                <th className="px-3.5 py-2.5">Paid To / Vendor</th>
+                <th className="px-3.5 py-2.5 text-center">Mode</th>
+                <th className="px-3.5 py-2.5 text-right">Amount (Rs.)</th>
+                <th className="px-3.5 py-2.5 text-center">Status</th>
+                <th className="px-3.5 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                  <td colSpan={10} className="px-4 py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                       <span className="font-medium text-xs">Loading site expenses from Supabase...</span>
@@ -876,7 +941,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 </tr>
               ) : filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                  <td colSpan={10} className="px-4 py-16 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Receipt className="w-8 h-8 text-slate-300 stroke-[1.5]" />
                       <span className="font-semibold text-slate-700">No expenses found</span>
@@ -908,8 +973,21 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                         {index + 1}
                       </td>
 
-                      {/* Code & Date */}
-                      <td className="px-4 py-3">
+                      {/* Site / Building Tag */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {(() => {
+                          const proj = availableProjects.find((p) => p.id === exp.project_id);
+                          return (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200/80 shadow-2xs">
+                              <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                              <span>{proj ? proj.name : (exp.project_id ? (project?.name || 'Site') : 'General / Unassigned')}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Code & 12-hr Mumbai Time */}
+                      <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <button
                             type="button"
@@ -917,7 +995,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               setViewingExpense(exp);
                               setIsVoucherModalOpen(true);
                             }}
-                            className="font-mono font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
+                            className="font-mono font-bold text-xs text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
                             title="Click to view & download bill voucher"
                           >
                             {exp.expense_code}
@@ -936,17 +1014,17 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                                 fileName: exp.receipt_file_name || 'Bill-Receipt',
                                 voucherNumber: exp.expense_code,
                               })}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
-                              title={`View uploaded bill copy (${exp.receipt_file_name || 'Receipt'}) - Supports iOS photos & PDF`}
+                              className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
+                              title={`View uploaded bill copy (${exp.receipt_file_name || 'Receipt'})`}
                             >
-                              <Paperclip className="w-3 h-3 text-[#653ef1]" />
-                              <span>Bill Copy</span>
+                              <Paperclip className="w-2.5 h-2.5 text-[#653ef1]" />
+                              <span>Bill</span>
                             </button>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>{exp.expense_date}</span>
+                        <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1" title="Created / Expense Date (Mumbai 12-hr IST)">
+                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{formatMumbaiDateTime(exp.created_at || exp.expense_date)}</span>
                         </div>
                       </td>
 
@@ -1165,6 +1243,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3">Site / Building</th>
                     <th className="px-4 py-3">Expense Code & Date</th>
                     <th className="px-4 py-3">Title & Purpose</th>
                     <th className="px-4 py-3">Category</th>
@@ -1177,14 +1256,14 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {isLoadingBin ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-rose-600" />
                         <p className="font-semibold text-slate-600">Loading deleted expenses from Recycle Bin...</p>
                       </td>
                     </tr>
                   ) : deletedExpenses.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <Trash2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                         <p className="font-semibold text-slate-700">Recycle Bin is empty</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">No expenses currently deleted.</p>
@@ -1193,9 +1272,23 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                   ) : (
                     deletedExpenses.map((exp) => (
                       <tr key={exp.id} className="hover:bg-rose-50/20 transition-colors">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(() => {
+                            const proj = availableProjects.find((p) => p.id === exp.project_id);
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200/80 shadow-2xs">
+                                <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                                <span>{proj ? proj.name : (exp.project_id ? (project?.name || 'Site') : 'General / Unassigned')}</span>
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-3.5 py-2.5">
                           <span className="font-mono font-bold text-slate-900 block">{exp.expense_code}</span>
-                          <span className="text-[11px] text-slate-400">{exp.expense_date}</span>
+                          <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{formatMumbaiDateTime(exp.created_at || exp.expense_date)}</span>
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <span className="font-semibold text-slate-900 block">{exp.title}</span>
@@ -1252,7 +1345,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           setIsAddModalOpen(false);
           setExpenseToEdit(null);
         }}
-        projectId={projectId}
+        projectId={siteFilter !== 'all' ? siteFilter : (projectId || availableProjects[0]?.id || '')}
+        availableProjects={availableProjects}
         expenseToEdit={expenseToEdit}
         onExpenseAdded={(newExp) => {
           setExpenses(prev => [newExp, ...prev]);

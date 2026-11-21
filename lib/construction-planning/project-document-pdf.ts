@@ -57,7 +57,7 @@ export function generateProjectDocumentPdf(file: ProjectFile): jsPDF {
   doc.setTextColor(107, 114, 128);
   doc.text(`Category: ${file.category} | File: ${file.file_name}`, margin + 4, currentY + 13);
   doc.text(
-    `Project: ${file.project?.name || 'Noori Crust Site'} | Code: ${file.project_code || 'SITE-1'} | Status: ${file.status.toUpperCase()}`,
+    `Project: ${file.project?.name || 'Noori Crust Site'} | Status: ${file.status.toUpperCase()}`,
     margin + 4,
     currentY + 18.5
   );

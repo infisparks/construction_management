@@ -143,6 +143,7 @@ export function setStoredActiveSite(project: DbProject): void {
   try {
     localStorage.setItem(ACTIVE_SITE_ID_KEY, project.id);
     localStorage.setItem(ACTIVE_SITE_DATA_KEY, JSON.stringify(project));
+    window.dispatchEvent(new CustomEvent('active-site-changed', { detail: { project } }));
   } catch (err) {
     console.warn('Failed to save active site to localStorage:', err);
   }

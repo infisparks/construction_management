@@ -16,10 +16,11 @@ import {
   Check,
   Paperclip,
   ExternalLink,
-  Trash2
+  Trash2,
+  Wrench
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
-import { ProfileVendor, fetchProfileVendors } from '@/lib/supabase/profile-services';
+import { ProfileVendor, fetchProfileVendors, createProfileVendor } from '@/lib/supabase/profile-services';
 import {
   fetchDropdownCategory,
   addCustomCategory,
@@ -85,7 +86,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [vendors, setVendors] = useState<ProfileVendor[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
   const [customPayeeName, setCustomPayeeName] = useState('');
+  const [customPayeeType, setCustomPayeeType] = useState<'vendor' | 'contractor'>('vendor');
   const [isCustomPayee, setIsCustomPayee] = useState(false);
+  const [isSavingNewPayee, setIsSavingNewPayee] = useState(false);
 
   // Dynamic Categories from Supabase category table
   const [categories, setCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
@@ -168,7 +171,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         setCustomPayeeName(expenseToEdit.vendor_name || '');
       }
     } else {
-      setSelectedProjectId(projectId || '');
+      const defaultProj = (projectId && projectId !== 'all') ? projectId : (availableProjects[0]?.id || '');
+      setSelectedProjectId(defaultProj);
       setExpenseDate(new Date().toISOString().split('T')[0]);
       setTitle('');
       setAmount('');
@@ -205,8 +209,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     return projectsList.map((p) => ({
       value: p.id,
       label: p.name,
-      subtitle: p.code ? `Code: ${p.code}` : undefined,
-      badge: p.serial_no ? `#${p.serial_no}` : (p.code || undefined),
+      subtitle: undefined,
+      badge: undefined,
     }));
   }, [projectsList]);
 
@@ -270,6 +274,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       } else {
         setCustomPayeeName('');
       }
+    }
+  };
+
+  const handleSaveAndSelectNewPayee = async () => {
+    const trimmed = customPayeeName.trim();
+    if (!trimmed) return;
+    setIsSavingNewPayee(true);
+    try {
+      const { data, error } = await createProfileVendor({
+        name: trimmed,
+        type: customPayeeType,
+      });
+      if (data) {
+        setVendors((prev) => [data, ...prev]);
+        setSelectedVendorId(data.id);
+        setIsCustomPayee(false);
+        setCustomPayeeName(data.name);
+      }
+    } catch (err) {
+      console.error('Error saving payee profile:', err);
+    } finally {
+      setIsSavingNewPayee(false);
     }
   };
 
@@ -360,6 +386,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       finalVendorName = matched ? matched.name : null;
     } else if (customPayeeName.trim()) {
       finalVendorName = customPayeeName.trim();
+      // Auto register to profile_vendor with selected type if not already saved
+      try {
+        const { data } = await createProfileVendor({
+          name: finalVendorName,
+          type: customPayeeType,
+        });
+        if (data) {
+          finalVendorId = data.id;
+          finalVendorName = data.name;
+          setVendors(prev => [data, ...prev]);
+        }
+      } catch (e) {
+        console.warn('Auto register payee failed:', e);
+      }
     }
 
     let uploadedReceiptUrl: string | null = null;
@@ -382,9 +422,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     }
 
+    const finalProjectId = (selectedProjectId && selectedProjectId !== 'all')
+      ? selectedProjectId
+      : ((projectId && projectId !== 'all') ? projectId : (availableProjects[0]?.id || null));
+
     if (expenseToEdit) {
       const payload: Partial<CreateExpensePayload> = {
-        project_id: selectedProjectId || projectId || null,
+        project_id: finalProjectId,
         title: title.trim(),
         category: selectedCategory,
         amount: numAmount,
@@ -417,7 +461,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     } else {
       const payload: CreateExpensePayload = {
-        project_id: selectedProjectId || projectId || null,
+        project_id: finalProjectId,
         title: title.trim(),
         category: selectedCategory,
         amount: numAmount,
@@ -753,21 +797,88 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               onChange={handleVendorSelect}
               placeholder="Select Payee / Vendor..."
               searchPlaceholder="Search vendor, contractor or recipient..."
+              onCreateOption={(newLabel) => {
+                setIsCustomPayee(true);
+                setSelectedVendorId('');
+                setCustomPayeeName(newLabel);
+              }}
             />
 
             {isCustomPayee && (
-              <div className="animate-in fade-in duration-150 pt-1">
-                <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                  Recipient / Local Vendor / Tea Stall Name <span className="text-rose-500">*</span>
-                </label>
+              <div className="animate-in fade-in duration-150 pt-2 p-3 bg-purple-50/50 rounded-xl border border-purple-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-800">
+                    Payee / Recipient / Shop Name <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomPayee(false);
+                      setCustomPayeeName('');
+                      setSelectedVendorId('');
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
                 <input
                   type="text"
                   value={customPayeeName}
                   onChange={(e) => setCustomPayeeName(e.target.value)}
-                  placeholder="e.g. Site Canteen, Hardware Store, Driver Auto"
+                  placeholder="e.g. Mudassir Electricals, Sharma RCC Gang, Site Canteen"
                   autoFocus
-                  className="w-full h-10 px-3 rounded-lg border border-purple-300 bg-purple-50/20 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 font-medium"
+                  className="w-full h-10 px-3 rounded-lg border border-purple-300 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium"
                 />
+
+                {/* Choose Type: Contractor vs Vendor */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                    Select Type <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCustomPayeeType('vendor')}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        customPayeeType === 'vendor'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Vendor (Supplier / Store)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCustomPayeeType('contractor')}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        customPayeeType === 'contractor'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Contractor (Labour / Work)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-slate-500">
+                    Registers as <strong>{customPayeeType === 'contractor' ? 'Contractor' : 'Vendor'}</strong> in Supabase
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!customPayeeName.trim() || isSavingNewPayee}
+                    onClick={handleSaveAndSelectNewPayee}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 shadow-2xs"
+                  >
+                    {isSavingNewPayee ? 'Saving...' : 'Save & Link to Supabase'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

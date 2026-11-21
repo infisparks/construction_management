@@ -47,6 +47,7 @@ const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementT
   'files-archive': { title: 'Files & Documents Archive', icon: FolderKanban },
   expenses: { title: 'Commercial Bills & Expenses', icon: Receipt },
   'contractor-work-orders': { title: 'Contractor Work Orders', icon: Wrench },
+  'customer-purchases': { title: 'Client Purchases & Inflow', icon: ArrowDownLeft },
 };
 
 interface PlanningHeaderProps {
@@ -190,11 +191,8 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-soft-pulse shrink-0" />
                   <span className="text-[10px] uppercase font-bold text-slate-400">Site:</span>
-                  <span className="font-bold text-slate-900 max-w-[120px] sm:max-w-[190px] truncate">
+                  <span className="font-bold text-slate-900 max-w-[150px] sm:max-w-[220px] truncate">
                     {project.name}
-                  </span>
-                  <span className="text-[10px] text-[#653ef1] bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded font-mono font-bold">
-                    {project.code || 'SITE'}
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isSiteSwitcherOpen ? 'rotate-180 text-[#653ef1]' : ''}`} />
                 </button>
@@ -230,11 +228,11 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
-                                  isCurrent ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
+                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                  isCurrent ? 'bg-[#653ef1] text-white shadow-2xs' : 'bg-slate-100 text-slate-500'
                                 }`}>
-                                  #{p.serial_no || 1}
-                                </span>
+                                  <Building2 className="w-3.5 h-3.5" />
+                                </div>
                                 <div className="min-w-0">
                                   <div className="text-xs font-bold truncate">
                                     {p.name}

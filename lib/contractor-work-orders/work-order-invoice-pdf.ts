@@ -71,7 +71,7 @@ export function generateWorkOrderInvoicePdf(
   doc.setFontSize(8);
   doc.setTextColor(107, 114, 128);
   doc.text('General Contracting, Structural Works & High-Rise Infrastructure', margin, currentY + 4.5);
-  doc.text(`${companyContact} • Site: ${projectName} (${projectCode})`, margin, currentY + 8.5);
+  doc.text(`${companyContact} • Site: ${projectName}`, margin, currentY + 8.5);
 
   // Document Title & Barcode on Top-Right
   doc.setFont('helvetica', 'bold');
@@ -123,9 +123,8 @@ export function generateWorkOrderInvoicePdf(
   doc.setFontSize(8);
   doc.setTextColor(31, 41, 55);
   doc.text(`Project Name: ${projectName}`, margin + 4, currentY + 11);
-  doc.text(`Project Code: ${projectCode}`, margin + 4, currentY + 15.5);
-  doc.text(`Location: ${projectLocation}`, margin + 4, currentY + 20, { maxWidth: colW - 8 });
-  doc.text(`Trade / Category: ${order.tradeCategory}`, margin + 4, currentY + 25);
+  doc.text(`Location: ${projectLocation}`, margin + 4, currentY + 16, { maxWidth: colW - 8 });
+  doc.text(`Trade / Category: ${order.tradeCategory}`, margin + 4, currentY + 22);
 
   // Right Box: Vendor / Contractor Details
   const rightX = margin + colW + 4;

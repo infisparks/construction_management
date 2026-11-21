@@ -99,6 +99,13 @@ export function isViewAllowed(
       return true;
     }
 
+    if (
+      (allowed === 'customer-purchases' || allowed === 'purchases' || allowed === 'sales' || allowed === 'commercial' || allowed === 'bills' || allowed === 'inflow') &&
+      target === 'customer-purchases'
+    ) {
+      return true;
+    }
+
 
 
     if (

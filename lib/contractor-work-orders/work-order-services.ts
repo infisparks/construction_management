@@ -192,18 +192,23 @@ export function mapUiWorkOrderToDb(order: Partial<ContractorWorkOrder>, projectI
 }
 
 /**
- * Fetch all work orders for a project with their revisions & payments
+ * Fetch all work orders for a project (or 'all' for all projects) with their revisions & payments
  */
-export async function fetchProjectWorkOrders(projectId: string): Promise<ContractorWorkOrder[]> {
-  const localList = readLocalOrders(projectId);
+export async function fetchProjectWorkOrders(projectId?: string): Promise<ContractorWorkOrder[]> {
+  const localList = readLocalOrders(projectId || 'all');
 
   try {
-    const { data: orders, error: ordersError } = await supabase
+    let query = supabase
       .from('contractor_work_orders')
       .select('*')
-      .eq('project_id', projectId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
+
+    if (projectId && projectId !== 'all') {
+      query = query.eq('project_id', projectId);
+    }
+
+    const { data: orders, error: ordersError } = await query;
 
     if (ordersError || !orders) {
       console.warn('Supabase work orders fetch warning (using local fallback if available):', ordersError?.message);
@@ -296,7 +301,7 @@ export async function fetchProjectWorkOrders(projectId: string): Promise<Contrac
     });
 
     // Save to local storage for fast cached startup
-    saveLocalOrders(projectId, merged);
+    saveLocalOrders(projectId || 'all', merged);
     return merged;
   } catch (err) {
     console.error('Error fetching work orders:', err);

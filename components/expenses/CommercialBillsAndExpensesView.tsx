@@ -12,16 +12,19 @@ import {
   ArrowDownLeft
 } from 'lucide-react';
 import { ProjectInfo, Party, ConstructionTask, SubcontractorBill } from '@/lib/construction-planning/types';
+import { DbProject } from '@/lib/supabase/types';
 import { SiteExpensesView } from './SiteExpensesView';
 import { SubcontractorBillsView } from '@/components/construction-planning/SubcontractorBillsView';
 import { ContractorWorkOrdersView } from '@/components/contractor-work-orders/ContractorWorkOrdersView';
+import { CustomerPurchasesView } from '@/components/customer-purchases/CustomerPurchasesView';
 
-export type CommercialTab = 'expenses' | 'subcontractor-bills' | 'contractor-work-orders';
+export type CommercialTab = 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases';
 
 interface CommercialBillsAndExpensesViewProps {
   initialTab?: CommercialTab;
   project?: ProjectInfo;
   projectId?: string;
+  allProjects?: DbProject[];
   userEmail?: string;
   userRole?: string;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
@@ -39,7 +42,8 @@ interface CommercialBillsAndExpensesViewProps {
 export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpensesViewProps> = ({
   initialTab = 'expenses',
   project,
-  projectId = 'f0e510da-9530-468f-bb09-59920070d55e',
+  projectId = '',
+  allProjects = [],
   userEmail,
   userRole,
   showToast,
@@ -95,13 +99,27 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
               <Wrench className={`w-3.5 h-3.5 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
               <span>Work Orders</span>
             </button>
+
+            {/* Tab 3: Customer Purchases & Inflow */}
+            <button
+              type="button"
+              onClick={() => handleSelectTab('customer-purchases')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'customer-purchases'
+                  ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <ArrowDownLeft className={`w-3.5 h-3.5 ${activeTab === 'customer-purchases' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
+              <span>Purchases & Inflow</span>
+            </button>
           </div>
 
           {/* Project Context & Meta */}
           <div className="hidden md:flex items-center gap-2 pr-2 text-xs text-slate-500">
             <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
             <span>Project Commercial:</span>
-            <strong className="text-slate-800 font-semibold">{project?.name || 'Noori Crest Tower'}</strong>
+            <strong className="text-slate-800 font-semibold">{project?.name || 'Loading Site...'}</strong>
           </div>
         </div>
       )}
@@ -110,7 +128,8 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
       {activeTab === 'expenses' ? (
         <SiteExpensesView
           project={project}
-          projectId={projectId}
+          projectId={projectId || project?.id}
+          allProjects={allProjects}
           userEmail={userEmail}
           showToast={showToast}
           externalActionTrigger={externalActionTrigger}
@@ -120,8 +139,17 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
       ) : activeTab === 'contractor-work-orders' ? (
         <ContractorWorkOrdersView
           project={project}
-          projectId={projectId}
+          projectId={projectId || project?.id}
+          allProjects={allProjects}
           onSelectProject={onSelectProject}
+          showToast={showToast}
+        />
+      ) : activeTab === 'customer-purchases' ? (
+        <CustomerPurchasesView
+          project={project}
+          projectId={projectId || project?.id}
+          allProjects={allProjects}
+          userEmail={userEmail}
           showToast={showToast}
         />
       ) : (

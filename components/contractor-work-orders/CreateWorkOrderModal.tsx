@@ -180,7 +180,7 @@ export const CreateWorkOrderModal: React.FC<CreateWorkOrderModalProps> = ({
             >
               {projectsList.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.serial_no ? `#${p.serial_no} ` : ''}{p.name} {p.code ? `(${p.code})` : ''}
+                  {p.name}
                 </option>
               ))}
             </select>

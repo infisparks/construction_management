@@ -1287,7 +1287,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
                 <div className="flex items-center gap-2 text-xs text-slate-800">
                   <Building className="w-4 h-4 text-purple-600 shrink-0" />
-                  <span>Construction Project: <strong>{file.project ? `Site #${file.project.serial_no} — ${file.project.name}` : 'Noori Crust Site'}</strong></span>
+                  <span>Construction Project: <strong>{file.project ? file.project.name : 'Site Office'}</strong></span>
                 </div>
 
                 {file.building_floor && (

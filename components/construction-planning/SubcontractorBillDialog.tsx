@@ -558,8 +558,8 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
     return projectsList.map((p) => ({
       value: p.id,
       label: p.name,
-      subtitle: p.code ? `Code: ${p.code}` : undefined,
-      badge: p.serial_no ? `#${p.serial_no}` : (p.code || undefined),
+      subtitle: undefined,
+      badge: undefined,
     }));
   }, [projectsList]);
 

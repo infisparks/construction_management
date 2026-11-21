@@ -140,7 +140,8 @@ export type ViewMode =
   | 'subcontractor-bills' 
   | 'files-archive'
   | 'expenses'
-  | 'contractor-work-orders';
+  | 'contractor-work-orders'
+  | 'customer-purchases';
 
 // Module 3 — Files Archive (Project Documents & Media Repository)
 export type FileCategory =

@@ -44,12 +44,13 @@ import {
   deleteWorkOrderPayment,
 } from '@/lib/contractor-work-orders/work-order-services';
 import { formatINR, downloadWorkOrderPdf, viewWorkOrderPdfInNewTab } from '@/lib/contractor-work-orders/work-order-invoice-pdf';
+import { formatMumbaiDateTime } from '@/lib/common/date-format';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 import { AddExtraWorkModal } from './AddExtraWorkModal';
 import { RecordPaymentModal } from './RecordPaymentModal';
 import { WorkOrderDetailDrawer } from './WorkOrderDetailDrawer';
-import { resolveActiveSite } from '@/lib/supabase/site-storage';
+import { resolveActiveSite, setStoredActiveSite } from '@/lib/supabase/site-storage';
 import { ProjectInfo } from '@/lib/construction-planning/types';
 
 interface ProjectOption {
@@ -57,43 +58,58 @@ interface ProjectOption {
   name: string;
   code?: string | null;
   location?: string | null;
+  serial_no?: number;
+  sequence_order?: number | null;
 }
 
 interface ContractorWorkOrdersViewProps {
   project?: ProjectInfo;
   projectId?: string;
-  onSelectProject?: (project: ProjectOption) => void;
+  allProjects?: any[];
+  onSelectProject?: (project: any) => void;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> = ({
   project: initialProject,
   projectId: initialProjectId,
+  allProjects: allProjectsProp,
   onSelectProject,
   showToast,
 }) => {
+  // Available Projects (Default from parent props if provided)
+  const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>(allProjectsProp || []);
+
+  // Sync availableProjects when allProjectsProp changes
+  useEffect(() => {
+    if (allProjectsProp && allProjectsProp.length > 0) {
+      setAvailableProjects(allProjectsProp);
+    }
+  }, [allProjectsProp]);
+
   // Active Project State (Default to currently selected site/project)
   const [activeProject, setActiveProject] = useState<ProjectOption | null>(initialProject || null);
-  const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
+  const [siteFilter, setSiteFilter] = useState<string>('all');
   
-  // Priority: 1. initialProjectId (from top header) -> 2. activeProject.id -> 3. initialProject.id
+  // Priority: 1. initialProjectId (from top header) -> 2. initialProject.id -> 3. activeProject.id -> 4. availableProjects[0]?.id
   const effectiveProjectId =
     (initialProjectId && initialProjectId !== 'active-site' ? initialProjectId : null) ||
-    (activeProject?.id && activeProject.id !== 'active-site' ? activeProject.id : null) ||
     (initialProject?.id && initialProject.id !== 'active-site' ? initialProject.id : null) ||
-    'f0e510da-9530-468f-bb09-59920070d55e';
+    (activeProject?.id && activeProject.id !== 'active-site' ? activeProject.id : null) ||
+    availableProjects[0]?.id ||
+    '';
 
   const matchedProject = availableProjects.find((p) => p.id === effectiveProjectId);
   const effectiveProjectName =
     matchedProject?.name ||
-    activeProject?.name ||
     initialProject?.name ||
-    'Noori Crest Tower';
+    activeProject?.name ||
+    'Selected Site';
   const effectiveProjectCode =
     matchedProject?.code ||
-    activeProject?.code ||
     initialProject?.code ||
-    'NC-2026';
+    activeProject?.code ||
+    (matchedProject?.serial_no ? `SITE-${matchedProject.serial_no}` : 'SITE');
 
   // Work Orders State
   const [workOrders, setWorkOrders] = useState<ContractorWorkOrder[]>([]);
@@ -116,6 +132,15 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
 
   // Load project context if not passed
   useEffect(() => {
+    if (allProjectsProp && allProjectsProp.length > 0) {
+      const targetId = initialProjectId || (initialProject?.id !== 'active-site' ? initialProject?.id : null);
+      if (targetId) {
+        const match = allProjectsProp.find((p) => p.id === targetId);
+        if (match) setActiveProject(match);
+      }
+      return;
+    }
+
     async function loadSites() {
       try {
         const { activeProject: site, allProjects } = await resolveActiveSite();
@@ -138,7 +163,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
       }
     }
     loadSites();
-  }, [initialProject, initialProjectId]);
+  }, [initialProject, initialProjectId, allProjectsProp]);
 
   // Sync active project when parent changes active site (e.g. from top header)
   useEffect(() => {
@@ -160,15 +185,16 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
       }
     }
     if (initialProject && initialProject.id && initialProject.id !== 'active-site') {
-      setActiveProject(initialProject);
+      setActiveProject(initialProject as any);
     }
   }, [initialProject, initialProjectId, availableProjects]);
 
-  // Load Work Orders from Supabase / Local storage
+  // Load Work Orders from Supabase / Local storage (supports 'all' for all sites)
   const loadOrders = async () => {
     try {
       setIsLoading(true);
-      const orders = await fetchProjectWorkOrders(effectiveProjectId);
+      const targetSite = siteFilter === 'all' ? 'all' : (siteFilter || effectiveProjectId);
+      const orders = await fetchProjectWorkOrders(targetSite);
       setWorkOrders(orders);
     } catch (err) {
       console.error('Error fetching work orders:', err);
@@ -179,16 +205,15 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
   };
 
   useEffect(() => {
-    if (effectiveProjectId) {
-      loadOrders();
-    }
-  }, [effectiveProjectId]);
+    loadOrders();
+  }, [siteFilter, effectiveProjectId]);
 
   // Handle Switch Project
   const handleSwitchProject = (newId: string) => {
     const found = availableProjects.find((p) => p.id === newId);
     if (found) {
       setActiveProject(found);
+      setStoredActiveSite(found as any);
       onSelectProject?.(found);
     }
   };
@@ -221,6 +246,11 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
   // Filter logic
   const filteredOrders = useMemo(() => {
     return workOrders.filter((order) => {
+      // 0. Site / Building Filter
+      if (siteFilter !== 'all' && order.projectId && order.projectId !== siteFilter) {
+        return false;
+      }
+
       // 1. Text Search (title, vendorName, workOrderNumber, scopeDescription, phone)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -284,8 +314,12 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
       }
 
       return true;
+    }).sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.startDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.startDate || 0).getTime();
+      return timeB - timeA;
     });
-  }, [workOrders, searchQuery, tradeFilter, statusFilter, datePreset, customStartDate, customEndDate, todayStr, yesterdayStr, weekStartStr, monthStartStr]);
+  }, [workOrders, siteFilter, searchQuery, tradeFilter, statusFilter, datePreset, customStartDate, customEndDate, todayStr, yesterdayStr, weekStartStr, monthStartStr]);
 
   // Overall and Today/Yesterday KPI Calculations
   const stats = useMemo(() => {
@@ -405,23 +439,26 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Active Site Selector */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
-            <Building2 className="w-4 h-4 text-purple-600" />
+            <Building2 className="w-4 h-4 text-purple-600 shrink-0" />
             <span className="text-slate-500 hidden sm:inline">Project:</span>
-            {availableProjects.length > 1 ? (
-              <select
-                value={effectiveProjectId}
-                onChange={(e) => handleSwitchProject(e.target.value)}
-                className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer"
-              >
-                {availableProjects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <strong className="text-slate-900 font-semibold">{effectiveProjectName}</strong>
-            )}
+            <select
+              value={siteFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSiteFilter(val);
+                if (val !== 'all') {
+                  handleSwitchProject(val);
+                }
+              }}
+              className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer"
+            >
+              <option value="all">🏢 All Construction Sites (All Work Orders)</option>
+              {availableProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <button
@@ -652,6 +689,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/60 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4">WO # & Barcode</th>
+                  <th className="py-3 px-4">Site / Building</th>
                   <th className="py-3 px-4">Work Title & Trade</th>
                   <th className="py-3 px-4">Contractor / Vendor</th>
                   <th className="py-3 px-4 text-right">Initial Deal</th>
@@ -684,7 +722,20 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                             <BarcodeIcon className="w-3.5 h-3.5" />
                           </span>
                         </div>
-                        <span className="text-[10px] font-normal text-slate-400 font-sans block">{order.startDate}</span>
+                        <span className="text-[10px] font-medium text-slate-500 font-sans block mt-0.5">{formatMumbaiDateTime(order.createdAt || order.startDate)}</span>
+                      </td>
+
+                      {/* Site / Building Badge */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {(() => {
+                          const proj = availableProjects.find((p) => p.id === order.projectId);
+                          return (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200/80 shadow-2xs">
+                              <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                              <span>{proj ? proj.name : (effectiveProjectName || 'Site')}</span>
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Work Title & Scope */}
@@ -846,7 +897,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
           isOpen={isCreateOpen}
           onClose={() => setIsCreateOpen(false)}
           projectName={effectiveProjectName}
-          projectId={effectiveProjectId}
+          projectId={siteFilter !== 'all' ? siteFilter : (effectiveProjectId || availableProjects[0]?.id || '')}
           availableProjects={availableProjects}
           existingCount={workOrders.length}
           onSave={handleCreateSave}
@@ -855,24 +906,29 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
       )}
 
       {/* Right-side Detail Drawer */}
-      {drawerOrder && (
-        <WorkOrderDetailDrawer
-          isOpen={Boolean(drawerOrder)}
-          onClose={() => setDrawerOrder(null)}
-          workOrder={drawerOrder}
-          projectName={effectiveProjectName}
-          projectCode={effectiveProjectCode || 'NC-2026'}
-          onOpenAddExtra={(o: ContractorWorkOrder) => {
-            setSelectedOrderForExtra(o);
-          }}
-          onOpenRecordPayment={(o: ContractorWorkOrder) => {
-            setSelectedOrderForPayment(o);
-          }}
-          onDeleteWorkOrder={handleDeleteWorkOrder}
-          onDeleteRevision={handleDeleteRevision}
-          onDeletePayment={handleDeletePayment}
-        />
-      )}
+      {drawerOrder && (() => {
+        const drawerProject = availableProjects.find((p) => p.id === drawerOrder.projectId);
+        const resolvedName = drawerProject?.name || effectiveProjectName;
+        const resolvedCode = drawerProject?.code || (drawerProject?.serial_no ? `SITE-${drawerProject.serial_no}` : effectiveProjectCode);
+        return (
+          <WorkOrderDetailDrawer
+            isOpen={Boolean(drawerOrder)}
+            onClose={() => setDrawerOrder(null)}
+            workOrder={drawerOrder}
+            projectName={resolvedName}
+            projectCode={resolvedCode || 'NC-2026'}
+            onOpenAddExtra={(o: ContractorWorkOrder) => {
+              setSelectedOrderForExtra(o);
+            }}
+            onOpenRecordPayment={(o: ContractorWorkOrder) => {
+              setSelectedOrderForPayment(o);
+            }}
+            onDeleteWorkOrder={handleDeleteWorkOrder}
+            onDeleteRevision={handleDeleteRevision}
+            onDeletePayment={handleDeletePayment}
+          />
+        );
+      })()}
 
       {/* Left-side Add Extra Work Variation Drawer */}
       {selectedOrderForExtra && (

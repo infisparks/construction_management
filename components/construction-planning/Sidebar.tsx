@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Determine active module based on currentView
   const [activeModule, setActiveModule] = useState<NavModuleId>(() => {
     if (currentView === 'files-archive') return 'archive';
-    if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders') return 'commercial';
+    if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
     if (currentView === 'materials') return 'materials';
     return 'planning';
   });
@@ -123,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     if (currentView === 'files-archive') {
       setActiveModule('archive');
-    } else if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders') {
+    } else if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') {
       setActiveModule('commercial');
     } else if (currentView === 'materials') {
       setActiveModule('materials');

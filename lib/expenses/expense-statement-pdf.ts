@@ -120,7 +120,7 @@ export function generateSiteExpensesPdf(
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
   doc.text(
-    `Project: ${projectName} (${projectCode})  •  Scope: ${filterLabel}  •  Audited Supabase Ledger`,
+    `Project: ${projectName}  •  Scope: ${filterLabel}  •  Audited Supabase Ledger`,
     margin + 6,
     currentY + 16
   );

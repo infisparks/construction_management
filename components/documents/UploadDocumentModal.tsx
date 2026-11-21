@@ -67,7 +67,7 @@ const CATEGORIES: FileCategory[] = [
 export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   isOpen,
   onClose,
-  projectId = 'f0e510da-9530-468f-bb09-59920070d55e',
+  projectId = '',
   projectCode,
   projectName,
   userEmail,
@@ -422,7 +422,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                     <span className="truncate">
                       {selectedProject
-                        ? `Site #${selectedProject.serial_no} — ${selectedProject.name}`
+                        ? selectedProject.name
                         : (activeProjectName || 'Select a site')}
                     </span>
                   </div>
@@ -459,7 +459,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#653ef1]' : 'bg-slate-300'}`} />
-                                <span className="truncate">Site #{p.serial_no} — {p.name}</span>
+                                <span className="truncate">{p.name}</span>
                               </div>
                               {isSelected && <Check className="w-4 h-4 text-[#653ef1] shrink-0 ml-2" />}
                             </button>

@@ -47,6 +47,7 @@ import {
   Phone
 } from 'lucide-react';
 import { ProjectInfo, ProjectFile, FileCategory, FileType } from '@/lib/construction-planning/types';
+import { formatMumbaiDateTime } from '@/lib/common/date-format';
 import { 
   fetchProjectFiles, 
   softDeleteProjectFile,
@@ -102,7 +103,7 @@ const BASE_CATEGORIES: { label: string; value: FileCategory | 'all' }[] = [
 
 export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   project,
-  projectId = 'f0e510da-9530-468f-bb09-59920070d55e',
+  projectId = '',
   userEmail,
   onOpenSitesManager,
   initialCategory = 'all',
@@ -115,9 +116,9 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [deletedFiles, setDeletedFiles] = useState<ProjectFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Available Projects (Foreign Keys)
+  // Available Projects (Foreign Keys) - Default to 'all' to show all construction sites
   const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
-  const [projectFilter, setProjectFilter] = useState<string>(projectId || 'all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
 
   // Dynamic Categories from Supabase category table
   const [dynamicCategories, setDynamicCategories] = useState<string[]>(DEFAULT_DOCUMENT_CATEGORIES);
@@ -227,13 +228,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
     }
     loadProjectsList();
   }, []);
-
-  // Sync active project if prop changes
-  useEffect(() => {
-    if (projectId) {
-      setProjectFilter(projectId);
-    }
-  }, [projectId]);
 
   // Load active and deleted files from Supabase
   const loadAllFiles = async () => {
@@ -384,6 +378,10 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
       }
 
       return true;
+    }).sort((a, b) => {
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      return timeB - timeA;
     });
   }, [currentList, searchQuery, selectedCategory, selectedFileType, onlyStarred, dateFilter]);
 
@@ -663,7 +661,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <div className="flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/25">
                 <Link2 className="w-3 h-3 text-[#653ef1]" />
                 <span>
-                  {activeProjectDef ? `Site #${activeProjectDef.serial_no} — ${activeProjectDef.name}` : 'All Projects (Multi-Site)'}
+                  {activeProjectDef ? activeProjectDef.name : 'All Projects (Multi-Site)'}
                 </span>
               </div>
             </div>
@@ -940,10 +938,10 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 className="text-xs bg-transparent font-bold text-[#6338eb] focus:outline-none cursor-pointer"
                 title="Filter documents by construction project foreign key"
               >
-                <option value="all">🏢 All Projects (Vault)</option>
+                <option value="all">🏢 All Construction Sites (All Documents)</option>
                 {availableProjects.map(p => (
                   <option key={p.id} value={p.id}>
-                    Site #{p.serial_no} — {p.name}
+                    {p.name}
                   </option>
                 ))}
               </select>
@@ -1207,7 +1205,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-full">
                       <Building2 className="w-3 h-3 text-[#653ef1] shrink-0" />
                       <span className="truncate">
-                        {file.project ? `Site #${file.project.serial_no} • ${file.project.name}` : project.name}
+                        {file.project ? file.project.name : project.name}
                       </span>
                     </span>
                   </div>
@@ -1224,9 +1222,18 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                     {file.title}
                   </h4>
 
-                  <span className="inline-block text-[10px] font-semibold text-[#653ef1] bg-[#653ef1]/10 border border-[#653ef1]/20 px-2 py-0.5 rounded-md truncate max-w-full">
-                    {file.category}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                    <span 
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md truncate max-w-[150px]"
+                      title={file.project?.name || project.name || 'Site'}
+                    >
+                      <Building2 className="w-3 h-3 text-[#653ef1] shrink-0" />
+                      <span className="truncate">{file.project?.name || project.name || 'Site'}</span>
+                    </span>
+                    <span className="inline-block text-[10px] font-semibold text-[#653ef1] bg-[#653ef1]/10 border border-[#653ef1]/20 px-2 py-0.5 rounded-md truncate max-w-[140px]">
+                      {file.category}
+                    </span>
+                  </div>
 
                   {/* Image Preview Thumbnail if Image File */}
                   {file.file_type === 'image' && (
@@ -1345,14 +1352,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="py-3 px-4">Doc Code</th>
-                    <th className="py-3 px-4">Project (FK)</th>
-                    <th className="py-3 px-4">Document Title & File</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Linked Entity</th>
-                    <th className="py-3 px-4">Size</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-2.5 px-3">Doc Code & Time</th>
+                    <th className="py-2.5 px-3">Project</th>
+                    <th className="py-2.5 px-3">Document Title & File</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3">Linked Entity</th>
+                    <th className="py-2.5 px-3">Size</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1365,21 +1372,30 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         setIsPreviewOpen(true);
                       }}
                     >
-                      {/* Doc No */}
-                      <td className="py-3 px-4 font-mono font-bold text-[#653ef1]">
-                        {file.document_no}
+                      {/* Doc No & Mumbai 12-hr Time */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <div className="font-mono font-bold text-xs text-[#653ef1]">
+                          {file.document_no}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5" title="Uploaded / Created (Mumbai 12-hr IST)">
+                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{formatMumbaiDateTime(file.created_at)}</span>
+                        </div>
                       </td>
 
-                      {/* Project Foreign Key */}
-                      <td className="py-3 px-4 font-semibold text-slate-700">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-[#653ef1]/10 text-[#653ef1] border border-[#653ef1]/20 font-mono">
-                          <Building2 className="w-3.5 h-3.5 text-[#653ef1]" />
-                          <span>{file.project ? `Site #${file.project.serial_no}` : 'Site #1'}</span>
+                      {/* Project / Construction Site Tag */}
+                      <td className="py-2.5 px-3 font-semibold text-slate-700">
+                        <span 
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200/80 max-w-[210px] truncate shadow-2xs"
+                          title={file.project?.name || project.name || 'Site'}
+                        >
+                          <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                          <span className="truncate">{file.project ? file.project.name : (project.name || 'Site')}</span>
                         </span>
                       </td>
 
                       {/* Title & File Name */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2.5">
                           {getFileBadge(file.file_type)}
                           <div className="min-w-0">
@@ -1394,7 +1410,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       </td>
 
                       {/* Category */}
-                      <td className="py-3 px-4 text-slate-600 font-medium">
+                      <td className="py-2.5 px-3 text-slate-600 font-medium">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-[11px] font-bold text-slate-700">
                           <Layers className="w-3.5 h-3.5 text-[#653ef1]" />
                           <span>{file.category}</span>
@@ -1402,17 +1418,17 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       </td>
 
                       {/* Linked Entity */}
-                      <td className="py-3 px-4 text-slate-500">
+                      <td className="py-2.5 px-3 text-slate-500">
                         {file.building_floor || file.contractor_name || file.task_code || '—'}
                       </td>
 
                       {/* Size */}
-                      <td className="py-3 px-4 font-mono text-slate-500">
+                      <td className="py-2.5 px-3 font-mono text-slate-500">
                         {formatFileSize(file.file_size)}
                       </td>
 
                       {/* Status */}
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
                           file.status === 'approved' 
                             ? 'bg-[#e6f9ed] text-[#16a34a] border border-[#b8f0ca]' 
@@ -1860,12 +1876,13 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-black/20 opacity-60 group-hover/thumb:opacity-80 transition-opacity" />
 
                               {/* Top Pills */}
-                              <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-black/50 text-white backdrop-blur-xs border border-white/20">
-                                  {file.document_no}
+                              <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none gap-1">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-xs border border-white/20 truncate max-w-[130px]">
+                                  <Building2 className="w-2.5 h-2.5 text-purple-300 shrink-0" />
+                                  <span className="truncate">{file.project?.name || project.name || 'Site'}</span>
                                 </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/90 text-white backdrop-blur-xs shadow-xs">
-                                  {file.status || 'Approved'}
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-black/50 text-white backdrop-blur-xs border border-white/20 shrink-0">
+                                  {file.document_no}
                                 </span>
                               </div>
 

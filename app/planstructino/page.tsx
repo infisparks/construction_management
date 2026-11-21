@@ -281,12 +281,13 @@ export default function ConstructionPlanningPage() {
     setIsTimelineWhatsAppOpen(true);
   };
 
-  // Active Project ID for Supabase Planning Tables (Checks state, then URL ?site=, then localStorage, then fallback)
+  // Active Project ID for Supabase Planning Tables (Checks state, then URL ?site=, then localStorage, then fallback to first site in sequence)
   const activeProjectId =
     activeDbProject?.id ||
     (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('site') : null) ||
     getStoredActiveSiteId() ||
-    'f0e510da-9530-468f-bb09-59920070d55e';
+    allDbProjects[0]?.id ||
+    '';
   const [isLoadingPlanningDb, setIsLoadingPlanningDb] = useState(false);
 
   // Synchronize planning data live with Supabase plan_* tables
@@ -418,6 +419,7 @@ export default function ConstructionPlanningPage() {
         'files-archive',
         'expenses',
         'contractor-work-orders',
+        'customer-purchases',
       ];
       if (urlView && validViews.includes(urlView as ViewMode)) {
         setCurrentView(urlView as ViewMode);
@@ -469,8 +471,18 @@ export default function ConstructionPlanningPage() {
         // ignore
       }
     };
+    const handleActiveSiteChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ project: DbProject }>;
+      if (customEvent.detail?.project && customEvent.detail.project.id !== activeDbProject?.id) {
+        handleSelectDbProject(customEvent.detail.project);
+      }
+    };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('active-site-changed', handleActiveSiteChanged);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('active-site-changed', handleActiveSiteChanged);
+    };
   }, [userRole, activeDbProject]);
 
   // Guard currentView against restricted role access (onlyallow)
@@ -1685,17 +1697,20 @@ export default function ConstructionPlanningPage() {
                   />
                 )}
 
-                {(currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'contractor-work-orders') && (
+                {(currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') && (
                   <CommercialBillsAndExpensesView
                     initialTab={
                       currentView === 'contractor-work-orders'
                         ? 'contractor-work-orders'
                         : currentView === 'subcontractor-bills'
                         ? 'subcontractor-bills'
+                        : currentView === 'customer-purchases'
+                        ? 'customer-purchases'
                         : 'expenses'
                     }
                     project={project}
                     projectId={activeProjectId}
+                    allProjects={allDbProjects}
                     userEmail={user.email || undefined}
                     userRole={userRole?.role}
                     showToast={showToast}
