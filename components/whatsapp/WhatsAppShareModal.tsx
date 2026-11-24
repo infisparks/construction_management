@@ -198,7 +198,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     return activeContact ? activeContact.name : 'Recipient';
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!payload) return;
     setStatusMessage(null);
 
@@ -213,126 +213,26 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
     setIsSending(true);
     try {
-      let finalMedia = payload.mediaUrl?.trim() || undefined;
+      const cleanPhone = cleanWhatsAppNumber(recipientNumber);
 
-      // If mediaUrl is a client-side in-memory blob: URL or data: URL, resolve to public HTTPS URL or Base64
-      if (finalMedia && (finalMedia.startsWith('blob:') || finalMedia.startsWith('data:'))) {
-        try {
-          const blobResp = await fetch(finalMedia);
-          if (blobResp.ok) {
-            const blobData = await blobResp.blob();
-            const cleanName = (payload.fileName || 'document.pdf').replace(/[^a-zA-Z0-9.-]/g, '_');
-            const storagePath = `whatsapp_shares/${Date.now()}_${cleanName}`;
-            
-            // Try uploading to Supabase Storage
-            const { data: uploadRes, error: uploadErr } = await supabase.storage
-              .from('project-documents')
-              .upload(storagePath, blobData, {
-                contentType: payload.fileType === 'image' ? 'image/jpeg' : 'application/pdf',
-                upsert: true,
-              });
+      // Build complete message text
+      let fullMessage = caption.trim();
 
-            if (!uploadErr && uploadRes) {
-              const { data: urlData } = supabase.storage
-                .from('project-documents')
-                .getPublicUrl(uploadRes.path);
-              if (urlData?.publicUrl) {
-                finalMedia = urlData.publicUrl;
-              }
-            } else {
-              // Storage upload failed, convert blob to Base64 so Evolution API accepts it directly
-              const reader = new FileReader();
-              const b64 = await new Promise<string>((resolve) => {
-                reader.onloadend = () => {
-                  const res = reader.result as string;
-                  resolve(res.replace(/^data:[^;]+;base64,/, ''));
-                };
-                reader.readAsDataURL(blobData);
-              });
-              finalMedia = b64;
-            }
-          } else {
-            throw new Error('Blob expired or unreachable');
-          }
-        } catch (blobErr) {
-          console.warn('Client blob fetch/upload fallback, generating verified document certificate:', blobErr);
-          try {
-            const { generateProjectDocumentPdf } = await import('@/lib/construction-planning/project-document-pdf');
-            const doc = generateProjectDocumentPdf({
-              id: payload.documentNo || 'DOC-VAULT',
-              project_id: '',
-              version: 'v1.0',
-              tags: [],
-              title: payload.title,
-              document_no: payload.documentNo || 'DOC-VAULT',
-              file_name: payload.fileName || 'document.pdf',
-              category: (payload.category as any) || 'Quotations and purchase orders',
-              file_type: (payload.fileType as any) || 'pdf',
-              file_size: payload.fileSize || 0,
-              status: 'approved',
-              is_starred: false,
-              created_at: new Date().toISOString(),
-              project: payload.projectName ? { id: '', name: payload.projectName, serial_no: 1 } : undefined,
-              description: payload.customSummary,
-            } as any);
-            const certBlob = doc.output('blob');
-            const cleanName = (payload.fileName || 'document.pdf').replace(/[^a-zA-Z0-9.-]/g, '_');
-            const storagePath = `whatsapp_shares/${Date.now()}_${cleanName}`;
-            const { data: certUpload } = await supabase.storage
-              .from('project-documents')
-              .upload(storagePath, certBlob, {
-                contentType: 'application/pdf',
-                upsert: true,
-              });
-            if (certUpload) {
-              const { data: urlData } = supabase.storage
-                .from('project-documents')
-                .getPublicUrl(certUpload.path);
-              if (urlData?.publicUrl) {
-                finalMedia = urlData.publicUrl;
-              }
-            }
-            if (!finalMedia || finalMedia.startsWith('blob:')) {
-              finalMedia = doc.output('datauristring').replace(/^data:[^;]+;base64,/, '');
-            }
-          } catch (pdfErr) {
-            console.warn('PDF fallback generation failed:', pdfErr);
-            finalMedia = undefined;
-          }
-        }
+      // If document has a valid live public URL, include it in the message
+      const media = payload.mediaUrl?.trim();
+      if (media && !media.startsWith('blob:') && !media.startsWith('data:')) {
+        fullMessage += `\n\n📄 *Document Link:*\n${media}`;
+      } else if (payload.documentNo) {
+        fullMessage += `\n\n📄 *Ref Doc:* ${payload.documentNo}`;
       }
 
-      // Safeguard: Never send unresolvable client blob string to WhatsApp server
-      if (finalMedia && finalMedia.startsWith('blob:')) {
-        finalMedia = undefined;
-      }
+      // Generate direct client-side WhatsApp URL
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(fullMessage)}`;
 
-      const response = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          number: recipientNumber,
-          media: finalMedia || undefined,
-          fileName: payload.fileName || `${payload.title.replace(/\s+/g, '_')}.pdf`,
-          mediatype: payload.fileType === 'image' ? 'image' : 'document',
-          mimetype: payload.fileType === 'image' ? 'image/jpeg' : 'application/pdf',
-          caption: caption,
-          text: caption
-        })
-      });
+      // Open directly in WhatsApp Web or Mobile WhatsApp
+      window.open(whatsappUrl, '_blank');
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        const errorText = Array.isArray(result.error)
-          ? result.error.join(', ')
-          : typeof result.error === 'object' && result.error !== null
-          ? JSON.stringify(result.error)
-          : result.error || 'Failed to send WhatsApp message.';
-        throw new Error(errorText);
-      }
-
-      const successText = `Sent to ${getRecipientName()} (${formatPhoneDisplay(recipientNumber)}) via WhatsApp!`;
+      const successText = `Opened WhatsApp to send to ${getRecipientName()} (${formatPhoneDisplay(recipientNumber)})!`;
       setStatusMessage({
         type: 'success',
         text: successText
@@ -342,15 +242,15 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         onSuccessToast(`✅ ${successText}`);
       }
 
-      // Auto close after 2.5s on success
+      // Auto close after 1.5s
       setTimeout(() => {
         onClose();
-      }, 2500);
+      }, 1500);
     } catch (err: any) {
-      console.error('WhatsApp send error:', err);
+      console.error('WhatsApp open error:', err);
       setStatusMessage({
         type: 'error',
-        text: err.message || 'Error communicating with WhatsApp Evolution API.'
+        text: err.message || 'Failed to open WhatsApp.'
       });
     } finally {
       setIsSending(false);
@@ -694,7 +594,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-200 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Sending via Evolution API (instance: mudassir)</span>
+              <span>Direct WhatsApp • Instant Client-Side Link</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -715,17 +615,17 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                 {payload.isGeneratingMedia ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Generating PDF URL...</span>
+                    <span>Preparing Document...</span>
                   </>
                 ) : isSending ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Sending to WhatsApp...</span>
+                    <span>Opening WhatsApp...</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    <span>Send to {getRecipientName().split(' ')[0]}</span>
+                    <span>Open in WhatsApp ({getRecipientName().split(' ')[0]})</span>
                   </>
                 )}
               </button>

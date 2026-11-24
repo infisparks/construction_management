@@ -44,6 +44,7 @@ import {
   Undo2,
   X,
   MessageCircle,
+  Paperclip,
   Phone
 } from 'lucide-react';
 import { ProjectInfo, ProjectFile, FileCategory, FileType } from '@/lib/construction-planning/types';
@@ -63,6 +64,7 @@ import {
   downloadProjectFile
 } from '@/lib/supabase/project-files';
 import { supabase } from '@/lib/supabase/client';
+import { fetchSubDocumentsCounts } from '@/lib/supabase/project-sub-documents';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
 import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
@@ -197,6 +199,17 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<ProjectFile | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewInitialTab, setPreviewInitialTab] = useState<'viewer' | 'subdocs' | 'details'>('viewer');
+  const [subDocsCounts, setSubDocsCounts] = useState<Record<string, number>>({});
+
+  const loadSubDocsCounts = async () => {
+    try {
+      const counts = await fetchSubDocumentsCounts();
+      setSubDocsCounts(counts);
+    } catch (err) {
+      console.warn('Could not load sub-docs counts:', err);
+    }
+  };
 
   // WhatsApp Share & Contacts
   const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
@@ -260,6 +273,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
       ]);
       setActiveFiles(actives);
       setDeletedFiles(deleteds);
+      loadSubDocsCounts();
     } catch (err) {
       console.error('Error loading files:', err);
     } finally {
@@ -728,7 +742,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <span className="hidden sm:inline">WhatsApp Contacts</span>
             </button>
 
-            {onOpenQuotationBuilder && (
+            {/* Quotation Builder button hidden for now per user request */}
+            {/* {onOpenQuotationBuilder && (
               <button
                 type="button"
                 onClick={onOpenQuotationBuilder}
@@ -738,7 +753,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 <FileText className="w-4 h-4 text-[#653ef1]" />
                 <span className="hidden sm:inline">Quotation Builder</span>
               </button>
-            )}
+            )} */}
 
             <button
               type="button"
@@ -1265,6 +1280,22 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                     <span className="inline-block text-[10px] font-semibold text-[#653ef1] bg-[#653ef1]/10 border border-[#653ef1]/20 px-2 py-0.5 rounded-md truncate max-w-[140px]">
                       {file.category}
                     </span>
+                    {Boolean(subDocsCounts[file.id]) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewFile(file);
+                          setPreviewInitialTab('subdocs');
+                          setIsPreviewOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md hover:bg-purple-100 transition-colors cursor-pointer"
+                        title="View sub-documents & attached notes"
+                      >
+                        <Paperclip className="w-2.5 h-2.5" />
+                        <span>{subDocsCounts[file.id]} sub-doc{subDocsCounts[file.id] > 1 ? 's' : ''}</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Image Preview Thumbnail if Image File */}
@@ -1437,6 +1468,22 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                             <span className="text-[11px] text-slate-400 font-mono block truncate">
                               {file.file_name}
                             </span>
+                            {Boolean(subDocsCounts[file.id]) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewFile(file);
+                                  setPreviewInitialTab('subdocs');
+                                  setIsPreviewOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md hover:bg-purple-100 transition-colors cursor-pointer mt-1"
+                                title="View attached sub-documents & notes"
+                              >
+                                <Paperclip className="w-2.5 h-2.5" />
+                                <span>{subDocsCounts[file.id]} sub-doc{subDocsCounts[file.id] > 1 ? 's' : ''}</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1502,6 +1549,24 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               title="Share via WhatsApp"
                             >
                               <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewFile(file);
+                                setPreviewInitialTab('subdocs');
+                                setIsPreviewOpen(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer relative"
+                              title="Sub-Documents & Attached Notes"
+                            >
+                              <Paperclip className="w-3.5 h-3.5" />
+                              {Boolean(subDocsCounts[file.id]) && (
+                                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#653ef1] text-white text-[8px] font-bold flex items-center justify-center">
+                                  {subDocsCounts[file.id]}
+                                </span>
+                              )}
                             </button>
 
                             <button
@@ -2097,14 +2162,18 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         }}
       />
 
-      {/* File Preview Modal (Direct In-App Viewer) */}
+      {/* File Preview Modal (Direct In-App Viewer & Sub-Documents) */}
       <FilePreviewModal
         file={previewFile}
         isOpen={isPreviewOpen}
         onClose={() => {
           setIsPreviewOpen(false);
           setPreviewFile(null);
+          setPreviewInitialTab('viewer');
         }}
+        initialTab={previewInitialTab}
+        currentUserEmail={userEmail}
+        onSubDocsCountChange={loadSubDocsCounts}
         onToggleStar={handleToggleStar}
         onDeleteFile={(f) => {
           handleSoftDelete(f);

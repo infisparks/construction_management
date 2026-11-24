@@ -31,11 +31,29 @@ import {
   Database,
   Copy,
   Check,
-  MessageCircle
+  MessageCircle,
+  Paperclip,
+  Plus,
+  StickyNote,
+  UploadCloud,
+  Eye,
+  FileCheck,
+  ChevronDown,
+  Pencil
 } from 'lucide-react';
 import { ProjectFile } from '@/lib/construction-planning/types';
 import { getProjectDocumentPdfUrl } from '@/lib/construction-planning/project-document-pdf';
 import { resolveFileUrl, extractStoragePath, downloadProjectFile } from '@/lib/supabase/project-files';
+import { 
+  ProjectSubDocument, 
+  fetchSubDocuments, 
+  createSubDocument, 
+  updateSubDocument,
+  softDeleteSubDocument, 
+  restoreSubDocument, 
+  uploadSubDocumentFile 
+} from '@/lib/supabase/project-sub-documents';
+import { formatMumbaiDateTime } from '@/lib/common/date-format';
 import * as XLSX from 'xlsx';
 
 interface FilePreviewModalProps {
@@ -46,6 +64,9 @@ interface FilePreviewModalProps {
   onDeleteFile?: (file: ProjectFile) => void;
   onRestoreFile?: (file: ProjectFile) => void;
   onShareWhatsApp?: (file: ProjectFile) => void;
+  initialTab?: 'viewer' | 'subdocs' | 'details';
+  currentUserEmail?: string;
+  onSubDocsCountChange?: () => void;
 }
 
 // Sample BOQ items for spreadsheet in-app view
@@ -70,11 +91,173 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onDeleteFile,
   onRestoreFile,
   onShareWhatsApp,
+  initialTab = 'viewer',
+  currentUserEmail = 'admin@gmail.com',
+  onSubDocsCountChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'viewer' | 'details'>('viewer');
+  const [activeTab, setActiveTab] = useState<'viewer' | 'subdocs' | 'details'>(initialTab);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [copiedPath, setCopiedPath] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+
+  // Sub-documents state
+  const [subDocs, setSubDocs] = useState<ProjectSubDocument[]>([]);
+  const [deletedSubDocs, setDeletedSubDocs] = useState<ProjectSubDocument[]>([]);
+  const [loadingSubDocs, setLoadingSubDocs] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showDeletedSubDocs, setShowDeletedSubDocs] = useState(false);
+  const [subDocSearch, setSubDocSearch] = useState('');
+
+  // Sub-document add form state
+  const [subDocMode, setSubDocMode] = useState<'file' | 'note'>('file');
+  const [subDocTitle, setSubDocTitle] = useState('');
+  const [subDocNote, setSubDocNote] = useState('');
+  const [subDocSelectedFile, setSubDocSelectedFile] = useState<File | null>(null);
+  const [subDocUploadedBy, setSubDocUploadedBy] = useState(currentUserEmail);
+  const [isSubmittingSubDoc, setIsSubmittingSubDoc] = useState(false);
+  const [subDocDeletingId, setSubDocDeletingId] = useState<string | null>(null);
+  const [subDocPreviewItem, setSubDocPreviewItem] = useState<ProjectSubDocument | null>(null);
+
+  // Note Viewer Modal state
+  const [viewingNoteItem, setViewingNoteItem] = useState<ProjectSubDocument | null>(null);
+  const [copiedNote, setCopiedNote] = useState(false);
+
+  // Note Edit Modal state
+  const [editingSubDoc, setEditingSubDoc] = useState<ProjectSubDocument | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editNoteText, setEditNoteText] = useState('');
+  const [isUpdatingSubDoc, setIsUpdatingSubDoc] = useState(false);
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Record<string, boolean>>({});
+
+  // Sub-documents loader
+  const loadSubDocs = useCallback(async () => {
+    if (!file?.id) return;
+    setLoadingSubDocs(true);
+    try {
+      const [activeList, delList] = await Promise.all([
+        fetchSubDocuments(file.id, false),
+        fetchSubDocuments(file.id, true),
+      ]);
+      setSubDocs(activeList);
+      setDeletedSubDocs(delList);
+    } catch (err) {
+      console.error('Error loading sub-documents:', err);
+    } finally {
+      setLoadingSubDocs(false);
+    }
+  }, [file?.id]);
+
+  useEffect(() => {
+    if (isOpen && file?.id) {
+      loadSubDocs();
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
+      setSubDocUploadedBy(currentUserEmail);
+    }
+  }, [isOpen, file?.id, initialTab, currentUserEmail, loadSubDocs]);
+
+  // Handle Add Sub-Document
+  const handleCreateSubDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file?.id || !subDocTitle.trim()) return;
+
+    setIsSubmittingSubDoc(true);
+    try {
+      let uploadedUrl: string | null = null;
+      let detectedType: ProjectSubDocument['file_type'] = subDocMode === 'note' ? 'note' : 'other';
+      let fileSize = 0;
+      let fileName: string | null = null;
+
+      if (subDocMode === 'file' && subDocSelectedFile) {
+        fileSize = subDocSelectedFile.size;
+        fileName = subDocSelectedFile.name;
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        if (['pdf'].includes(ext || '')) detectedType = 'pdf';
+        else if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext || '')) detectedType = 'image';
+        else if (['xls', 'xlsx', 'csv'].includes(ext || '')) detectedType = 'spreadsheet';
+        else detectedType = 'other';
+
+        const uploadRes = await uploadSubDocumentFile(subDocSelectedFile);
+        uploadedUrl = uploadRes.publicUrl;
+      }
+
+      await createSubDocument({
+        parent_document_id: file.id,
+        project_id: file.project_id || null,
+        title: subDocTitle.trim(),
+        note_text: subDocNote.trim() || null,
+        file_name: fileName,
+        file_url: uploadedUrl,
+        file_type: detectedType,
+        file_size: fileSize,
+        uploaded_by: subDocUploadedBy.trim() || currentUserEmail || 'admin@gmail.com',
+      });
+
+      setSubDocTitle('');
+      setSubDocNote('');
+      setSubDocSelectedFile(null);
+      setShowAddForm(false);
+      await loadSubDocs();
+      onSubDocsCountChange?.();
+    } catch (err) {
+      console.error('Failed to create sub-document:', err);
+    } finally {
+      setIsSubmittingSubDoc(false);
+    }
+  };
+
+  // Handle Soft-Delete
+  const handleSoftDeleteSubDoc = async (id: string) => {
+    setSubDocDeletingId(id);
+    try {
+      await softDeleteSubDocument(id);
+      await loadSubDocs();
+      onSubDocsCountChange?.();
+    } catch (err) {
+      console.error('Failed to soft delete sub-document:', err);
+    } finally {
+      setSubDocDeletingId(null);
+    }
+  };
+
+  // Handle Restore
+  const handleRestoreSubDoc = async (id: string) => {
+    try {
+      await restoreSubDocument(id);
+      await loadSubDocs();
+      onSubDocsCountChange?.();
+    } catch (err) {
+      console.error('Failed to restore sub-document:', err);
+    }
+  };
+
+  // Handle Update Note / Sub-Document
+  const handleUpdateSubDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSubDoc || !editTitle.trim()) return;
+
+    setIsUpdatingSubDoc(true);
+    try {
+      await updateSubDocument(editingSubDoc.id, {
+        title: editTitle.trim(),
+        note_text: editNoteText.trim() || null,
+      });
+
+      setEditingSubDoc(null);
+      await loadSubDocs();
+      if (viewingNoteItem?.id === editingSubDoc.id) {
+        setViewingNoteItem((prev) =>
+          prev ? { ...prev, title: editTitle.trim(), note_text: editNoteText.trim() || null } : null
+        );
+      }
+      onSubDocsCountChange?.();
+    } catch (err) {
+      console.error('Failed to update sub-document:', err);
+    } finally {
+      setIsUpdatingSubDoc(false);
+    }
+  };
 
   // Zoom, Pan & Rotation Engine
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -498,7 +681,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           <div className="flex items-center gap-2">
             
             {/* View Mode Tabs */}
-            <div className="hidden sm:flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-100/70 text-xs">
+            <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-100/70 text-xs">
               <button
                 type="button"
                 onClick={() => setActiveTab('viewer')}
@@ -507,6 +690,23 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 }`}
               >
                 In-App Viewer
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('subdocs')}
+                className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'subdocs' ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Paperclip className="w-3.5 h-3.5" />
+                <span>Sub-Docs</span>
+                {subDocs.length > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    activeTab === 'subdocs' ? 'bg-purple-100 text-purple-700' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {subDocs.length}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -1226,7 +1426,575 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: DETAILED METADATA & REVISION HISTORY */}
+          {/* TAB 2: SUB-DOCUMENTS & ATTACHED NOTES */}
+          {activeTab === 'subdocs' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50 space-y-4">
+              
+              {/* Header Action Bar */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200">
+                      <Paperclip className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 truncate">
+                        Sub-Documents & Attached Notes
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Attach child files, revised drawings, site photos, or text notes linked directly to <span className="font-semibold text-purple-700">{file.document_no}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Search filter */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search sub-docs..."
+                      value={subDocSearch}
+                      onChange={(e) => setSubDocSearch(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-600 focus:bg-white w-40 sm:w-48 transition-colors"
+                    />
+                  </div>
+
+                  {/* Toggle Trash / Soft-deleted */}
+                  {deletedSubDocs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeletedSubDocs(!showDeletedSubDocs)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        showDeletedSubDocs 
+                          ? 'bg-amber-50 text-amber-800 border-amber-300' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      title="View soft-deleted sub-documents"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Trash ({deletedSubDocs.length})</span>
+                    </button>
+                  )}
+
+                  {/* Add button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#653ef1] hover:bg-[#532ed6] text-white shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Attach Sub-Doc / Note</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Add Sub-Document Form Drawer */}
+              {showAddForm && (
+                <form
+                  onSubmit={handleCreateSubDoc}
+                  className="bg-white p-5 rounded-xl border-2 border-purple-200 shadow-md space-y-4 animate-in fade-in duration-200"
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded-md bg-purple-100 text-purple-700">
+                        <Plus className="w-4 h-4" />
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Attach New Sub-Document or Site Note
+                      </h4>
+                    </div>
+
+                    {/* Mode Switcher */}
+                    <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-100/70 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSubDocMode('file')}
+                        className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                          subDocMode === 'file' ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        <span>File / Document</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubDocMode('note')}
+                        className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                          subDocMode === 'note' ? 'bg-white text-purple-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <StickyNote className="w-3.5 h-3.5" />
+                        <span>Text Note Only</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Form Fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">
+                        Sub-Document Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder={subDocMode === 'file' ? 'e.g., Revised Ground Beam Schedule R2' : 'e.g., Site Engineer Clarification Memo'}
+                        value={subDocTitle}
+                        onChange={(e) => setSubDocTitle(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-600"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">
+                        Uploaded By
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. admin@gmail.com"
+                        value={subDocUploadedBy}
+                        onChange={(e) => setSubDocUploadedBy(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-600 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* File Upload Dropzone (if in file mode) */}
+                  {subDocMode === 'file' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">
+                        Select File Attachment (PDF, Image, Excel, Drawing) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:border-purple-400 transition-colors bg-slate-50/50">
+                        <input
+                          type="file"
+                          id="subDocFileInput"
+                          required
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setSubDocSelectedFile(e.target.files[0]);
+                              if (!subDocTitle) {
+                                setSubDocTitle(e.target.files[0].name.replace(/\.[^/.]+$/, ''));
+                              }
+                            }
+                          }}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="subDocFileInput"
+                          className="cursor-pointer flex flex-col items-center justify-center gap-1.5"
+                        >
+                          <UploadCloud className="w-6 h-6 text-purple-600" />
+                          <span className="text-xs font-semibold text-slate-700">
+                            {subDocSelectedFile ? (
+                              <span className="text-purple-700 font-bold">
+                                {subDocSelectedFile.name} ({formatFileSize(subDocSelectedFile.size)})
+                              </span>
+                            ) : (
+                              'Click to select or drag and drop file'
+                            )}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Supports PDF, PNG, JPG, XLSX, DWG, TXT up to 50MB
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Note / Remarks Textarea */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">
+                      {subDocMode === 'file' ? 'Attached Note / Scope Remarks (Optional)' : 'Text Note Content *'}
+                    </label>
+                    <textarea
+                      rows={3}
+                      required={subDocMode === 'note'}
+                      placeholder="Write any specifications, site inspection observations, revision notes, or vendor details here..."
+                      value={subDocNote}
+                      onChange={(e) => setSubDocNote(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-600 resize-y"
+                    />
+                  </div>
+
+                  {/* Form Actions */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setSubDocTitle('');
+                        setSubDocNote('');
+                        setSubDocSelectedFile(null);
+                      }}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingSubDoc || !subDocTitle.trim() || (subDocMode === 'file' && !subDocSelectedFile)}
+                      className="px-5 py-2 text-xs font-bold text-white bg-[#653ef1] hover:bg-[#532ed6] rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmittingSubDoc ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Save & Attach Sub-Document</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Sub-Documents Table */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+                {loadingSubDocs ? (
+                  <div className="p-12 text-center text-slate-400">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600" />
+                    <span className="text-xs font-medium">Loading sub-documents...</span>
+                  </div>
+                ) : (
+                  (() => {
+                    const filtered = subDocs.filter((d) => {
+                      if (!subDocSearch.trim()) return true;
+                      const q = subDocSearch.toLowerCase();
+                      return (
+                        d.title.toLowerCase().includes(q) ||
+                        (d.note_text && d.note_text.toLowerCase().includes(q)) ||
+                        (d.file_name && d.file_name.toLowerCase().includes(q)) ||
+                        (d.uploaded_by && d.uploaded_by.toLowerCase().includes(q))
+                      );
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-12 text-center space-y-3">
+                          <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto border border-purple-100">
+                            <Paperclip className="w-6 h-6" />
+                          </div>
+                          <div className="max-w-sm mx-auto">
+                            <h4 className="text-sm font-bold text-slate-800">
+                              {subDocSearch ? 'No matching sub-documents' : 'No Sub-Documents Attached'}
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                              {subDocSearch 
+                                ? 'Try refining your search keyword above.'
+                                : 'You can attach revision drawings, site photos, test reports, vendor bills, or text notes to this document.'}
+                            </p>
+                          </div>
+                          {!subDocSearch && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddForm(true);
+                                setSubDocMode('file');
+                              }}
+                              className="px-4 py-2 text-xs font-bold text-white bg-[#653ef1] hover:bg-[#532ed6] rounded-lg shadow-2xs transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Attach First Sub-Doc</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                              <th className="py-3 px-4">Sub-Document & Attachment</th>
+                              <th className="py-3 px-4">Attached Note</th>
+                              <th className="py-3 px-4">Format / Size</th>
+                              <th className="py-3 px-4">Uploaded By</th>
+                              <th className="py-3 px-4">Created Date & Time</th>
+                              <th className="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filtered.map((item) => {
+                              const isPdf = item.file_type === 'pdf';
+                              const isImg = item.file_type === 'image';
+                              const isXls = item.file_type === 'spreadsheet';
+                              const isNote = item.file_type === 'note';
+
+                              return (
+                                <tr 
+                                  key={item.id} 
+                                  onClick={() => setViewingNoteItem(item)}
+                                  className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                                >
+                                  {/* Sub-document Title & File */}
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-start gap-2.5">
+                                      <span className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                                        isPdf 
+                                          ? 'bg-rose-50 text-rose-600 border border-rose-200' 
+                                          : isImg 
+                                          ? 'bg-blue-50 text-blue-600 border border-blue-200' 
+                                          : isXls 
+                                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
+                                          : isNote 
+                                          ? 'bg-amber-50 text-amber-600 border border-amber-200' 
+                                          : 'bg-purple-50 text-purple-600 border border-purple-200'
+                                      }`}>
+                                        {isPdf && <FileText className="w-4 h-4" />}
+                                        {isImg && <ImageIcon className="w-4 h-4" />}
+                                        {isXls && <FileSpreadsheet className="w-4 h-4" />}
+                                        {isNote && <StickyNote className="w-4 h-4" />}
+                                        {!isPdf && !isImg && !isXls && !isNote && <Paperclip className="w-4 h-4" />}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <span className="font-bold text-slate-900 block truncate text-xs group-hover:text-purple-700 transition-colors">
+                                          {item.title}
+                                        </span>
+                                        {item.file_name ? (
+                                          <span className="text-[11px] text-slate-500 font-mono block truncate mt-0.5">
+                                            {item.file_name}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-purple-600 font-medium block mt-0.5 flex items-center gap-1">
+                                            <StickyNote className="w-3 h-3" />
+                                            <span>Text Note (Click to view)</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Note / Remarks */}
+                                  <td className="py-3 px-4 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                                    {item.note_text ? (
+                                      <div>
+                                        <p 
+                                          onClick={() => setViewingNoteItem(item)}
+                                          className={`text-xs text-slate-700 leading-relaxed cursor-pointer hover:text-purple-700 transition-colors ${
+                                            expandedNoteIds[item.id] ? 'whitespace-pre-wrap' : 'line-clamp-2'
+                                          }`}
+                                          title="Click to view full note"
+                                        >
+                                          {item.note_text}
+                                        </p>
+                                        {item.note_text.length > 70 && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setExpandedNoteIds(prev => ({ ...prev, [item.id]: !prev[item.id] }));
+                                            }}
+                                            className="text-[10px] text-purple-600 font-bold hover:underline mt-0.5 inline-block cursor-pointer"
+                                          >
+                                            {expandedNoteIds[item.id] ? 'Show less ▲' : 'Read full note ▼'}
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400 italic text-[11px]">— No note —</span>
+                                    )}
+                                  </td>
+
+                                  {/* Format & Size */}
+                                  <td className="py-3 px-4 whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                        isPdf 
+                                          ? 'bg-rose-100 text-rose-700' 
+                                          : isImg 
+                                          ? 'bg-blue-100 text-blue-700' 
+                                          : isXls 
+                                          ? 'bg-emerald-100 text-emerald-700' 
+                                          : isNote 
+                                          ? 'bg-amber-100 text-amber-700' 
+                                          : 'bg-purple-100 text-purple-700'
+                                      }`}>
+                                        {item.file_type}
+                                      </span>
+                                      {item.file_size > 0 && (
+                                        <span className="text-[11px] text-slate-500 font-mono">
+                                          {formatFileSize(item.file_size)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Uploaded By */}
+                                  <td className="py-3 px-4 whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center text-[10px] shrink-0 uppercase">
+                                        {(item.uploaded_by || 'A')[0]}
+                                      </div>
+                                      <span className="text-xs text-slate-700 font-medium truncate max-w-[140px]" title={item.uploaded_by}>
+                                        {item.uploaded_by || 'admin@gmail.com'}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Created Date & Time (Mumbai 12-hr) */}
+                                  <td className="py-3 px-4 whitespace-nowrap">
+                                    <div className="text-xs text-slate-700 font-medium">
+                                      {formatMumbaiDateTime(item.created_at)}
+                                    </div>
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="py-3 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-1">
+                                      {/* View Note / Details Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingNoteItem(item)}
+                                        className="p-1.5 text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                        title="View full note & details"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Edit Note / Title Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingSubDoc(item);
+                                          setEditTitle(item.title);
+                                          setEditNoteText(item.note_text || '');
+                                        }}
+                                        className="p-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                        title="Edit title & note"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {item.file_url && (
+                                        <>
+                                          <a
+                                            href={item.file_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="p-1.5 text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                                            title="View attachment in new tab"
+                                          >
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                          </a>
+                                          <a
+                                            href={item.file_url}
+                                            download={item.file_name || 'sub_document'}
+                                            className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                            title="Download attachment"
+                                          >
+                                            <Download className="w-3.5 h-3.5" />
+                                          </a>
+                                        </>
+                                      )}
+
+                                      {/* Soft Delete */}
+                                      <button
+                                        type="button"
+                                        disabled={subDocDeletingId === item.id}
+                                        onClick={() => {
+                                          if (confirm(`Soft delete sub-document "${item.title}"? You can restore it anytime from Trash.`)) {
+                                            handleSoftDeleteSubDoc(item.id);
+                                          }
+                                        }}
+                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                        title="Soft delete (hides sub-document, sets is_deleted = true)"
+                                      >
+                                        {subDocDeletingId === item.id ? (
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" />
+                                        ) : (
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* Soft-Deleted Records Drawer / Section */}
+              {showDeletedSubDocs && deletedSubDocs.length > 0 && (
+                <div className="bg-amber-50/50 rounded-xl border border-amber-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-800">
+                      <Trash2 className="w-4 h-4 text-amber-600" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider">
+                        Soft-Deleted Sub-Documents (Trash Archive)
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                      {deletedSubDocs.length} hidden record{deletedSubDocs.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-700 leading-normal">
+                    These sub-documents have <code>is_deleted = true</code> and are hidden from the active view. Click <strong>Restore</strong> to bring them back at any time.
+                  </p>
+
+                  <div className="bg-white rounded-lg border border-amber-200 overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-amber-50/80 border-b border-amber-200 text-[10px] font-bold text-amber-800 uppercase">
+                          <th className="py-2 px-3">Title & File</th>
+                          <th className="py-2 px-3">Uploaded By</th>
+                          <th className="py-2 px-3">Deleted Date & Time</th>
+                          <th className="py-2 px-3 text-right">Restore Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-amber-100">
+                        {deletedSubDocs.map((delItem) => (
+                          <tr key={delItem.id} className="hover:bg-amber-50/40">
+                            <td className="py-2 px-3">
+                              <span className="font-semibold text-slate-600 line-through block">
+                                {delItem.title}
+                              </span>
+                              {delItem.file_name && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {delItem.file_name}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-slate-500 text-xs">
+                              {delItem.uploaded_by}
+                            </td>
+                            <td className="py-2 px-3 text-slate-500 text-xs">
+                              {formatMumbaiDateTime(delItem.deleted_at || delItem.updated_at)}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreSubDoc(delItem.id)}
+                                className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                title="Restore sub-document to active list"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Restore</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* TAB 3: DETAILED METADATA & REVISION HISTORY */}
           {activeTab === 'details' && (
             <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-white">
               
@@ -1430,6 +2198,240 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
         </div>
       </div>
+
+      {/* VIEW SUB-DOCUMENT / NOTE DETAILS MODAL */}
+      {viewingNoteItem && (
+        <div 
+          className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setViewingNoteItem(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={`p-2 rounded-xl shrink-0 ${
+                  viewingNoteItem.file_type === 'note' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
+                }`}>
+                  {viewingNoteItem.file_type === 'note' ? <StickyNote className="w-5 h-5" /> : <Paperclip className="w-5 h-5" />}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 truncate" title={viewingNoteItem.title}>
+                    {viewingNoteItem.title}
+                  </h3>
+                  <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+                    {viewingNoteItem.file_type === 'note' ? 'Attached Site Note' : `Sub-Document (${viewingNoteItem.file_type})`}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingNoteItem(null)}
+                className="p-1 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Note Text Box */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    Attached Note & Remarks
+                  </label>
+                  {viewingNoteItem.note_text && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(viewingNoteItem.note_text || '');
+                        setCopiedNote(true);
+                        setTimeout(() => setCopiedNote(false), 2000);
+                      }}
+                      className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedNote ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedNote ? 'Copied!' : 'Copy Text'}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words min-h-[120px] max-h-[300px] overflow-y-auto select-text font-sans">
+                  {viewingNoteItem.note_text ? (
+                    viewingNoteItem.note_text
+                  ) : (
+                    <span className="text-slate-400 italic">No text content written for this note.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Attached File Card if present */}
+              {viewingNoteItem.file_url && (
+                <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200/80 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Paperclip className="w-4 h-4 text-purple-600 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-slate-800 block truncate">
+                        {viewingNoteItem.file_name || 'Attached File'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {formatFileSize(viewingNoteItem.file_size)} &bull; {viewingNoteItem.file_type.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <a
+                      href={viewingNoteItem.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1 text-xs font-semibold text-purple-700 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Open</span>
+                    </a>
+                    <a
+                      href={viewingNoteItem.file_url}
+                      download={viewingNoteItem.file_name || 'attachment'}
+                      className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200"
+                      title="Download"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-100">
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block font-semibold uppercase">Uploaded By</span>
+                  <span className="font-medium text-slate-800 truncate block mt-0.5" title={viewingNoteItem.uploaded_by}>
+                    {viewingNoteItem.uploaded_by || 'admin@gmail.com'}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block font-semibold uppercase">Date & Time</span>
+                  <span className="font-medium text-slate-800 block mt-0.5">
+                    {formatMumbaiDateTime(viewingNoteItem.created_at)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const item = viewingNoteItem;
+                  setViewingNoteItem(null);
+                  setEditingSubDoc(item);
+                  setEditTitle(item.title);
+                  setEditNoteText(item.note_text || '');
+                }}
+                className="px-3.5 py-1.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Edit Note</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingNoteItem(null)}
+                className="px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT SUB-DOCUMENT / NOTE MODAL */}
+      {editingSubDoc && (
+        <div 
+          className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setEditingSubDoc(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+                  <Pencil className="w-4 h-4" />
+                </span>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Edit Sub-Document / Note
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSubDoc(null)}
+                className="p-1 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSubDoc} className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-600"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  Attached Note & Scope Remarks
+                </label>
+                <textarea
+                  rows={5}
+                  value={editNoteText}
+                  onChange={(e) => setEditNoteText(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-600 resize-y"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingSubDoc(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingSubDoc || !editTitle.trim()}
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#653ef1] hover:bg-[#532ed6] rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isUpdatingSubDoc ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Update Note</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

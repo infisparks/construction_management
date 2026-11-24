@@ -91,6 +91,8 @@ const MODULES: NavModuleDef[] = [
     badgeColor: 'bg-purple-100 text-[#653ef1]',
     description: 'Central document repository',
   },
+  // Quotation Builder hidden for now per user request
+  /*
   {
     id: 'quotations',
     label: 'Quotation Builder',
@@ -100,6 +102,7 @@ const MODULES: NavModuleDef[] = [
     badgeColor: 'bg-emerald-100 text-emerald-700',
     description: 'Letterhead quotation builder & PDF generator',
   },
+  */
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({

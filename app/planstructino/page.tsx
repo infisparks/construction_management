@@ -1742,7 +1742,6 @@ export default function ConstructionPlanningPage() {
                     onOpenSitesManager={() => setIsSitesManagerOpen(true)}
                     initialCategory={archiveCategoryFilter}
                     onCategoryChange={setArchiveCategoryFilter}
-                    onOpenQuotationBuilder={() => setCurrentView('quotations')}
                   />
                 )}
 
@@ -1756,7 +1755,8 @@ export default function ConstructionPlanningPage() {
                   />
                 )}
 
-                {currentView === 'quotations' && (
+                {/* Quotations view hidden for now per user request */}
+                {/* {currentView === 'quotations' && (
                   <QuotationsListView
                     userEmail={user.email || undefined}
                     userRole={userRole?.role}
@@ -1764,7 +1764,7 @@ export default function ConstructionPlanningPage() {
                     activeProjectId={activeProjectId}
                     showToast={showToast}
                   />
-                )}
+                )} */}
               </>
             )}
           </section>

@@ -34,6 +34,15 @@ export function cleanWhatsAppNumber(phone: string): string {
 }
 
 /**
+ * Generate a direct client-side WhatsApp send link (wa.me / api.whatsapp.com)
+ * No server-side API or external server required!
+ */
+export function getDirectWhatsAppUrl(phone: string, text: string): string {
+  const cleaned = cleanWhatsAppNumber(phone);
+  return `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(text.trim())}`;
+}
+
+/**
  * Format phone number for user-friendly display (e.g. +91 99583 99157)
  */
 export function formatPhoneDisplay(phone: string): string {
