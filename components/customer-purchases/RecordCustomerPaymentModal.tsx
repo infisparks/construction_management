@@ -115,11 +115,11 @@ export const RecordCustomerPaymentModal: React.FC<RecordCustomerPaymentModalProp
 
   if (!isOpen || !purchase) return null;
 
-  const totalDeal = purchase.total_amount || 0;
-  const alreadyCollected = purchase.totalCollected || 0;
-  const currentBalance = Math.max(0, totalDeal - alreadyCollected);
-  const parsedAmount = parseFloat(amountPaid) || 0;
-  const remainingAfterPayment = Math.max(0, currentBalance - parsedAmount);
+  const totalDeal = Math.round((Number(purchase.total_amount ?? 0)) * 100) / 100;
+  const alreadyCollected = Math.round((Number(purchase.totalCollected ?? 0)) * 100) / 100;
+  const currentBalance = Math.max(0, Math.round((totalDeal - alreadyCollected) * 100) / 100);
+  const parsedAmount = Math.round((parseFloat(amountPaid.replace(/,/g, '')) || 0) * 100) / 100;
+  const remainingAfterPayment = Math.max(0, Math.round((currentBalance - parsedAmount) * 100) / 100);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,11 +235,10 @@ export const RecordCustomerPaymentModal: React.FC<RecordCustomerPaymentModalProp
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs select-none">Rs.</span>
                 <input
-                  type="number"
-                  step="any"
-                  min="1"
+                  type="text"
+                  inputMode="decimal"
                   required
-                  placeholder="0.00"
+                  placeholder="e.g. 2,00,00,000 or 50,000"
                   value={amountPaid}
                   onChange={e => setAmountPaid(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 text-sm font-semibold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#653ef1] focus:border-[#653ef1]"

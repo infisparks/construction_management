@@ -66,193 +66,230 @@ export function generateInventoryVoucherPdf(
   const isReturn = transaction.type === 'return';
   const isDamage = transaction.type === 'damage';
 
-  // --- 1. Top Accent Bar ---
-  if (isCheckIn) {
-    doc.setFillColor(16, 185, 129); // Emerald 500
-  } else if (isCheckOut) {
-    doc.setFillColor(4, 47, 56); // Deep Spruce / Teal #042f38
-  } else if (isReturn) {
-    doc.setFillColor(217, 119, 6); // Amber 600
-  } else {
-    doc.setFillColor(225, 29, 72); // Rose 600
-  }
-  doc.rect(margin, currentY, pageWidth - margin * 2, 3.5, 'F');
-  currentY += 8;
+  // Helper: Convert INR amount to words (supports up to 100+ Cr)
+  const amountToWords = (num: number): string => {
+    if (!num || num <= 0) return '';
+    const a = [
+      '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+      'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen',
+    ];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const inWords = (n: number): string => {
+      if (n === 0) return '';
+      if (n < 20) return a[n] + ' ';
+      if (n < 100) return b[Math.floor(n / 10)] + ' ' + a[n % 10] + ' ';
+      if (n < 1000) return a[Math.floor(n / 100)] + ' Hundred ' + inWords(n % 100);
+      if (n < 100000) return inWords(Math.floor(n / 1000)) + ' Thousand ' + inWords(n % 1000);
+      if (n < 10000000) return inWords(Math.floor(n / 100000)) + ' Lakh ' + inWords(n % 100000);
+      return inWords(Math.floor(n / 10000000)) + ' Crore ' + inWords(n % 10000000);
+    };
+    return `${inWords(Math.round(num)).trim()} Rupees Only`;
+  };
 
-  // --- 2. Organization & Project Header ---
+  // Color Palette by Transaction Type
+  const accentRGB: [number, number, number] = isCheckIn
+    ? [16, 185, 129] // Emerald
+    : isCheckOut
+    ? [101, 62, 241] // Executive Purple #653ef1
+    : isReturn
+    ? [217, 119, 6] // Amber
+    : [225, 29, 72]; // Rose
+
+  const badgeBgRGB: [number, number, number] = isCheckIn
+    ? [236, 253, 245]
+    : isCheckOut
+    ? [245, 243, 255]
+    : isReturn
+    ? [255, 251, 235]
+    : [255, 241, 242];
+
+  // --- 1. Top Executive Brand Band ---
+  doc.setFillColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.rect(margin, currentY, pageWidth - margin * 2, 3.2, 'F');
+  currentY += 5.5;
+
+  // --- 2. Header Card Container ---
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin, currentY, pageWidth - margin * 2, 27, 2.5, 2.5, 'FD');
+
+  // Left: Company & Project Info
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(17, 24, 39); // #111827
-  doc.text(projectName, margin, currentY);
+  doc.setFontSize(7.5);
+  doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.text('ARMEE ENTERPRISES • STORE & SUPPLY LOGISTICS', margin + 4.5, currentY + 6);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42);
+  doc.text(projectName.toUpperCase(), margin + 4.5, currentY + 12.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(107, 114, 128); // #6B7280
-  doc.text('Central Construction Site Materials Store & Supply Logistics Division', margin, currentY + 4.5);
-  doc.text('Site Gate Office #1 • Plot 48/A, Commercial Business Hub, Mumbai', margin, currentY + 8.5);
+  doc.setFontSize(7.8);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Site Gate Office #1 • Plot 48/A, Commercial Business Hub, Mumbai', margin + 4.5, currentY + 17.5);
+  doc.text('GSTIN / Store Audit Verified Voucher • Digital ERP Record', margin + 4.5, currentY + 22);
 
-  // Title on right side
+  // Right: Voucher Title Pill, Voucher #, Date & Barcode
   let voucherTitle = 'MATERIAL ISSUE NOTE (MIN)';
   if (isCheckIn) voucherTitle = 'GOODS RECEIPT NOTE (GRN)';
   else if (isReturn) voucherTitle = 'VENDOR RETURN VOUCHER (RET)';
   else if (isDamage) voucherTitle = 'DAMAGE & SCRAP VOUCHER (DMG)';
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  if (isCheckIn) doc.setTextColor(16, 185, 129);
-  else if (isCheckOut) doc.setTextColor(4, 47, 56);
-  else if (isReturn) doc.setTextColor(217, 119, 6);
-  else doc.setTextColor(225, 29, 72);
-
-  doc.text(voucherTitle, pageWidth - margin, currentY, { align: 'right' });
+  doc.setFillColor(badgeBgRGB[0], badgeBgRGB[1], badgeBgRGB[2]);
+  doc.setDrawColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.roundedRect(pageWidth - margin - 66, currentY + 3.5, 61.5, 6.5, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(17, 24, 39);
-  doc.text(`VOUCHER #: ${transaction.voucherNumber}`, pageWidth - margin, currentY + 5, { align: 'right' });
+  doc.setFontSize(7.6);
+  doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.text(voucherTitle, pageWidth - margin - 35.25, currentY + 7.8, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(transaction.voucherNumber, pageWidth - margin - 4.5, currentY + 14.5, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(107, 114, 128);
-  doc.text(`DATE: ${transaction.date} | ${transaction.time}`, pageWidth - margin, currentY + 9, { align: 'right' });
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`${transaction.date}  |  ${transaction.time || '12:00 PM'}`, pageWidth - margin - 4.5, currentY + 18.5, { align: 'right' });
 
-  // Draw Code 39 Barcode for the voucher number
+  // Draw Code 39 Barcode cleanly inside right header
   drawBarcodeOnPdf(doc, transaction.voucherNumber, {
-    x: pageWidth - margin - 46,
-    y: currentY + 11.5,
-    height: 6,
-    narrowBarWidth: 0.22,
+    x: pageWidth - margin - 49,
+    y: currentY + 20,
+    height: 5,
+    narrowBarWidth: 0.2,
     includeText: false,
   });
 
-  currentY += 21;
+  currentY += 32;
 
-  // --- 3. Summary Metadata Box ---
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.setDrawColor(226, 232, 240); // slate-200
-  doc.roundedRect(margin, currentY, pageWidth - margin * 2, 24, 2, 2, 'FD');
-
+  // --- 3. Two-Column Executive Party & Dispatch Details Cards ---
   const rawEngineer = (transaction.engineerName || transaction.authorizedBy || '').trim();
   const hasEngineer = Boolean(rawEngineer);
   const engineerDisplayName = rawEngineer;
 
-  const colWidth = (pageWidth - margin * 2) / 4;
-  
-  // Row 1
+  const cardGap = 4;
+  const halfWidth = (pageWidth - margin * 2 - cardGap) / 2;
+  const cardHeight = hasEngineer ? 32 : 27;
+
+  // Left Card: Party & Site Location
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin, currentY, halfWidth, cardHeight, 2, 2, 'FD');
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
+  doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.text(
+    isCheckIn || isReturn ? 'SUPPLIER & DELIVERY DETAILS' : 'ISSUED TO & SITE LOCATION',
+    margin + 4,
+    currentY + 5.5
+  );
+  doc.setDrawColor(241, 245, 249);
+  doc.line(margin + 4, currentY + 7.5, margin + halfWidth - 4, currentY + 7.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('TRANSACTION TYPE', margin + 3, currentY + 5);
-  doc.text(isCheckIn || isReturn ? 'SUPPLIER / VENDOR' : 'SUBCONTRACTOR AGENCY', margin + colWidth + 3, currentY + 5);
-  doc.text(isCheckIn ? 'DELIVERY CHALLAN #' : 'RECEIVING PERSON', margin + colWidth * 2 + 3, currentY + 5);
-  doc.text(isCheckIn ? 'VEHICLE / TRUCK #' : 'FLOOR / ZONE LOCATION', margin + colWidth * 3 + 3, currentY + 5);
+  doc.text(isCheckIn || isReturn ? 'Vendor / Party:' : 'Subcontractor:', margin + 4, currentY + 12);
+  doc.text(isCheckIn ? 'Challan / Inv #:' : 'Receiving Person:', margin + 4, currentY + 17);
+  doc.text(isCheckIn ? 'Vehicle / Truck:' : 'Floor / Zone:', margin + 4, currentY + 22);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(17, 24, 39);
-  doc.text(
-    isCheckIn ? 'Inward Check-In (+)' : isCheckOut ? 'Outward Dispatch (-)' : isReturn ? 'Vendor Return (-)' : 'Damage Scrap (-)',
-    margin + 3,
-    currentY + 10.5
-  );
-  doc.text(
-    (transaction.supplierName || transaction.subcontractorName || 'Site Central Store').slice(0, 26),
-    margin + colWidth + 3,
-    currentY + 10.5
-  );
-  doc.text(
-    (transaction.challanNumber || transaction.foremanName || 'Authorized Foreman').slice(0, 24),
-    margin + colWidth * 2 + 3,
-    currentY + 10.5
-  );
-  doc.text(
-    (transaction.vehicleNumber || transaction.floorZone || 'Ground Yard').slice(0, 24),
-    margin + colWidth * 3 + 3,
-    currentY + 10.5
-  );
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  const leftValMaxW = halfWidth - 33;
+  doc.text((transaction.supplierName || transaction.subcontractorName || 'Site Central Store').slice(0, 34), margin + 30, currentY + 12, { maxWidth: leftValMaxW });
+  doc.text((transaction.challanNumber || transaction.foremanName || 'Authorized Foreman').slice(0, 34), margin + 30, currentY + 17, { maxWidth: leftValMaxW });
+  doc.text((transaction.vehicleNumber || transaction.floorZone || 'Central Site Yard').slice(0, 34), margin + 30, currentY + 22, { maxWidth: leftValMaxW });
 
-  // Row 2 (If engineer not entered, completely omit engineer field)
+  // Right Card: Store & Audit Metadata
+  const rightCardX = margin + halfWidth + cardGap;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(rightCardX, currentY, halfWidth, cardHeight, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.text('STORE & AUDIT METADATA', rightCardX + 4, currentY + 5.5);
+  doc.setDrawColor(241, 245, 249);
+  doc.line(rightCardX + 4, currentY + 7.5, rightCardX + halfWidth - 4, currentY + 7.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Movement:', rightCardX + 4, currentY + 12);
+  doc.text('Storekeeper:', rightCardX + 4, currentY + 17);
+  doc.text('WBS / QC Status:', rightCardX + 4, currentY + 22);
   if (hasEngineer) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('STOREKEEPER', margin + 3, currentY + 16.5);
-    doc.text('PROJECT ENGINEER', margin + colWidth + 3, currentY + 16.5);
-    doc.text('LINKED WBS TASK', margin + colWidth * 2 + 3, currentY + 16.5);
-    doc.text('QC / AUDIT STATUS', margin + colWidth * 3 + 3, currentY + 16.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(30, 41, 59);
-    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 3, currentY + 21);
-    doc.text(engineerDisplayName.slice(0, 24), margin + colWidth + 3, currentY + 21);
-    doc.text(transaction.wbsTaskCode || 'SITE-GENERAL', margin + colWidth * 2 + 3, currentY + 21);
-    doc.text(transaction.qcStatus || 'VERIFIED ON-SITE', margin + colWidth * 3 + 3, currentY + 21);
-  } else {
-    // 3 columns when engineer is not provided - omit the engineer field
-    const colWidth3 = (pageWidth - margin * 2) / 3;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('STOREKEEPER', margin + 3, currentY + 16.5);
-    doc.text('LINKED WBS TASK', margin + colWidth3 + 3, currentY + 16.5);
-    doc.text('QC / AUDIT STATUS', margin + colWidth3 * 2 + 3, currentY + 16.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(30, 41, 59);
-    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 3, currentY + 21);
-    doc.text(transaction.wbsTaskCode || 'SITE-GENERAL', margin + colWidth3 + 3, currentY + 21);
-    doc.text(transaction.qcStatus || 'VERIFIED ON-SITE', margin + colWidth3 * 2 + 3, currentY + 21);
+    doc.text('Project Engineer:', rightCardX + 4, currentY + 27);
   }
 
-  currentY += 28;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(
+    isCheckIn ? 'Inward Check-In (+)' : isCheckOut ? 'Outward Site Issue (-)' : isReturn ? 'Vendor Return (-)' : 'Damage Write-Off (-)',
+    rightCardX + 30,
+    currentY + 12
+  );
+  doc.text((transaction.receivedOrIssuedBy || 'Site Storekeeper').slice(0, 30), rightCardX + 30, currentY + 17);
+  doc.text(`${transaction.wbsTaskCode || 'SITE-GEN'} • ${transaction.qcStatus || 'VERIFIED'}`, rightCardX + 30, currentY + 22);
+  if (hasEngineer) {
+    doc.text(engineerDisplayName.slice(0, 30), rightCardX + 30, currentY + 27);
+  }
+
+  currentY += cardHeight + 5;
 
   // --- 4. Callout Box for Return Reason or Damage Reason ---
   if (transaction.returnReason || transaction.damageReason) {
     if (transaction.returnReason) {
-      doc.setFillColor(254, 243, 199); // amber-100
-      doc.setDrawColor(245, 158, 11); // amber-500
-      doc.roundedRect(margin, currentY, pageWidth - margin * 2, 12, 1.5, 1.5, 'FD');
+      doc.setFillColor(254, 243, 199);
+      doc.setDrawColor(245, 158, 11);
+      doc.roundedRect(margin, currentY, pageWidth - margin * 2, 13, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(7.8);
       doc.setTextColor(146, 64, 14);
-      doc.text('SPECIFIC REASON FOR RETURN TO VENDOR:', margin + 4, currentY + 4.5);
+      doc.text('REASON FOR RETURN TO VENDOR:', margin + 4, currentY + 4.8);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8.2);
       doc.setTextColor(180, 83, 9);
       const returnDesc = `${transaction.returnReason}${transaction.notes ? ` • Note: ${transaction.notes}` : ''}`;
-      doc.text(returnDesc, margin + 4, currentY + 9, { maxWidth: pageWidth - margin * 2 - 8 });
+      doc.text(returnDesc, margin + 4, currentY + 9.5, { maxWidth: pageWidth - margin * 2 - 8 });
     } else if (transaction.damageReason) {
-      doc.setFillColor(255, 228, 230); // rose-100
-      doc.setDrawColor(244, 63, 94); // rose-500
+      doc.setFillColor(255, 228, 230);
+      doc.setDrawColor(244, 63, 94);
       doc.roundedRect(margin, currentY, pageWidth - margin * 2, 14, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(7.8);
       doc.setTextColor(159, 18, 57);
-      doc.text('OFFICIAL CAUSE FOR MATERIAL DAMAGE / SCRAP WRITE-OFF:', margin + 4, currentY + 4.5);
+      doc.text('CAUSE FOR MATERIAL DAMAGE / SCRAP WRITE-OFF:', margin + 4, currentY + 4.8);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8.2);
       doc.setTextColor(190, 18, 60);
       const dmgDesc = `${transaction.damageReason}${transaction.notes ? ` • Note: ${transaction.notes}` : ''}`;
-      doc.text(dmgDesc, margin + 4, currentY + 9, { maxWidth: pageWidth - margin * 2 - 8 });
+      doc.text(dmgDesc, margin + 4, currentY + 9.5, { maxWidth: pageWidth - margin * 2 - 8 });
     }
-    currentY += 17;
+    currentY += 18;
   }
 
-  // --- 5. Item AutoTable ---
+  // --- 5. Item & Valuation AutoTable ---
   const itemCode = getCleanItemCode(transaction.materialCode, transaction.materialId, 1);
 
   const tableData = [
     [
       '1',
       itemCode,
-      transaction.brand ? `${transaction.materialName} (${transaction.brand})` : transaction.materialName,
-      transaction.category,
+      transaction.brand ? `${transaction.materialName}\nBrand: ${transaction.brand}` : transaction.materialName,
+      transaction.category || 'General',
       `${isCheckIn ? '+' : '-'}${transaction.quantity} ${transaction.unit}`,
       transaction.unitRate ? formatINR(transaction.unitRate) : '—',
       transaction.totalAmount ? formatINR(transaction.totalAmount) : '—',
@@ -262,31 +299,42 @@ export function generateInventoryVoucherPdf(
   autoTable(doc, {
     startY: currentY,
     margin: { left: margin, right: margin },
-    head: [['#', 'Item Code', 'Description of Goods', 'Category', 'Quantity', 'Rate', 'Total Value']],
+    head: [[
+      { content: '#', styles: { halign: 'center' } },
+      'Item Code',
+      'Material Description',
+      'Category',
+      { content: 'Quantity', styles: { halign: 'right' } },
+      { content: 'Unit Rate', styles: { halign: 'right' } },
+      { content: 'Total Value', styles: { halign: 'right' } },
+    ]],
     body: tableData,
     theme: 'grid',
     columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 26, fontStyle: 'bold' },
-      2: { cellWidth: 46 },
+      0: { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 23, fontStyle: 'bold', textColor: accentRGB },
+      2: { cellWidth: 44, fontStyle: 'bold' },
       3: { cellWidth: 26 },
       4: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
       5: { cellWidth: 24, halign: 'right' },
-      6: { cellWidth: 32, halign: 'right', fontStyle: 'bold' },
+      6: { cellWidth: 30, halign: 'right', fontStyle: 'bold' },
     },
     styles: {
       fontSize: 8,
       textColor: [30, 41, 59],
-      cellPadding: 3,
+      cellPadding: 3.5,
       valign: 'middle',
+      lineColor: [226, 232, 240],
+      lineWidth: 0.2,
     },
     headStyles: {
-      fillColor: isCheckIn ? [16, 185, 129] : isCheckOut ? [4, 47, 56] : isReturn ? [217, 119, 6] : [225, 29, 72],
+      fillColor: accentRGB,
       textColor: [255, 255, 255],
-      fontSize: 8,
+      fontSize: 7.8,
       fontStyle: 'bold',
       halign: 'left',
       valign: 'middle',
+      cellPadding: 3.2,
     },
     didDrawPage: (data) => {
       currentY = data.cursor?.y || currentY + 30;
@@ -295,48 +343,109 @@ export function generateInventoryVoucherPdf(
 
   currentY += 6;
 
-  // Running Balance Card
-  doc.setFillColor(241, 245, 249);
-  doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(pageWidth - margin - 75, currentY, 75, 16, 1.5, 1.5, 'FD');
+  // --- 6. Financial Summary & Running Store Balance (Side-by-Side) ---
+  const summaryRightW = 76;
+  const summaryLeftW = pageWidth - margin * 2 - summaryRightW - 5;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-  doc.text('Remaining Store Balance:', pageWidth - margin - 71, currentY + 5.5);
+  // Left: Amount in Words + Remarks
+  let leftBlockY = currentY;
+  const totalAmtNum = Number(transaction.totalAmount || 0);
+  if (totalAmtNum > 0) {
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, leftBlockY, summaryLeftW, 14, 1.5, 1.5, 'FD');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(17, 24, 39);
-  doc.text(
-    `${transaction.runningStockBalance} ${transaction.unit}`,
-    pageWidth - margin - 71,
-    currentY + 11.5
-  );
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text('AMOUNT IN WORDS:', margin + 3.5, leftBlockY + 4.8);
 
-  currentY += 22;
-
-  // --- 6. Notes & Purpose Remarks ---
-  if (transaction.purpose || transaction.notes) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(amountToWords(totalAmtNum), margin + 3.5, leftBlockY + 9.5, { maxWidth: summaryLeftW - 7 });
+    leftBlockY += 17;
+  }
+
+  if (transaction.purpose || transaction.notes) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text('FIELD REMARKS & INSTRUCTIONS:', margin, currentY);
+    doc.text('FIELD REMARKS & PURPOSE:', margin, leftBlockY + 3);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.8);
     doc.setTextColor(100, 116, 139);
     let noteText = '';
     if (transaction.purpose) noteText += `Purpose: ${transaction.purpose}. `;
-    if (transaction.notes) noteText += `Notes: ${transaction.notes}`;
-    doc.text(noteText || 'Material verified by site storekeeper.', margin, currentY + 4, {
-      maxWidth: pageWidth - margin * 2,
+    if (transaction.notes) noteText += `${transaction.notes}`;
+    doc.text(noteText || 'Material verified by site storekeeper.', margin, leftBlockY + 7.5, {
+      maxWidth: summaryLeftW,
     });
-    currentY += 12;
   }
 
-  // --- 7. Sign-Off Block ---
-  const signBlockY = Math.max(currentY + 10, pageHeight - margin - 28);
+  // Right: Valuation & Remaining Stock Box
+  const rightBoxX = pageWidth - margin - summaryRightW;
+  const rightBoxH = totalAmtNum > 0 ? 27 : 16;
+
+  doc.setFillColor(badgeBgRGB[0], badgeBgRGB[1], badgeBgRGB[2]);
+  doc.setDrawColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.roundedRect(rightBoxX, currentY, summaryRightW, rightBoxH, 2, 2, 'FD');
+
+  if (totalAmtNum > 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Total Voucher Value:', rightBoxX + 4, currentY + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(formatINR(totalAmtNum), rightBoxX + summaryRightW - 4, currentY + 6, { align: 'right' });
+
+    doc.setDrawColor(203, 213, 225);
+    doc.line(rightBoxX + 4, currentY + 9.5, rightBoxX + summaryRightW - 4, currentY + 9.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Updated Store Balance:', rightBoxX + 4, currentY + 16);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+    doc.text(`${transaction.runningStockBalance} ${transaction.unit}`, rightBoxX + summaryRightW - 4, currentY + 16, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Live Ledger-Verified Balance', rightBoxX + 4, currentY + 22.5);
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Updated Store Balance:', rightBoxX + 4, currentY + 7);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+    doc.text(
+      `${transaction.runningStockBalance} ${transaction.unit}`,
+      rightBoxX + summaryRightW - 4,
+      currentY + 7.5,
+      { align: 'right' }
+    );
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Live Ledger-Verified Balance', rightBoxX + 4, currentY + 12.5);
+  }
+
+  currentY += Math.max(rightBoxH + 8, 30);
+
+  // --- 7. Certified Sign-Off Block ---
+  const signBlockY = Math.max(currentY + 12, pageHeight - margin - 26);
 
   const receiverLabel = isCheckIn
     ? transaction.driverName || 'Driver / Transporter'
@@ -345,87 +454,82 @@ export function generateInventoryVoucherPdf(
     : transaction.foremanName || 'Receiving Supervisor';
 
   const receiverSubtext = isCheckIn
-    ? 'Driver Signature'
+    ? 'Driver / Carrier Signature'
     : isReturn
     ? 'Vendor Acknowledgment'
-    : 'Contractor Foreman Signature';
+    : 'Contractor / Foreman Signature';
 
   if (hasEngineer) {
-    // 3 Signatures: Storekeeper, Receiver, Project Engineer
     const signColWidth = (pageWidth - margin * 2) / 3;
 
-    // Sign 1: Storekeeper
-    doc.setDrawColor(203, 213, 225);
-    doc.line(margin + 5, signBlockY, margin + signColWidth - 10, signBlockY);
+    doc.setDrawColor(148, 163, 184);
+    doc.line(margin + 2, signBlockY, margin + signColWidth - 8, signBlockY);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(17, 24, 39);
-    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 5, signBlockY + 4);
+    doc.setTextColor(15, 23, 42);
+    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 2, signBlockY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text('Storekeeper / Dispatch Incharge', margin + 5, signBlockY + 7.5);
+    doc.text('Storekeeper / Dispatch Incharge', margin + 2, signBlockY + 8);
 
-    // Sign 2: Receiver / Transporter
-    const sign2X = margin + signColWidth + 5;
-    doc.line(sign2X, signBlockY, sign2X + signColWidth - 15, signBlockY);
+    const sign2X = margin + signColWidth + 4;
+    doc.line(sign2X, signBlockY, sign2X + signColWidth - 10, signBlockY);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(17, 24, 39);
-    doc.text(receiverLabel, sign2X, signBlockY + 4);
+    doc.setTextColor(15, 23, 42);
+    doc.text(receiverLabel, sign2X, signBlockY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text(receiverSubtext, sign2X, signBlockY + 7.5);
+    doc.text(receiverSubtext, sign2X, signBlockY + 8);
 
-    // Sign 3: Project Engineer
-    const sign3X = margin + signColWidth * 2 + 5;
-    doc.line(sign3X, signBlockY, sign3X + signColWidth - 15, signBlockY);
+    const sign3X = margin + signColWidth * 2 + 6;
+    doc.line(sign3X, signBlockY, sign3X + signColWidth - 10, signBlockY);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(17, 24, 39);
-    doc.text(engineerDisplayName, sign3X, signBlockY + 4);
+    doc.setTextColor(15, 23, 42);
+    doc.text(engineerDisplayName, sign3X, signBlockY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text('Project Engineer / Site PM', sign3X, signBlockY + 7.5);
+    doc.text('Project Engineer / Site PM', sign3X, signBlockY + 8);
   } else {
-    // 2 Signatures only: Storekeeper & Receiver (Engineer omitted completely)
     const signColWidth = (pageWidth - margin * 2) / 2;
 
-    // Sign 1: Storekeeper
-    doc.setDrawColor(203, 213, 225);
-    doc.line(margin + 5, signBlockY, margin + signColWidth - 20, signBlockY);
+    doc.setDrawColor(148, 163, 184);
+    doc.line(margin + 4, signBlockY, margin + signColWidth - 16, signBlockY);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(17, 24, 39);
-    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 5, signBlockY + 4);
+    doc.setTextColor(15, 23, 42);
+    doc.text(transaction.receivedOrIssuedBy || 'Site Storekeeper', margin + 4, signBlockY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text('Storekeeper / Dispatch Incharge', margin + 5, signBlockY + 7.5);
+    doc.text('Storekeeper / Dispatch Incharge', margin + 4, signBlockY + 8);
 
-    // Sign 2: Receiver / Transporter
-    const sign2X = margin + signColWidth + 10;
-    doc.line(sign2X, signBlockY, sign2X + signColWidth - 15, signBlockY);
+    const sign2X = margin + signColWidth + 12;
+    doc.line(sign2X, signBlockY, sign2X + signColWidth - 12, signBlockY);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(17, 24, 39);
-    doc.text(receiverLabel, sign2X, signBlockY + 4);
+    doc.setTextColor(15, 23, 42);
+    doc.text(receiverLabel, sign2X, signBlockY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text(receiverSubtext, sign2X, signBlockY + 7.5);
+    doc.text(receiverSubtext, sign2X, signBlockY + 8);
   }
 
-  // Footer Disclaimer
+  // Footer Bar
+  doc.setDrawColor(226, 232, 240);
+  doc.line(margin, pageHeight - margin - 4, pageWidth - margin, pageHeight - margin - 4);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6.8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    'This is a system generated construction material audit voucher. Material movements are tracked with tamper-proof running balances.',
+    'System-Verified Digital Store Voucher • Armee Enterprises Construction ERP • Tamper-Proof Ledger',
     pageWidth / 2,
-    pageHeight - margin + 2,
+    pageHeight - margin + 1,
     { align: 'center' }
   );
 

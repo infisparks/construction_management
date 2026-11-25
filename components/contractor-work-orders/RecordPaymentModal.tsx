@@ -39,9 +39,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   if (!isOpen) return null;
 
-  const remaining = Math.max(0, workOrder.balanceRemaining);
-  const paidNum = parseFloat(amountPaid) || 0;
-  const newBalance = Math.max(0, workOrder.totalRevisedAmount - (workOrder.totalPaid + paidNum));
+  const remaining = Math.max(0, Math.round((Number(workOrder.balanceRemaining ?? 0)) * 100) / 100);
+  const paidNum = Math.round((parseFloat(amountPaid.replace(/,/g, '')) || 0) * 100) / 100;
+  const newBalance = Math.max(0, Math.round((workOrder.totalRevisedAmount - (workOrder.totalPaid + paidNum)) * 100) / 100);
 
   const handlePayFull = () => {
     setAmountPaid(remaining.toString());
@@ -147,14 +147,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">Rs.</span>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 required
-                min="1"
-                step="0.01"
+                placeholder="e.g. 2,00,00,000 or 50,000"
                 value={amountPaid}
                 onChange={(e) => setAmountPaid(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-sm border-2 border-emerald-300 rounded-lg focus:outline-hidden focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 font-bold text-emerald-900 bg-emerald-50/30"
-                placeholder="e.g. 25000"
                 autoFocus
               />
             </div>

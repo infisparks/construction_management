@@ -304,7 +304,7 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
             </div>
           </div>
           <div className="mt-2">
-            <span className="text-lg sm:text-xl font-extrabold text-slate-900">
+            <span className="text-base sm:text-lg font-extrabold text-slate-900 tabular-nums break-words">
               Rs. {kpiStats.totalDealValue.toLocaleString('en-IN')}
             </span>
           </div>
@@ -322,7 +322,7 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
             </div>
           </div>
           <div className="mt-2">
-            <span className="text-lg sm:text-xl font-extrabold text-emerald-700">
+            <span className="text-base sm:text-lg font-extrabold text-emerald-700 tabular-nums break-words">
               Rs. {kpiStats.totalCollected.toLocaleString('en-IN')}
             </span>
           </div>
@@ -340,7 +340,7 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
             </div>
           </div>
           <div className="mt-2">
-            <span className="text-lg sm:text-xl font-extrabold text-amber-700">
+            <span className="text-base sm:text-lg font-extrabold text-amber-700 tabular-nums break-words">
               Rs. {kpiStats.totalBalance.toLocaleString('en-IN')}
             </span>
           </div>

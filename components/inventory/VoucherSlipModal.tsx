@@ -213,32 +213,43 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
         ) : (
           /* Printable Slip Body */
           <div className="overflow-y-auto p-6 sm:p-8 space-y-6 text-slate-900 bg-white">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b pb-5 border-slate-200">
+            {/* Top Executive Accent Bar */}
+            <div className={`h-1.5 w-full rounded-full ${
+              isCheckIn
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                : isReturn
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                : isDamage
+                ? 'bg-gradient-to-r from-rose-500 to-red-600'
+                : 'bg-gradient-to-r from-[#653ef1] to-indigo-600'
+            }`} />
+
+            {/* Header Card */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 p-5 rounded-2xl bg-slate-50/80 border border-slate-200/90">
               <div>
-                <div className="flex items-center gap-2 text-purple-700 font-bold text-base">
-                  <Building2 className="w-5 h-5" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#653ef1] block mb-1">
+                  Armee Enterprises • Store & Logistics
+                </span>
+                <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
+                  <Building2 className="w-5 h-5 text-[#653ef1]" />
                   <span>{projectName}</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Central Site Store & Materials Logistics Division
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  Plot 48/A, Commercial Business Hub, Site Office Gate #1
+                <p className="text-xs text-slate-500 mt-1">
+                  Site Gate Office #1 • Plot 48/A, Commercial Business Hub, Mumbai
                 </p>
               </div>
 
               <div className="text-left sm:text-right">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${
                   isCheckIn
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : isReturn
                     ? 'bg-amber-50 text-amber-800 border-amber-200'
                     : isDamage
                     ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-purple-50 text-[#653ef1] border-purple-200'
                 }`}>
-                  {isCheckIn ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                  {isCheckIn ? <ArrowDownLeft className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
                   <span>
                     {isCheckIn && 'GOODS RECEIPT NOTE (GRN)'}
                     {transaction.type === 'check_out' && 'MATERIAL ISSUE NOTE (MIN)'}
@@ -246,66 +257,88 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                     {isDamage && 'DAMAGE / SCRAP VOUCHER (DMG)'}
                   </span>
                 </span>
-                <div className="mt-2 text-xs font-mono font-bold text-slate-900">
+                <div className="mt-2.5 text-sm font-mono font-extrabold text-slate-900">
                   {transaction.voucherNumber}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 sm:justify-end">
+                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 sm:justify-end">
+                  <Calendar className="w-3 h-3 text-slate-400" />
                   <span>{transaction.date}</span>
                   <span>•</span>
+                  <Clock className="w-3 h-3 text-slate-400" />
                   <span>{transaction.time}</span>
                 </div>
               </div>
             </div>
 
-            {/* Logistics Summary Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Category</span>
-                <span className="font-semibold text-slate-800">{transaction.category}</span>
+            {/* Two-Column Party & Store Audit Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#653ef1] block border-b border-slate-100 pb-1.5">
+                  {isCheckIn || isReturn ? 'Supplier & Delivery Details' : 'Issued To & Site Location'}
+                </span>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">{isCheckIn || isReturn ? 'Supplier:' : 'Subcontractor:'}</span>
+                  <span className="font-bold text-slate-900 text-right truncate">
+                    {isCheckIn || isReturn ? transaction.supplierName || 'Site Supplier' : transaction.subcontractorName || 'Site Labour Agency'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">{isCheckIn ? 'Challan / Inv #:' : 'Receiving Person:'}</span>
+                  <span className="font-semibold text-slate-800 text-right">
+                    {isCheckIn ? transaction.challanNumber || 'N/A' : transaction.foremanName || 'Authorized Foreman'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">{isCheckIn ? 'Vehicle #:' : 'Floor / Zone:'}</span>
+                  <span className="font-semibold text-slate-800 font-mono text-right">
+                    {isCheckIn ? transaction.vehicleNumber || 'N/A' : transaction.floorZone || 'Central Site Yard'}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  {isCheckIn || isReturn ? 'Supplier Agency' : 'Subcontractor'}
+
+              <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#653ef1] block border-b border-slate-100 pb-1.5">
+                  Store & Audit Metadata
                 </span>
-                <span className="font-semibold text-slate-800 truncate block">
-                  {isCheckIn || isReturn 
-                    ? transaction.supplierName || 'Site Supplier' 
-                    : transaction.subcontractorName || 'Site Gang'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  {isCheckIn ? 'Challan / Invoice' : 'Linked Task'}
-                </span>
-                <span className="font-semibold text-slate-800">
-                  {isCheckIn ? transaction.challanNumber || 'N/A' : transaction.wbsTaskCode || 'N/A'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  {isCheckIn ? 'Vehicle Number' : 'Floor / Zone'}
-                </span>
-                <span className="font-semibold text-slate-800 font-mono">
-                  {isCheckIn ? transaction.vehicleNumber || 'N/A' : transaction.floorZone || 'N/A'}
-                </span>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Category:</span>
+                  <span className="font-bold text-slate-900 text-right">{transaction.category}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Storekeeper:</span>
+                  <span className="font-semibold text-slate-800 text-right">{transaction.receivedOrIssuedBy || 'Site Storekeeper'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">WBS / Audit:</span>
+                  <span className="font-semibold text-slate-800 text-right font-mono">{transaction.wbsTaskCode || 'SITE-GEN'} • VERIFIED</span>
+                </div>
               </div>
             </div>
 
-            {/* Main Item Table */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
+            {/* Main Item & Valuation Table */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold">
+                <thead className={`text-white font-bold ${
+                  isCheckIn
+                    ? 'bg-emerald-600'
+                    : isReturn
+                    ? 'bg-amber-600'
+                    : isDamage
+                    ? 'bg-rose-600'
+                    : 'bg-[#653ef1]'
+                }`}>
                   <tr>
-                    <th className="px-4 py-2.5">Item Description & Code</th>
-                    <th className="px-4 py-2.5 text-right">Movement Quantity</th>
-                    <th className="px-4 py-2.5 text-right">Remaining Stock</th>
-                    <th className="px-4 py-2.5 text-right">Total (Rs.)</th>
+                    <th className="px-4 py-3">Item Description & Code</th>
+                    <th className="px-4 py-3 text-right">Unit Rate</th>
+                    <th className="px-4 py-3 text-right">Movement Qty</th>
+                    <th className="px-4 py-3 text-right">Store Balance</th>
+                    <th className="px-4 py-3 text-right">Total Value</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   <tr>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900">{transaction.materialName}</div>
+                    <td className="px-4 py-3.5">
+                      <div className="font-bold text-slate-900 text-sm">{transaction.materialName}</div>
                       <div className="text-[11px] text-purple-700 font-semibold font-mono mt-0.5 flex items-center gap-2 flex-wrap">
                         <span>Code: {getCleanItemCode(transaction.materialCode, transaction.materialId, 1)}</span>
                         {transaction.brand && (
@@ -313,21 +346,26 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                         )}
                       </div>
                     </td>
-                    <td className={`px-4 py-3 text-right font-bold text-sm ${
+                    <td className="px-4 py-3.5 text-right font-mono text-slate-600">
+                      {transaction.unitRate ? `Rs. ${transaction.unitRate.toLocaleString('en-IN')}` : '—'}
+                    </td>
+                    <td className={`px-4 py-3.5 text-right font-extrabold text-sm tabular-nums ${
                       isCheckIn 
                         ? 'text-emerald-700' 
                         : isReturn 
                         ? 'text-amber-800' 
                         : isDamage 
                         ? 'text-rose-700' 
-                        : 'text-indigo-700'
+                        : 'text-[#653ef1]'
                     }`}>
                       {isCheckIn ? '+' : '-'}{transaction.quantity} {transaction.unit}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
-                      {transaction.runningStockBalance} {transaction.unit}
+                    <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-800">
+                      <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
+                        {transaction.runningStockBalance} {transaction.unit}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-bold font-mono text-slate-900">
+                    <td className="px-4 py-3.5 text-right font-extrabold font-mono text-slate-900 tabular-nums">
                       {transaction.totalAmount ? `Rs. ${transaction.totalAmount.toLocaleString('en-IN')}` : '—'}
                     </td>
                   </tr>

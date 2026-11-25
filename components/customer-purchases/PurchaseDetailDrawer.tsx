@@ -56,9 +56,9 @@ export const PurchaseDetailDrawer: React.FC<PurchaseDetailDrawerProps> = ({
 
   if (!isOpen || !purchase) return null;
 
-  const totalAmount = purchase.total_amount || 0;
-  const collected = purchase.totalCollected || 0;
-  const balance = Math.max(0, totalAmount - collected);
+  const totalAmount = Math.round((Number(purchase.total_amount ?? 0)) * 100) / 100;
+  const collected = Math.round((Number(purchase.totalCollected ?? 0)) * 100) / 100;
+  const balance = Math.max(0, Math.round((totalAmount - collected) * 100) / 100);
   const percentCollected = totalAmount > 0 ? Math.min(100, Math.round((collected / totalAmount) * 100)) : 0;
   const effectiveProjectName = purchase.project?.name || projectName || 'Site Office';
 

@@ -87,6 +87,7 @@ import {
   softDeleteInventoryTransaction,
   restoreInventoryTransaction,
   updateInventoryTransactionRecord,
+  syncProductStockFromLedger,
   InventoryQuickSummary,
 } from '@/lib/supabase/inventory-services';
 import {
@@ -142,44 +143,49 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     try {
       const [prodList, txList, summary, vendList] = await Promise.all([
         fetchProfileProducts(),
-        fetchInventoryTransactions({ limit: 200 }),
+        fetchInventoryTransactions(),
         fetchQuickStockSummary(),
         fetchProfileVendors(),
       ]);
 
       // 1. Process materials from Supabase profile_product
       const mappedMaterials: ConstructionMaterial[] = (prodList || []).map((p) => {
-        // Find latest rate from inward transactions if available
-        const relatedTxs = (txList || []).filter(
-          (t) => (t.product_id === p.id || (p.code && t.product_code === p.code)) &&
-                 (t.type === 'in' || t.type === 'check_in') &&
-                 Number(t.unit_rate) > 0 &&
-                 !t.is_deleted &&
-                 !(t.notes && t.notes.startsWith('[DELETED]'))
+        // Find all transactions for this product (by product_id or product_code)
+        const allProductTxs = (txList || []).filter(
+          (t) => t.product_id === p.id || (p.code && t.product_code === p.code)
+        );
+
+        const activeProductTxs = allProductTxs.filter(
+          (t) => !t.is_deleted && !(t.notes && t.notes.startsWith('[DELETED]'))
+        );
+
+        // Find latest rate from active inward transactions if available
+        const relatedTxs = activeProductTxs.filter(
+          (t) => (t.type === 'in' || t.type === 'check_in') && Number(t.unit_rate) > 0
         );
         const latestRate = relatedTxs.length > 0 ? Number(relatedTxs[0].unit_rate) : 0;
 
-        // Calculate live stock balance directly from inventory_transactions ledger
-        // Inward (+), Outward / Defect / Return (-)
-        const productTxs = (txList || []).filter(
-          (t) => (t.product_id === p.id || (p.code && t.product_code === p.code)) &&
-                 !t.is_deleted &&
-                 !(t.notes && t.notes.startsWith('[DELETED]'))
-        );
-        
-        let effectiveStock = Number(p.current_stock ?? 0);
-        if (productTxs.length > 0) {
-          let liveStockBalance = 0;
-          for (const t of productTxs) {
+        // Single Source of Truth: Total Active Check-In - (Check-Out + Return + Damage)
+        // If product has never had any ledger entries, preserve its opening current_stock.
+        let effectiveStock = Math.max(0, Math.round(Number(p.current_stock ?? 0) * 100) / 100);
+        if (allProductTxs.length > 0) {
+          let totalIn = 0;
+          let totalOut = 0;
+          for (const t of activeProductTxs) {
             const type = (t.type || '').toLowerCase();
             const qty = Number(t.quantity) || 0;
             if (type === 'in' || type === 'check_in') {
-              liveStockBalance += qty;
+              totalIn += qty;
             } else {
-              liveStockBalance = Math.max(0, liveStockBalance - qty);
+              totalOut += qty;
             }
           }
-          effectiveStock = liveStockBalance;
+          effectiveStock = Math.max(0, Math.round((totalIn - totalOut) * 100) / 100);
+
+          // Self-heal profile_product.current_stock in DB if it drifted from the ledger
+          if (effectiveStock !== Math.round(Number(p.current_stock ?? 0) * 100) / 100) {
+            syncProductStockFromLedger(p.id, p.code);
+          }
         }
 
         return {
@@ -202,6 +208,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         };
       });
       setMaterials(mappedMaterials);
+      setHistoryDrawerMaterial((prev) => {
+        if (!prev) return null;
+        const fresh = mappedMaterials.find((m) => m.id === prev.id);
+        return fresh ? fresh : prev;
+      });
 
       // 2. Process transactions from Supabase inventory_transactions
       if (txList) {
@@ -300,11 +311,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
   const isTransactionOfDeletedProduct = useCallback(
     (t: InventoryTransaction) => {
       if (t.materialId && deletedProductIds.has(t.materialId)) return true;
+      // If transaction belongs to an active product ID in materials, never hide it by name/code match
+      if (t.materialId && materials.some((m) => m.id === t.materialId)) return false;
       if (t.materialCode && deletedProductCodes.has(t.materialCode.toLowerCase())) return true;
       if (t.materialName && deletedProductNames.has(t.materialName.toLowerCase().trim())) return true;
       return false;
     },
-    [deletedProductIds, deletedProductCodes, deletedProductNames]
+    [deletedProductIds, deletedProductCodes, deletedProductNames, materials]
   );
 
   const loadDeletedProducts = async () => {
@@ -491,6 +504,14 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     };
   }, [materials, transactions, isTransactionOfDeletedProduct]);
 
+  const liveStockMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const m of materials) {
+      map[m.id] = m.currentStock;
+    }
+    return map;
+  }, [materials]);
+
   // Unique Categories
   const categories = useMemo(() => {
     const set = new Set(materials.map((m) => m.category));
@@ -636,23 +657,30 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     txData: Omit<InventoryTransaction, 'id' | 'runningStockBalance'>,
     stockUpdate: { materialId: string; quantityDelta: number; newRate?: number }
   ) => {
-    let updatedBalance = 0;
-    let targetMaterialObj: ConstructionMaterial | null = null;
+    const existingMat = materials.find((m) => m.id === stockUpdate.materialId);
+    const updatedBalance = existingMat
+      ? Math.max(0, Math.round((existingMat.currentStock + stockUpdate.quantityDelta) * 100) / 100)
+      : 0;
+    const targetMaterialObj: ConstructionMaterial | null = existingMat
+      ? {
+          ...existingMat,
+          currentStock: updatedBalance,
+          averageUnitRate: stockUpdate.newRate || existingMat.averageUnitRate,
+          lastUpdated: new Date().toISOString().split('T')[0],
+        }
+      : null;
 
     // Update material stock in-memory
     setMaterials((prev) =>
       prev.map((m) => {
         if (m.id === stockUpdate.materialId) {
           const newStock = Math.max(0, Math.round((m.currentStock + stockUpdate.quantityDelta) * 100) / 100);
-          updatedBalance = newStock;
-          const updated = {
+          return {
             ...m,
             currentStock: newStock,
             averageUnitRate: stockUpdate.newRate || m.averageUnitRate,
             lastUpdated: new Date().toISOString().split('T')[0],
           };
-          targetMaterialObj = updated;
-          return updated;
         }
         return m;
       })
@@ -724,18 +752,35 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         });
 
         if (!error && dbTx) {
+          const syncedStock = Number(dbTx.stock_after ?? updatedBalance);
           setTransactions((prev) =>
             prev.map((t) =>
               t.id === newTx.id
                 ? {
                     ...t,
                     id: dbTx.id,
-                    runningStockBalance: Number(dbTx.stock_after ?? updatedBalance),
+                    runningStockBalance: syncedStock,
                   }
                 : t
             )
           );
+          setMaterials((prev) =>
+            prev.map((m) =>
+              m.id === stockUpdate.materialId ? { ...m, currentStock: syncedStock } : m
+            )
+          );
+          setHistoryDrawerMaterial((prev) =>
+            prev && prev.id === stockUpdate.materialId ? { ...prev, currentStock: syncedStock } : prev
+          );
           fetchQuickStockSummary().then((s) => s && setDbSummary(s));
+        } else if (error) {
+          console.error('Failed to persist transaction to Supabase:', error);
+          // Remove unsaved optimistic transaction and reload synced state so UI matches DB
+          setTransactions((prev) => prev.filter((t) => t.id !== newTx.id));
+          loadDataFromSupabase();
+          if (showToast) {
+            showToast(`Failed to save ${txData.voucherNumber}: ${error.message || 'Database error'}`, 'error');
+          }
         }
       } catch (dbErr) {
         console.error('Failed to persist transaction to Supabase:', dbErr);
@@ -939,6 +984,24 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       });
       if (data) {
         setMaterials((prev) => prev.map((m) => (m.id === newProduct.id ? { ...m, id: data.id } : m)));
+        // If product was created with opening stock > 0, log an Opening Stock Check-In so the ledger stays 100% synced
+        if (newProduct.currentStock > 0) {
+          await createInventoryTransaction({
+            voucher_no: `OPEN-${newProduct.code}`,
+            type: 'check_in',
+            product_id: data.id,
+            product_name: newProduct.name,
+            product_code: newProduct.code,
+            category: newProduct.category,
+            brand: newProduct.brand,
+            quantity: newProduct.currentStock,
+            unit: newProduct.unit,
+            location: newProduct.storageLocation,
+            person_name: 'Storekeeper',
+            notes: 'Opening stock balance on product creation',
+            transaction_date: new Date().toISOString().split('T')[0],
+          });
+        }
       }
       if (error) {
         console.error('Error creating product in Supabase:', error);
@@ -951,8 +1014,15 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
     }
   };
 
-  // Soft Delete a Movement Voucher (sets is_deleted = true, adjusts stock)
+  // Soft Delete a Movement Voucher (sets is_deleted = true, re-syncs stock from ledger)
   const handleDeleteTransaction = async (tx: InventoryTransaction) => {
+    if (tx.id.startsWith('tx-')) {
+      if (showToast) {
+        showToast('Please wait a moment for the voucher to finish saving to database.', 'info');
+      }
+      return;
+    }
+
     if (!window.confirm(`Are you sure you want to move voucher "${tx.voucherNumber}" to the Recycle Bin? Stock will be adjusted.`)) {
       return;
     }
@@ -966,30 +1036,36 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       )
     );
 
-    // 2. Adjust material stock:
+    // 2. Adjust material stock optimistically
     const isAddition = tx.type === 'check_in' || (tx.type as any) === 'in';
     const delta = isAddition ? -tx.quantity : tx.quantity;
 
     setMaterials((prev) =>
       prev.map((m) =>
         m.id === tx.materialId
-          ? { ...m, currentStock: Math.max(0, m.currentStock + delta) }
+          ? { ...m, currentStock: Math.max(0, Math.round((m.currentStock + delta) * 100) / 100) }
           : m
       )
     );
 
     if (historyDrawerMaterial && historyDrawerMaterial.id === tx.materialId) {
       setHistoryDrawerMaterial((prev) =>
-        prev ? { ...prev, currentStock: Math.max(0, prev.currentStock + delta) } : null
+        prev ? { ...prev, currentStock: Math.max(0, Math.round((prev.currentStock + delta) * 100) / 100) } : null
       );
     }
 
-    // 3. Persist to Supabase
+    // 3. Persist to Supabase & re-sync from active ledger
     try {
-      await softDeleteInventoryTransaction(tx.id, tx.notes);
+      const res = await softDeleteInventoryTransaction(tx.id, tx.notes);
       await loadDataFromSupabase();
+      if (!res.success) {
+        if (showToast) {
+          showToast(`Failed to delete voucher ${tx.voucherNumber}: ${res.error?.message || 'Database error'}`, 'error');
+        }
+        return;
+      }
       if (showToast) {
-        showToast(`Voucher ${tx.voucherNumber} moved to Bin. Stock adjusted.`, 'info');
+        showToast(`Voucher ${tx.voucherNumber} moved to Bin. Stock restored from ledger.`, 'info');
       }
     } catch (err) {
       console.error('Failed to soft delete transaction in Supabase:', err);
@@ -1044,7 +1120,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       prev.map((t) => (t.id === updatedTx.id ? updatedTx : t))
     );
 
-    // 2. Persist to Supabase
+    // 2. Persist to Supabase (updateInventoryTransactionRecord auto-syncs product stock from ledger)
     try {
       await updateInventoryTransactionRecord(updatedTx.id, {
         type: updatedTx.type === 'check_in' ? 'check_in' : updatedTx.type === 'check_out' ? 'check_out' : updatedTx.type === 'damage' ? 'damage' : 'return',
@@ -1060,6 +1136,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
         file_url: updatedTx.fileUrl,
         file_name: updatedTx.fileName,
       });
+
+      await loadDataFromSupabase();
+
       if (showToast) {
         showToast(`Voucher ${updatedTx.voucherNumber} updated successfully.`, 'success');
       }
@@ -2872,7 +2951,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
       {/* TAB 0: PRODUCT PROFILES (profile_product) */}
       {activeTab === 'products' && (
-        <ProductProfileView showToast={showToast} />
+        <ProductProfileView
+          showToast={showToast}
+          liveStockMap={liveStockMap}
+          onProductsChanged={loadDataFromSupabase}
+        />
       )}
 
       {/* TAB 7: VENDORS & PARTIES DIRECTORY (profile_vendor) */}

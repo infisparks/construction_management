@@ -196,52 +196,122 @@ export async function fetchInventoryTransactions(options?: {
 }
 
 /**
- * Insert a unified transaction (in, out, defect, return) and update current stock
- * directly using indexed primary key on profile_product (zero custom database functions).
+ * Single Source of Truth: Recalculates a product's exact stock from all active
+ * (non-deleted) inventory_transactions and persists it to profile_product.current_stock.
+ *
+ * Formula:
+ *   Stock = Total Active Check-In - (Total Active Check-Out + Total Active Return + Total Active Damage)
+ *
+ * Matches by product_id OR product_code so no transaction is ever skipped.
+ * If the product has zero transactions in the ledger, preserves its opening current_stock.
+ */
+export async function syncProductStockFromLedger(
+  productId?: string | null,
+  productCode?: string | null
+): Promise<{ success: boolean; stock: number; error?: any }> {
+  try {
+    if (!productId && !productCode) {
+      return { success: false, stock: 0, error: new Error('Missing productId or productCode') };
+    }
+
+    // 1. Resolve product row from profile_product
+    let prodQuery = supabase.from('profile_product').select('id, code, current_stock');
+    if (productId) {
+      prodQuery = prodQuery.eq('id', productId);
+    } else if (productCode) {
+      prodQuery = prodQuery.eq('code', productCode);
+    }
+    const { data: prod, error: prodErr } = await prodQuery.single();
+    if (prodErr || !prod) {
+      return { success: false, stock: 0, error: prodErr || new Error('Product not found') };
+    }
+
+    // 2. Fetch all transactions for this product (matching by product_id or product_code)
+    let txQuery = supabase
+      .from('inventory_transactions')
+      .select('id, type, quantity, notes, is_deleted, product_id, product_code');
+
+    if (prod.id && prod.code) {
+      txQuery = txQuery.or(`product_id.eq.${prod.id},product_code.eq.${prod.code}`);
+    } else if (prod.id) {
+      txQuery = txQuery.eq('product_id', prod.id);
+    }
+
+    const { data: rows, error: txErr } = await txQuery;
+    if (txErr) {
+      return { success: false, stock: Number(prod.current_stock ?? 0), error: txErr };
+    }
+
+    const allRows = rows || [];
+    if (allRows.length === 0) {
+      return { success: true, stock: Math.max(0, Math.round(Number(prod.current_stock ?? 0) * 100) / 100) };
+    }
+
+    // 3. Sum strictly active (non-deleted) transactions
+    let totalIn = 0;
+    let totalOut = 0;
+    for (const row of allRows) {
+      if ((row as any).is_deleted === true) continue;
+      if (typeof row.notes === 'string' && row.notes.startsWith('[DELETED]')) continue;
+
+      const t = (row.type || '').toLowerCase();
+      const qty = Number(row.quantity) || 0;
+      if (t === 'in' || t === 'check_in') {
+        totalIn += qty;
+      } else {
+        totalOut += qty;
+      }
+    }
+
+    const accurateStock = Math.max(0, Math.round((totalIn - totalOut) * 100) / 100);
+
+    // 4. Persist exact calculated stock to profile_product
+    const { error: updateErr } = await supabase
+      .from('profile_product')
+      .update({
+        current_stock: accurateStock,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', prod.id);
+
+    if (updateErr) {
+      console.error('syncProductStockFromLedger update error:', updateErr);
+      return { success: false, stock: accurateStock, error: updateErr };
+    }
+
+    return { success: true, stock: accurateStock };
+  } catch (err) {
+    console.error('Exception in syncProductStockFromLedger:', err);
+    return { success: false, stock: 0, error: err };
+  }
+}
+
+/**
+ * Insert a unified transaction (in, out, defect, return) and sync current stock
+ * from the active transaction ledger.
  */
 export async function createInventoryTransaction(
   tx: Omit<InventoryTransactionRecord, 'id' | 'created_at' | 'updated_at' | 'stock_after'>
 ): Promise<{ data: InventoryTransactionRecord | null; error: any }> {
   try {
-    const isAddition = tx.type === 'in' || tx.type === 'check_in';
-    const delta = isAddition ? Number(tx.quantity) : -Number(tx.quantity);
-
-    let calculatedStockAfter = 0;
-
-    // Fetch existing product stock and update directly using indexed PK
-    if (tx.product_id) {
-      const { data: prod } = await supabase
-        .from('profile_product')
-        .select('current_stock')
-        .eq('id', tx.product_id)
-        .single();
-
-      const currentStock = Number(prod?.current_stock ?? 0);
-      calculatedStockAfter = Math.max(0, currentStock + delta);
-
-      await supabase
-        .from('profile_product')
-        .update({
-          current_stock: calculatedStockAfter,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tx.product_id);
-    }
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const safeProductId = tx.product_id && uuidRegex.test(tx.product_id) ? tx.product_id : null;
+    const safeVendorId = tx.vendor_id && uuidRegex.test(tx.vendor_id) ? tx.vendor_id : null;
 
     const insertPayload: any = {
       voucher_no: tx.voucher_no,
       type: tx.type,
-      product_id: tx.product_id || null,
+      product_id: safeProductId,
       product_name: tx.product_name,
       product_code: tx.product_code || null,
       category: tx.category || null,
       brand: tx.brand || null,
       quantity: tx.quantity,
       unit: tx.unit,
-      stock_after: calculatedStockAfter,
+      stock_after: 0,
       unit_rate: tx.unit_rate ?? null,
       total_amount: tx.total_amount ?? null,
-      vendor_id: tx.vendor_id || null,
+      vendor_id: safeVendorId,
       vendor_name: tx.vendor_name || null,
       reference_no: tx.reference_no || null,
       location: tx.location || null,
@@ -251,6 +321,7 @@ export async function createInventoryTransaction(
       notes: tx.notes || null,
       file_url: tx.file_url || null,
       file_name: tx.file_name || null,
+      is_deleted: false,
       transaction_date: tx.transaction_date || new Date().toISOString().split('T')[0],
       transaction_time:
         tx.transaction_time ||
@@ -263,10 +334,15 @@ export async function createInventoryTransaction(
       .select()
       .single();
 
-    // Graceful fallback if engineer_name column has not yet been migrated in Supabase
-    if (error && error.message && error.message.includes('engineer_name')) {
-      console.warn('engineer_name column pending in Supabase; retrying insert without column:', error.message);
-      delete insertPayload.engineer_name;
+    // Graceful fallback if optional columns (engineer_name, is_deleted) have not yet been migrated in Supabase
+    if (
+      error &&
+      error.message &&
+      (error.message.includes('engineer_name') || error.message.includes('is_deleted'))
+    ) {
+      console.warn('Optional column pending in Supabase; retrying insert without optional columns:', error.message);
+      if (error.message.includes('engineer_name')) delete insertPayload.engineer_name;
+      if (error.message.includes('is_deleted')) delete insertPayload.is_deleted;
       const retry = await supabase
         .from('inventory_transactions')
         .insert([insertPayload])
@@ -276,7 +352,21 @@ export async function createInventoryTransaction(
       error = retry.error;
     }
 
-    return { data: data as InventoryTransactionRecord, error };
+    if (error || !data) {
+      return { data: null, error };
+    }
+
+    // Sync exact stock from ledger and update stock_after on the newly created row
+    const syncRes = await syncProductStockFromLedger(safeProductId, tx.product_code);
+    if (syncRes.success) {
+      await supabase
+        .from('inventory_transactions')
+        .update({ stock_after: syncRes.stock })
+        .eq('id', data.id);
+      data.stock_after = syncRes.stock;
+    }
+
+    return { data: data as InventoryTransactionRecord, error: null };
   } catch (err) {
     console.error('Failed to create inventory transaction:', err);
     return { data: null, error: err };
@@ -284,14 +374,18 @@ export async function createInventoryTransaction(
 }
 
 /**
- * Delete an inventory transaction.
- * The database trigger trg_sync_product_stock automatically recalculates
- * current_stock in profile_product using the indexed transaction ledger.
+ * Permanently delete an inventory transaction and re-sync product stock from ledger.
  */
 export async function deleteInventoryTransaction(
   id: string
 ): Promise<{ success: boolean; error: any }> {
   try {
+    const { data: existing } = await supabase
+      .from('inventory_transactions')
+      .select('product_id, product_code')
+      .eq('id', id)
+      .single();
+
     const { error } = await supabase
       .from('inventory_transactions')
       .delete()
@@ -300,6 +394,10 @@ export async function deleteInventoryTransaction(
     if (error) {
       console.error('Failed to delete inventory transaction:', error);
       return { success: false, error };
+    }
+
+    if (existing) {
+      await syncProductStockFromLedger(existing.product_id, existing.product_code);
     }
     return { success: true, error: null };
   } catch (err) {
@@ -448,8 +546,9 @@ export async function fetchProductTotalStock(productId: string): Promise<number>
   try {
     const { data, error } = await supabase
       .from('inventory_transactions')
-      .select('type, quantity, notes')
-      .eq('product_id', productId);
+      .select('type, quantity, notes, is_deleted')
+      .eq('product_id', productId)
+      .order('created_at', { ascending: true });
 
     if (error || !data) return 0;
 
@@ -465,7 +564,7 @@ export async function fetchProductTotalStock(productId: string): Promise<number>
         balance = Math.max(0, balance - qty);
       }
     }
-    return balance;
+    return Math.round(balance * 100) / 100;
   } catch (err) {
     console.error('Failed to calculate product stock:', err);
     return 0;
@@ -536,68 +635,55 @@ export function mapDbToInventoryTransaction(row: InventoryTransactionRecord) {
 
 /**
  * Soft delete an inventory transaction record (moves it to the Bin).
- * Reverses its stock effect in profile_product so stock balance strictly ignores deleted vouchers.
- * Gracefully tries is_deleted column first, then falls back to [DELETED] notes tag if column is pending.
+ * Marks the voucher deleted first, then re-syncs profile_product.current_stock from the active ledger.
  */
 export async function softDeleteInventoryTransaction(
   id: string,
   currentNotes?: string
-): Promise<{ success: boolean; error?: any }> {
+): Promise<{ success: boolean; syncedStock?: number; error?: any }> {
   try {
+    if (!id || id.startsWith('tx-')) {
+      return { success: false, error: new Error('Transaction is still saving to database. Please try again in a moment.') };
+    }
+
     const now = new Date().toISOString();
 
-    // 1. Fetch transaction details to adjust product stock balance
+    // 1. Fetch transaction details so we know which product to re-sync
     const { data: tx } = await supabase
       .from('inventory_transactions')
-      .select('product_id, type, quantity')
+      .select('product_id, product_code')
       .eq('id', id)
       .single();
 
-    if (tx && tx.product_id && tx.quantity) {
-      const isAddition = tx.type === 'in' || tx.type === 'check_in';
-      // Inward delivery deleted -> decrease stock; outward/deduction deleted -> restore stock
-      const delta = isAddition ? -Number(tx.quantity) : Number(tx.quantity);
-
-      const { data: prod } = await supabase
-        .from('profile_product')
-        .select('current_stock')
-        .eq('id', tx.product_id)
-        .single();
-
-      if (prod) {
-        const newStock = Math.max(0, Number(prod.current_stock ?? 0) + delta);
-        await supabase
-          .from('profile_product')
-          .update({
-            current_stock: newStock,
-            updated_at: now,
-          })
-          .eq('id', tx.product_id);
-      }
-    }
-
-    // 2. Try modern is_deleted column
+    // 2. Mark deleted (try modern is_deleted column first, then [DELETED] notes fallback)
     const { error: colErr } = await supabase
       .from('inventory_transactions')
       .update({ is_deleted: true, updated_at: now })
       .eq('id', id);
 
-    if (!colErr) {
-      return { success: true };
+    if (colErr) {
+      console.warn('softDeleteInventoryTransaction: is_deleted column update fallback:', colErr.message);
+      const taggedNote = currentNotes
+        ? (currentNotes.startsWith('[DELETED]') ? currentNotes : `[DELETED] ${currentNotes}`)
+        : '[DELETED]';
+      const { error: noteErr } = await supabase
+        .from('inventory_transactions')
+        .update({ notes: taggedNote, updated_at: now })
+        .eq('id', id);
+
+      if (noteErr) {
+        return { success: false, error: noteErr };
+      }
     }
 
-    // 3. Fallback if is_deleted column doesn't exist yet in remote schema
-    console.warn('softDeleteInventoryTransaction: is_deleted column update fallback:', colErr.message);
-    const taggedNote = currentNotes ? `[DELETED] ${currentNotes}` : '[DELETED]';
-    const { error: noteErr } = await supabase
-      .from('inventory_transactions')
-      .update({ notes: taggedNote, updated_at: now })
-      .eq('id', id);
-
-    if (noteErr) {
-      return { success: false, error: noteErr };
+    // 3. Re-sync exact stock from active ledger
+    let syncedStock: number | undefined;
+    if (tx) {
+      const syncRes = await syncProductStockFromLedger(tx.product_id, tx.product_code);
+      if (syncRes.success) syncedStock = syncRes.stock;
     }
-    return { success: true };
+
+    return { success: true, syncedStock };
   } catch (err: any) {
     console.error('Exception in softDeleteInventoryTransaction:', err);
     return { success: false, error: err };
@@ -606,61 +692,77 @@ export async function softDeleteInventoryTransaction(
 
 /**
  * Restore a soft-deleted inventory transaction record from the Bin.
- * Re-applies its stock effect to profile_product so stock balance counts it again.
+ * Marks the voucher active first, then re-syncs profile_product.current_stock from the active ledger.
  */
 export async function restoreInventoryTransaction(
   id: string,
   currentNotes?: string
-): Promise<{ success: boolean; error?: any }> {
+): Promise<{ success: boolean; syncedStock?: number; error?: any }> {
   try {
     const now = new Date().toISOString();
 
-    // 1. Fetch transaction details to re-apply product stock balance
+    // 1. Fetch transaction details so we know which product to re-sync
     const { data: tx } = await supabase
       .from('inventory_transactions')
-      .select('product_id, type, quantity')
+      .select('product_id, product_code')
       .eq('id', id)
       .single();
 
-    if (tx && tx.product_id && tx.quantity) {
-      const isAddition = tx.type === 'in' || tx.type === 'check_in';
-      // Inward delivery restored -> add stock back; outward restored -> deduct stock
-      const delta = isAddition ? Number(tx.quantity) : -Number(tx.quantity);
-
-      const { data: prod } = await supabase
-        .from('profile_product')
-        .select('current_stock')
-        .eq('id', tx.product_id)
-        .single();
-
-      if (prod) {
-        const newStock = Math.max(0, Number(prod.current_stock ?? 0) + delta);
-        await supabase
-          .from('profile_product')
-          .update({
-            current_stock: newStock,
-            updated_at: now,
-          })
-          .eq('id', tx.product_id);
-      }
-    }
-
-    // 2. Try modern is_deleted column
-    const { error: colErr } = await supabase
+    // 2. Mark active (is_deleted = false) and strip [DELETED] from notes
+    await supabase
       .from('inventory_transactions')
       .update({ is_deleted: false, updated_at: now })
       .eq('id', id);
 
-    // 3. Also strip [DELETED] from notes if present
     const cleanNote = currentNotes ? currentNotes.replace(/^\[DELETED\]\s*/, '') : '';
     await supabase
       .from('inventory_transactions')
       .update({ notes: cleanNote, updated_at: now })
       .eq('id', id);
 
-    return { success: true };
+    // 3. Re-sync exact stock from active ledger
+    let syncedStock: number | undefined;
+    if (tx) {
+      const syncRes = await syncProductStockFromLedger(tx.product_id, tx.product_code);
+      if (syncRes.success) syncedStock = syncRes.stock;
+    }
+
+    return { success: true, syncedStock };
   } catch (err: any) {
     console.error('Exception in restoreInventoryTransaction:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Adjust a product's current_stock in profile_product by a relative delta.
+ */
+export async function adjustProductStock(
+  productId: string,
+  delta: number
+): Promise<{ success: boolean; newStock?: number; error?: any }> {
+  try {
+    const { data: prod, error: fetchErr } = await supabase
+      .from('profile_product')
+      .select('current_stock')
+      .eq('id', productId)
+      .single();
+
+    if (fetchErr || !prod) {
+      return { success: false, error: fetchErr || new Error('Product not found') };
+    }
+
+    const newStock = Math.max(0, Math.round((Number(prod.current_stock ?? 0) + delta) * 100) / 100);
+    const { error: updateErr } = await supabase
+      .from('profile_product')
+      .update({ current_stock: newStock, updated_at: new Date().toISOString() })
+      .eq('id', productId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr };
+    }
+    return { success: true, newStock };
+  } catch (err) {
     return { success: false, error: err };
   }
 }
@@ -671,23 +773,32 @@ export async function restoreInventoryTransaction(
 export async function updateInventoryTransactionRecord(
   id: string,
   updates: Partial<InventoryTransactionRecord>
-): Promise<{ success: boolean; error?: any }> {
+): Promise<{ success: boolean; syncedStock?: number; error?: any }> {
   try {
     const payload = {
       ...updates,
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('inventory_transactions')
       .update(payload)
-      .eq('id', id);
+      .eq('id', id)
+      .select('product_id, product_code')
+      .single();
 
     if (error) {
       console.error('Error updating inventory transaction:', error);
       return { success: false, error };
     }
-    return { success: true };
+
+    let syncedStock: number | undefined;
+    if (data) {
+      const syncRes = await syncProductStockFromLedger(data.product_id, data.product_code);
+      if (syncRes.success) syncedStock = syncRes.stock;
+    }
+
+    return { success: true, syncedStock };
   } catch (err: any) {
     console.error('Exception in updateInventoryTransactionRecord:', err);
     return { success: false, error: err };

@@ -138,7 +138,7 @@ export const CreatePurchaseModal: React.FC<CreatePurchaseModalProps> = ({
       setErrorMsg('Customer name is required.');
       return;
     }
-    const numAmount = parseFloat(totalAmount.replace(/,/g, ''));
+    const numAmount = Math.round((parseFloat(totalAmount.replace(/,/g, '')) || 0) * 100) / 100;
     if (isNaN(numAmount) || numAmount <= 0) {
       setErrorMsg('Please enter a valid total deal amount.');
       return;
@@ -178,7 +178,7 @@ export const CreatePurchaseModal: React.FC<CreatePurchaseModalProps> = ({
       });
 
       let finalPurchase = created;
-      const parsedInitAmt = parseFloat(initialAmountPaid.replace(/,/g, ''));
+      const parsedInitAmt = Math.round((parseFloat(initialAmountPaid.replace(/,/g, '')) || 0) * 100) / 100;
 
       // If user opted to record an advance token or full payment right now
       if (recordInitialPayment && parsedInitAmt > 0) {
@@ -464,10 +464,9 @@ export const CreatePurchaseModal: React.FC<CreatePurchaseModalProps> = ({
                     Amount Received Now (Rs.) <span className="text-rose-500">*</span>
                   </label>
                   <input
-                    type="number"
-                    step="any"
-                    min="1"
-                    placeholder="0.00"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="e.g. 2,00,00,000 or 50,000"
                     value={initialAmountPaid}
                     onChange={(e) => setInitialAmountPaid(e.target.value)}
                     className="w-full h-9 px-3 text-xs font-bold rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"

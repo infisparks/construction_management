@@ -62,10 +62,14 @@ const DEFAULT_UNITS = [
 
 interface ProductProfileViewProps {
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
+  liveStockMap?: Record<string, number>;
+  onProductsChanged?: () => void;
 }
 
 export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
   showToast,
+  liveStockMap,
+  onProductsChanged,
 }) => {
   const [products, setProducts] = useState<ProfileProduct[]>([]);
   const [deletedProducts, setDeletedProducts] = useState<ProfileProduct[]>([]);
@@ -112,6 +116,13 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
     loadProducts();
     loadDeletedProducts();
   }, []);
+
+  const getEffectiveStock = (p: ProfileProduct): number => {
+    if (liveStockMap && p.id in liveStockMap) {
+      return liveStockMap[p.id];
+    }
+    return Number(p.current_stock) || 0;
+  };
 
   // Filtered products
   const filteredProducts = useMemo(() => {
@@ -207,6 +218,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
           prev.map((item) => (item.id === editingProduct.id ? data : item))
         );
         showToast?.('Product profile updated successfully!', 'success');
+        onProductsChanged?.();
       } else {
         showToast?.('Failed to update product profile', 'error');
       }
@@ -215,6 +227,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
       if (!error && data) {
         setProducts((prev) => [data, ...prev]);
         showToast?.('Product profile created successfully in Supabase!', 'success');
+        onProductsChanged?.();
       } else {
         showToast?.('Failed to create product profile', 'error');
       }
@@ -232,6 +245,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
     if (!error) {
       showToast?.(`Product "${productName}" moved to Recycle Bin.`, 'info');
       await Promise.all([loadProducts(), loadDeletedProducts()]);
+      onProductsChanged?.();
     } else {
       showToast?.('Failed to delete product profile', 'error');
     }
@@ -242,6 +256,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
     if (!error) {
       showToast?.(`Product "${productName}" restored to Active Catalog!`, 'success');
       await Promise.all([loadProducts(), loadDeletedProducts()]);
+      onProductsChanged?.();
     } else {
       showToast?.('Failed to restore product profile', 'error');
     }
@@ -371,7 +386,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total Current Stock Units</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-xl font-bold text-slate-900">
-                {products.reduce((acc, p) => acc + (Number(p.current_stock) || 0), 0).toLocaleString()}
+                {Math.round(products.reduce((acc, p) => acc + getEffectiveStock(p), 0) * 100) / 100}
               </span>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                 Indexed Direct
@@ -384,7 +399,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Low Stock Alerts</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-xl font-bold text-amber-700">
-                {products.filter((p) => Number(p.minimum_alert_stock || 0) > 0 && (Number(p.current_stock) || 0) <= (Number(p.minimum_alert_stock) || 0)).length}
+                {products.filter((p) => Number(p.minimum_alert_stock || 0) > 0 && getEffectiveStock(p) <= (Number(p.minimum_alert_stock) || 0)).length}
               </span>
               <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3 text-amber-600" />
@@ -483,16 +498,26 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <span className={`inline-flex items-center gap-1 font-mono font-bold px-2 py-0.5 rounded-md text-xs ${
-                          (Number(p.current_stock) || 0) <= (Number(p.minimum_alert_stock) || 0)
-                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                        }`}>
-                          {(Number(p.current_stock) || 0) <= (Number(p.minimum_alert_stock) || 0) && (
-                            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                          )}
-                          {Number(p.current_stock) || 0} {p.unit}
-                        </span>
+                        {(() => {
+                          const stock = getEffectiveStock(p);
+                          const alertBuf = Number(p.minimum_alert_stock) || 0;
+                          const isLow = alertBuf > 0 && stock <= alertBuf;
+                          const isDepleted = stock <= 0;
+                          return (
+                            <span className={`inline-flex items-center gap-1 font-mono font-bold px-2 py-0.5 rounded-md text-xs ${
+                              isDepleted
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : isLow
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            }`}>
+                              {(isLow || isDepleted) && (
+                                <AlertTriangle className={`w-3 h-3 shrink-0 ${isDepleted ? 'text-rose-600' : 'text-amber-600'}`} />
+                              )}
+                              {stock} {p.unit}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className="font-mono font-bold text-slate-700">

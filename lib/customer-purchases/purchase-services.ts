@@ -96,9 +96,11 @@ function mapPaymentRow(pay: any): CustomerPayment {
 
 // Map purchase row to dual-casing CustomerPurchase
 function mapPurchaseRow(row: any, payments: CustomerPayment[] = []): CustomerPurchase {
-  const totalAmount = Number(row.total_amount ?? row.totalAmount ?? 0);
-  const totalCollected = payments.reduce((sum, p) => sum + (Number(p.amount_paid ?? p.amountPaid ?? 0) || 0), 0);
-  const balanceRemaining = Math.max(0, totalAmount - totalCollected);
+  const totalAmount = Math.round((Number(row.total_amount ?? row.totalAmount ?? 0)) * 100) / 100;
+  const totalCollected = Math.round(
+    payments.reduce((sum, p) => sum + (Number(p.amount_paid ?? p.amountPaid ?? 0) || 0), 0) * 100
+  ) / 100;
+  const balanceRemaining = Math.max(0, Math.round((totalAmount - totalCollected) * 100) / 100);
   const dealNo = row.deal_number || row.dealNumber || '';
   const custName = row.customer_name || row.customerName || '';
   const projId = row.project_id || row.projectId || '';
