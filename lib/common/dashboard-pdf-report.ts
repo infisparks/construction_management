@@ -377,7 +377,12 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     });
   }
 
-  const safeSiteSlug = input.siteName.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
-  const dateSlug = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-  doc.save(`Armee_Executive_Report_${safeSiteSlug}_${dateSlug}.pdf`);
+  const pdfBlob = doc.output('blob');
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  const opened = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  if (!opened) {
+    const safeSiteSlug = input.siteName.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+    const dateSlug = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    doc.save(`Armee_Executive_Report_${safeSiteSlug}_${dateSlug}.pdf`);
+  }
 }

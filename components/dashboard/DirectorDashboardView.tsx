@@ -691,10 +691,10 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
               }
             }}
             className="h-9 px-3.5 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
-            title="Download full Director Report PDF on Armee letterhead"
+            title="Open full Director Report PDF in Blob URL tab (Download from browser if needed)"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{isDownloadingPdf ? 'Generating...' : 'Download Report'}</span>
+            <span>{isDownloadingPdf ? 'Generating...' : 'View Report PDF'}</span>
           </button>
         </div>
       </div>
