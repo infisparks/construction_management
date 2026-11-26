@@ -143,6 +143,7 @@ export type ViewMode =
   | 'expenses'
   | 'contractor-work-orders'
   | 'customer-purchases'
+  | 'purchase-outflow'
   | 'quotations';
 
 // Module 3 — Files Archive (Project Documents & Media Repository)

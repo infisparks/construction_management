@@ -21,6 +21,15 @@ export function isAccountRole(role?: string | null): boolean {
 }
 
 /**
+ * Checks if the given role represents a "purchase" / "procurement" role.
+ */
+export function isPurchaseRole(role?: string | null): boolean {
+  if (!role) return false;
+  const normalized = role.trim().toLowerCase().replace(/[\s\-_]/g, '');
+  return normalized === 'purchase' || normalized === 'procurement' || normalized === 'buyer';
+}
+
+/**
  * Checks if the user role has restricted access (onlyallow or account).
  */
 export function isRestrictedRole(role?: string | null): boolean {
@@ -86,6 +95,10 @@ export function isViewAllowed(
     }
     // Quotations / Quote Builder
     if (target === 'quotations' || target === 'quotes' || target === 'quote') {
+      return true;
+    }
+    // Purchase Outflow (Requisitions & Quotations)
+    if (target === 'purchase-outflow' || target === 'purchase') {
       return true;
     }
     // All timeline views (list, gantt, critical, milestones, progress, planning) are disallowed
@@ -189,6 +202,7 @@ export function isModuleAllowed(
     if (mod === 'materials') return true;                         // Store
     if (mod === 'archive') return true;                           // Document
     if (mod === 'quotations' || mod === 'quotes') return true;    // Quotations
+    if (mod === 'purchase') return true;                          // Purchase Outflow
     // Timeline ('planning'), execution, controls are hidden
     return false;
   }

@@ -10,6 +10,7 @@ import {
   FolderKanban, 
   FileText,
   LayoutDashboard,
+  ShoppingBag,
   LogOut, 
   X,
   Sparkles
@@ -17,7 +18,7 @@ import {
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
 import { isModuleAllowed, isAccountRole } from '@/lib/auth/role-access';
 
-export type NavModuleId = 'dashboard' | 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'sites' | 'quotations';
+export type NavModuleId = 'dashboard' | 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'purchase' | 'sites' | 'quotations';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -101,6 +102,15 @@ const MODULES: NavModuleDef[] = [
     badgeColor: 'bg-purple-100 text-[#653ef1]',
     description: 'Central document repository',
   },
+  {
+    id: 'purchase',
+    label: 'Purchase Outflow',
+    shortLabel: 'Purchase',
+    icon: ShoppingBag,
+    badge: 'Flow',
+    badgeColor: 'bg-purple-100 text-[#653ef1]',
+    description: 'Vendor quotations & 3-step requisitions',
+  },
   // Quotation Builder hidden for now per user request
   /*
   {
@@ -137,6 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Determine active module based on currentView
   const [activeModule, setActiveModule] = useState<NavModuleId>(() => {
     if (currentView === 'dashboard') return 'dashboard';
+    if (currentView === 'purchase-outflow') return 'purchase';
     if (currentView === 'quotations') return 'quotations';
     if (currentView === 'files-archive') return 'archive';
     if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
@@ -149,6 +160,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     if (currentView === 'dashboard') {
       setActiveModule('dashboard');
+    } else if (currentView === 'purchase-outflow') {
+      setActiveModule('purchase');
     } else if (currentView === 'quotations') {
       setActiveModule('quotations');
     } else if (currentView === 'files-archive') {
@@ -189,6 +202,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onSelectArchiveCategory('all');
       }
       onViewChange('files-archive');
+    } else if (modId === 'purchase') {
+      onViewChange('purchase-outflow');
     } else if (modId === 'quotations') {
       onViewChange('quotations');
     }

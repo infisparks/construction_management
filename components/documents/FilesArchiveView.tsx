@@ -48,7 +48,7 @@ import {
   Phone
 } from 'lucide-react';
 import { ProjectInfo, ProjectFile, FileCategory, FileType } from '@/lib/construction-planning/types';
-import { formatMumbaiDateTime } from '@/lib/common/date-format';
+import { formatMumbaiDate } from '@/lib/common/date-format';
 import { 
   fetchProjectFiles, 
   softDeleteProjectFile,
@@ -67,8 +67,6 @@ import { supabase } from '@/lib/supabase/client';
 import { fetchSubDocumentsCounts } from '@/lib/supabase/project-sub-documents';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
-import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
-import { WhatsAppContactsManagerModal } from '@/components/whatsapp/WhatsAppContactsManagerModal';
 import {
   fetchDropdownCategory,
   DEFAULT_DOCUMENT_CATEGORIES
@@ -216,42 +214,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
     } catch (err) {
       console.warn('Could not load sub-docs counts:', err);
     }
-  };
-
-  // WhatsApp Share & Contacts
-  const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
-  const [whatsAppPayload, setWhatsAppPayload] = useState<WhatsAppSharePayload | null>(null);
-  const [isContactsManagerOpen, setIsContactsManagerOpen] = useState(false);
-
-  const handleShareToWhatsApp = (file: ProjectFile) => {
-    let fullUrl = '';
-    const rawStorage = file.storage_path || file.file_url || '';
-    if (rawStorage && !rawStorage.startsWith('blob:') && !rawStorage.startsWith('data:')) {
-      const cleanPath = extractStoragePath(rawStorage);
-      if (cleanPath) {
-        const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(cleanPath);
-        fullUrl = data?.publicUrl || '';
-      }
-    }
-    if (!fullUrl && file.file_url && !file.file_url.startsWith('blob:') && !file.file_url.startsWith('data:')) {
-      fullUrl = resolveFileUrl(file.file_url);
-    }
-    if (!fullUrl && file.file_url) {
-      fullUrl = file.file_url;
-    }
-
-    setWhatsAppPayload({
-      title: file.title,
-      documentNo: file.document_no,
-      category: file.category,
-      projectName: file.project?.name || project.name,
-      mediaUrl: fullUrl,
-      fileName: file.file_name,
-      fileType: file.file_type,
-      fileSize: file.file_size,
-      customSummary: file.description || undefined,
-    });
-    setIsWhatsAppShareOpen(true);
   };
 
   // Toast message
@@ -739,16 +701,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#653ef1]' : ''}`} />
             </button>
 
-            <button
-              type="button"
-              onClick={() => setIsContactsManagerOpen(true)}
-              className="h-9 px-4 rounded-full text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:border-emerald-500/50 hover:bg-emerald-50/40 hover:text-emerald-700 transition-all shadow-2xs hover:shadow-xs cursor-pointer flex items-center gap-2"
-              title="Manage WhatsApp Directory & Saved Contacts"
-            >
-              <MessageCircle className="w-4 h-4 text-emerald-600 fill-emerald-600/10" />
-              <span className="hidden sm:inline">WhatsApp Contacts</span>
-            </button>
-
             {/* Quotation Builder button hidden for now per user request */}
             {/* {onOpenQuotationBuilder && (
               <button
@@ -1216,17 +1168,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                                 <Download className="w-3.5 h-3.5 text-slate-400" />
                                 <span>Download</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleShareToWhatsApp(file);
-                                  setActiveMenuId(null);
-                                }}
-                                className="w-full px-3 py-1.5 text-xs text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer font-medium"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600/20" />
-                                <span>Share on WhatsApp</span>
-                              </button>
                               <div className="my-1 border-t border-slate-100" />
                               <button
                                 type="button"
@@ -1371,14 +1312,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleShareToWhatsApp(file)}
-                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
-                          title="Share via WhatsApp"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => handleSoftDelete(file)}
                           className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                           title="Move to Recycle Bin"
@@ -1459,7 +1392,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                 <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
                   <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     <th className="py-2.5 pl-3 pr-2 w-10 text-center">Sr.</th>
-                    <th className="py-2.5 px-2">Doc Code & Time</th>
+                    <th className="py-2.5 px-2">Date</th>
                     <th className="py-2.5 px-2">Project</th>
                     <th className="py-2.5 px-2">Document Title & File</th>
                     <th className="py-2.5 px-2">Category</th>
@@ -1483,14 +1416,11 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         {idx + 1}
                       </td>
 
-                      {/* Doc No & Mumbai 12-hr Time */}
+                      {/* Upload Date Only */}
                       <td className="py-2.5 px-2.5 whitespace-nowrap">
-                        <div className="font-mono font-bold text-xs text-[#653ef1]">
-                          {file.document_no}
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5" title="Uploaded / Created (Mumbai 12-hr IST)">
-                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span>{formatMumbaiDateTime(file.created_at)}</span>
+                        <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5" title="Upload Date">
+                          <Calendar className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                          <span>{formatMumbaiDate(file.created_at)}</span>
                         </div>
                       </td>
 
@@ -1583,15 +1513,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               title="Download"
                             >
                               <Download className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleShareToWhatsApp(file)}
-                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
-                              title="Share via WhatsApp"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
                             </button>
 
                             <button
@@ -2055,17 +1976,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleShareToWhatsApp(file);
-                                  }}
-                                  className="w-9 h-9 rounded-xl bg-white text-emerald-600 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                                  title="Send via WhatsApp"
-                                >
-                                  <MessageCircle className="w-4 h-4 fill-emerald-600/20" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
                                     handleToggleStar(file.id, !file.is_starred);
                                   }}
                                   className={`w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all cursor-pointer ${
@@ -2144,14 +2054,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               >
                                 <Download className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleShareToWhatsApp(file)}
-                                className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                                title="Share via WhatsApp"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                              </button>
                               {activeTab === 'vault' ? (
                                 <button
                                   type="button"
@@ -2226,27 +2128,6 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           handleRestoreFile(f);
           setIsPreviewOpen(false);
         }}
-        onShareWhatsApp={handleShareToWhatsApp}
-      />
-
-      {/* WhatsApp Share Modal */}
-      <WhatsAppShareModal
-        isOpen={isWhatsAppShareOpen}
-        onClose={() => {
-          setIsWhatsAppShareOpen(false);
-          setWhatsAppPayload(null);
-        }}
-        payload={whatsAppPayload}
-        onSuccessToast={(msg) => {
-          setToastMessage({ text: msg, type: 'success' });
-          setTimeout(() => setToastMessage(null), 4000);
-        }}
-      />
-
-      {/* WhatsApp Contacts Directory Manager Modal */}
-      <WhatsAppContactsManagerModal
-        isOpen={isContactsManagerOpen}
-        onClose={() => setIsContactsManagerOpen(false)}
       />
 
     </div>

@@ -50,6 +50,7 @@ const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementT
   expenses: { title: 'Commercial Bills & Expenses', icon: Receipt },
   'contractor-work-orders': { title: 'Contractor Work Orders', icon: Wrench },
   'customer-purchases': { title: 'Client Purchases & Inflow', icon: ArrowDownLeft },
+  'purchase-outflow': { title: 'Purchase Outflow', icon: Receipt },
   quotations: { title: 'Quotation Builder', icon: FileText },
 };
 

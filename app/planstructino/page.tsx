@@ -61,6 +61,7 @@ import { SiteInventoryManagement } from '@/components/inventory/SiteInventoryMan
 import { SiteExpensesView } from '@/components/expenses/SiteExpensesView';
 import { CommercialBillsAndExpensesView } from '@/components/expenses/CommercialBillsAndExpensesView';
 import { DirectorDashboardView } from '@/components/dashboard/DirectorDashboardView';
+import { PurchaseOutflowView } from '@/components/purchase/PurchaseOutflowView';
 import { useAuth } from '@/lib/supabase/auth-context';
 import { useRouter } from 'next/navigation';
 import { LoginPage } from '@/components/auth/LoginPage';
@@ -423,6 +424,7 @@ export default function ConstructionPlanningPage() {
         'expenses',
         'contractor-work-orders',
         'customer-purchases',
+        'purchase-outflow',
         'quotations',
       ];
       if (urlView && validViews.includes(urlView as ViewMode)) {
@@ -1767,6 +1769,16 @@ export default function ConstructionPlanningPage() {
                     initialTab={inventorySubTab}
                     showToast={showToast}
                     externalActionTrigger={triggerMaterialAction}
+                  />
+                )}
+
+                {currentView === 'purchase-outflow' && (
+                  <PurchaseOutflowView
+                    projectId={activeProjectId}
+                    allProjects={allDbProjects}
+                    userEmail={user.email || undefined}
+                    userRole={userRole?.role}
+                    showToast={showToast}
                   />
                 )}
 

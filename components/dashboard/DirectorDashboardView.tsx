@@ -24,6 +24,10 @@ import {
   fetchDirectorDashboardData,
   DirectorDashboardData,
 } from '@/lib/supabase/dashboard-services';
+import {
+  fetchSiteExpensesSummaryRpc,
+  ExpenseSummaryStats,
+} from '@/lib/supabase/expense-services';
 import { ViewMode } from '@/lib/construction-planning/types';
 import { formatMumbaiDate } from '@/lib/common/date-format';
 
@@ -129,6 +133,52 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
 
   const todayStr = useMemo(() => getTodayIST(), []);
 
+  // Server-side Postgres RPC summary for fast 20k+ row calculations
+  const [rpcPeriodStats, setRpcPeriodStats] = useState<ExpenseSummaryStats | null>(null);
+  const [rpcSiteTodayMonthStats, setRpcSiteTodayMonthStats] = useState<ExpenseSummaryStats | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function loadRpcTotals() {
+      let startDate: string | null = null;
+      let endDate: string | null = null;
+
+      if (period === 'today') {
+        startDate = todayStr;
+        endDate = todayStr;
+      } else if (period === 'this_month') {
+        startDate = `${todayStr.slice(0, 7)}-01`;
+        endDate = todayStr;
+      } else if (period === 'last_7' || period === 'last_30') {
+        const d = new Date(`${todayStr}T00:00:00`);
+        d.setDate(d.getDate() - (period === 'last_7' ? 7 : 30));
+        startDate = d.toISOString().split('T')[0];
+        endDate = todayStr;
+      }
+
+      const [periodRes, siteAllTimeRes] = await Promise.all([
+        fetchSiteExpensesSummaryRpc({
+          projectId: selectedSiteId,
+          startDate,
+          endDate,
+        }),
+        period === 'all'
+          ? Promise.resolve(null)
+          : fetchSiteExpensesSummaryRpc({ projectId: selectedSiteId }),
+      ]);
+
+      if (!active) return;
+      if (periodRes) {
+        setRpcPeriodStats(periodRes);
+        setRpcSiteTodayMonthStats(siteAllTimeRes ?? periodRes);
+      }
+    }
+    loadRpcTotals();
+    return () => {
+      active = false;
+    };
+  }, [selectedSiteId, period, todayStr, data?.fetchedAt]);
+
   const projectMap = useMemo(() => {
     const map = new Map<string, string>();
     (data?.projects || []).forEach((p) => map.set(p.id, p.name));
@@ -231,27 +281,36 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
       }
     }
 
-    const paidPct = total > 0 ? Math.round((paid / total) * 100) : 0;
-    const avgBill = filteredExpenses.length > 0 ? total / filteredExpenses.length : 0;
+    const finalTotal = rpcPeriodStats ? rpcPeriodStats.allTimeTotal : total;
+    const finalPaid = rpcPeriodStats ? rpcPeriodStats.paidTotal : paid;
+    const finalUnpaid = rpcPeriodStats ? rpcPeriodStats.pendingTotal : pending + reimbursable;
+    const finalCount = rpcPeriodStats ? rpcPeriodStats.allTimeCount : filteredExpenses.length;
+    const finalTodayTotal = rpcSiteTodayMonthStats ? rpcSiteTodayMonthStats.todayTotal : todayTotal;
+    const finalTodayCount = rpcSiteTodayMonthStats ? rpcSiteTodayMonthStats.todayCount : todayCount;
+    const finalMonthTotal = rpcSiteTodayMonthStats ? rpcSiteTodayMonthStats.monthTotal : monthTotal;
+    const finalMonthCount = rpcSiteTodayMonthStats ? rpcSiteTodayMonthStats.monthCount : monthCount;
+
+    const paidPct = finalTotal > 0 ? Math.round((finalPaid / finalTotal) * 100) : 0;
+    const avgBill = finalCount > 0 ? finalTotal / finalCount : 0;
     return {
-      total,
-      paid,
+      total: finalTotal,
+      paid: finalPaid,
       pending,
       reimbursable,
       paidCount,
       pendingCount,
       reimbursableCount,
-      unpaidTotal: pending + reimbursable,
-      todayTotal,
-      todayCount,
-      monthTotal,
-      monthCount,
+      unpaidTotal: finalUnpaid,
+      todayTotal: finalTodayTotal,
+      todayCount: finalTodayCount,
+      monthTotal: finalMonthTotal,
+      monthCount: finalMonthCount,
       avgBill,
       maxBill,
-      count: filteredExpenses.length,
+      count: finalCount,
       paidPct,
     };
-  }, [filteredExpenses, data?.expenses, selectedSiteId, todayStr]);
+  }, [filteredExpenses, data?.expenses, selectedSiteId, todayStr, rpcPeriodStats, rpcSiteTodayMonthStats]);
 
   // 2. Store & Inventory Summary (Central Store)
   const storeStats = useMemo(() => {
@@ -1280,122 +1339,7 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
           )}
         </div>
 
-        {/* Low Stock & Depleted Material Alerts */}
-        <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
-              <h3 className="text-sm font-semibold text-[#111827]">Low-Stock & Depleted Alerts</h3>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigateView('materials')}
-              className="text-xs font-semibold text-[#653ef1] hover:underline cursor-pointer"
-            >
-              Manage Store
-            </button>
-          </div>
-
-          {storeStats.lowStockItems.length === 0 ? (
-            <div className="py-6 text-center text-xs text-emerald-700 flex flex-col items-center gap-1">
-              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-              All store items are above minimum alert levels.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {storeStats.lowStockItems.map((item) => {
-                const isDepleted = item.current_stock <= 0;
-                return (
-                  <div key={item.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-[#111827] truncate">{item.name}</div>
-                      <div className="text-[11px] text-[#6B7280]">
-                        {item.code} {item.storage_location ? `• ${item.storage_location}` : ''}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                          isDepleted
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}
-                      >
-                        {item.current_stock} {item.unit}
-                      </span>
-                      <div className="text-[10px] text-[#6B7280] mt-0.5">
-                        Min: {item.minimum_alert_stock} {item.unit}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Schedule Risks & Recent Documents */}
-        <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-[#653ef1]" />
-              <h3 className="text-sm font-semibold text-[#111827]">
-                Schedule Risks & Recent Documents
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigateView('files-archive')}
-              className="text-xs font-semibold text-[#653ef1] hover:underline cursor-pointer"
-            >
-              Open Vault
-            </button>
-          </div>
-
-          {scheduleStats.attentionTasks.length > 0 && (
-            <div className="mb-3 space-y-1.5">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-600">
-                Delayed / Critical Tasks ({scheduleStats.attentionTasks.length})
-              </div>
-              {scheduleStats.attentionTasks.slice(0, 3).map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => onNavigateView('list')}
-                  className="p-2 rounded-lg bg-rose-50/60 border border-rose-200/70 flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-rose-50"
-                >
-                  <span className="font-medium text-[#111827] truncate">{t.plan_name}</span>
-                  <span className="text-[11px] font-bold text-rose-700 shrink-0">
-                    {t.variance_days > 0 ? `+${t.variance_days}d delay` : `${t.plan_progress}%`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
-              Latest Uploaded Documents
-            </div>
-            {filteredDocuments.slice(0, 4).map((doc) => (
-              <div
-                key={doc.id}
-                onClick={() => onNavigateView('files-archive')}
-                className="py-1.5 flex items-center justify-between gap-2 text-xs border-b border-slate-100 last:border-b-0 cursor-pointer hover:text-[#653ef1]"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
-                  <span className="font-medium text-[#111827] truncate">{doc.title}</span>
-                </div>
-                <span className="text-[11px] text-[#6B7280] shrink-0">
-                  {formatMumbaiDate(doc.created_at)}
-                </span>
-              </div>
-            ))}
-            {filteredDocuments.length === 0 && (
-              <p className="text-xs text-[#6B7280] py-3 text-center">No documents found.</p>
-            )}
-          </div>
-        </div>
+        {/* Low Stock & Depleted Material Alerts & Schedule Risks & Recent Documents hidden per user request */}
       </div>
     </div>
   );

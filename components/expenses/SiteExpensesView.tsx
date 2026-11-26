@@ -34,7 +34,8 @@ import {
   RotateCcw,
   Box,
   ArrowDownLeft,
-  FileText
+  FileText,
+  MoreVertical
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus, DbProject } from '@/lib/supabase/types';
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
@@ -47,6 +48,7 @@ import {
   deleteSiteExpense,
   restoreSiteExpense,
   calculateExpenseSummary,
+  fetchSiteExpensesSummaryRpc,
   getExpenseAttachments,
   getExpensePaymentBreakdown,
   recordExpensePayment,
@@ -54,6 +56,7 @@ import {
 } from '@/lib/supabase/expense-services';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
+import { SearchableSelect } from '@/components/common/SearchableSelect';
 import { 
   DateFilterControl, 
   DateFilterState, 
@@ -122,15 +125,24 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
     isOpen: boolean;
     fileUrl: string | null;
     fileName?: string | null;
+    attachments?: { url: string; name?: string | null; type?: string }[];
     voucherNumber?: string;
   }>({
     isOpen: false,
     fileUrl: null,
   });
 
-  // Filters
+  // Filters (default to Last 30 Days so initial load doesn't download all historical records)
+  const getLast30DaysDateFilter = (): DateFilterState => {
+    const endStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const d = new Date(`${endStr}T00:00:00`);
+    d.setDate(d.getDate() - 30);
+    const startStr = d.toISOString().split('T')[0];
+    return { mode: 'range', exactDate: '', startDate: startStr, endDate: endStr };
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
+  const [dateFilter, setDateFilter] = useState<DateFilterState>(() => getLast30DaysDateFilter());
   const [vendorFilter, setVendorFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -144,6 +156,14 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
   // Edit Expense State
   const [expenseToEdit, setExpenseToEdit] = useState<SiteExpense | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openActionMenuId) return;
+    const handleDocClick = () => setOpenActionMenuId(null);
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, [openActionMenuId]);
 
   // Confirm Delete Modal State
   const [expenseToDelete, setExpenseToDelete] = useState<SiteExpense | null>(null);
@@ -203,12 +223,24 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
     }
   };
 
-  // Load expenses from Supabase (supports 'all' for multi-site overview)
+  // Load expenses from Supabase (server-side filtered by site & active date range)
   const loadExpenses = async () => {
     setIsLoading(true);
     try {
       const target = siteFilter === 'all' ? 'all' : (siteFilter || projectId || 'all');
-      const data = await fetchSiteExpenses(target);
+      const startDate =
+        dateFilter.mode === 'exact'
+          ? dateFilter.exactDate || null
+          : dateFilter.mode === 'range'
+          ? dateFilter.startDate || null
+          : null;
+      const endDate =
+        dateFilter.mode === 'exact'
+          ? dateFilter.exactDate || null
+          : dateFilter.mode === 'range'
+          ? dateFilter.endDate || null
+          : null;
+      const data = await fetchSiteExpenses(target, { startDate, endDate });
       setExpenses(data);
     } catch (err) {
       console.error('Failed to load expenses:', err);
@@ -233,6 +265,9 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
   useEffect(() => {
     loadExpenses();
+  }, [projectId, siteFilter, dateFilter]);
+
+  useEffect(() => {
     loadDeletedExpenses();
   }, [projectId, siteFilter]);
 
@@ -322,10 +357,51 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
     });
   }, [expenses, searchQuery, siteFilter, dateFilter, vendorFilter, paymentMethodFilter, statusFilter]);
 
-  // KPI Calculations (strictly based on active date / vendor / site filters)
-  const stats: ExpenseSummaryStats = useMemo(() => {
+  // KPI Calculations (powered by Postgres RPC get_site_expenses_summary, with instant local fallback)
+  const localStats: ExpenseSummaryStats = useMemo(() => {
     return calculateExpenseSummary(filteredExpenses);
   }, [filteredExpenses]);
+
+  const [rpcStats, setRpcStats] = useState<ExpenseSummaryStats | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(async () => {
+      const startDate =
+        dateFilter.mode === 'exact'
+          ? dateFilter.exactDate || null
+          : dateFilter.mode === 'range'
+          ? dateFilter.startDate || null
+          : null;
+      const endDate =
+        dateFilter.mode === 'exact'
+          ? dateFilter.exactDate || null
+          : dateFilter.mode === 'range'
+          ? dateFilter.endDate || null
+          : null;
+
+      const res = await fetchSiteExpensesSummaryRpc({
+        projectId: siteFilter,
+        startDate,
+        endDate,
+        vendorName: vendorFilter,
+        paymentMethod: paymentMethodFilter,
+        paymentStatus: statusFilter,
+        search: searchQuery,
+      });
+
+      if (active && res) {
+        setRpcStats(res);
+      }
+    }, 150);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [siteFilter, dateFilter, vendorFilter, paymentMethodFilter, statusFilter, searchQuery, expenses]);
+
+  const stats: ExpenseSummaryStats = rpcStats ?? localStats;
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -640,7 +716,13 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
           }`}
         >
           <Receipt className="w-3.5 h-3.5" />
-          <span>Active Site Bills ({expenses.length})</span>
+          <span>
+            Active Site Bills (
+            {filteredExpenses.length !== expenses.length
+              ? `${filteredExpenses.length} of ${expenses.length}`
+              : expenses.length}
+            )
+          </span>
         </button>
 
         <button
@@ -705,11 +787,19 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 </div>
               </div>
 
-              {/* Bottom Row: Subtext */}
-              <div className="mt-2 pt-1 relative z-10">
-                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
-                  {stats.todayCount === 0 ? 'No expenses logged today yet' : `${stats.todayCount} Bills Today`}
-                </p>
+              {/* Bottom Row: Paid & Due Breakdown */}
+              <div className="mt-2 pt-1.5 relative z-10 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200">
+                    Paid: {formatINR(stats.todayPaid)}
+                  </span>
+                  <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100/90 text-amber-800 border border-amber-200">
+                    Due: {formatINR(stats.todayDue)}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-600 font-semibold">
+                  {stats.todayCount} {stats.todayCount === 1 ? 'Bill' : 'Bills'}
+                </span>
               </div>
 
               {/* Organic Bottom-Right Corner Wave Accent */}
@@ -736,25 +826,37 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 {/* Metric Info Column */}
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
-                    This Month's Total
+                    {isDateFilterActive(dateFilter) ? 'Filtered Date Total' : "This Month's Total"}
                   </span>
 
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
-                      {formatINR(stats.monthTotal)}
+                      {formatINR(isDateFilterActive(dateFilter) ? stats.allTimeTotal : stats.monthTotal)}
                     </span>
                     <span className="text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap bg-blue-100 text-blue-800 border border-blue-200/90">
-                      Month to Date
+                      {isDateFilterActive(dateFilter)
+                        ? dateFilter.mode === 'exact'
+                          ? 'Selected Date'
+                          : 'Selected Range'
+                        : 'Month to Date'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Bottom Row: Subtext */}
-              <div className="mt-2 pt-1 relative z-10">
-                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
-                  Accumulated for current calendar month
-                </p>
+              {/* Bottom Row: Paid & Due Breakdown */}
+              <div className="mt-2 pt-1.5 relative z-10 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200">
+                    Paid: {formatINR(isDateFilterActive(dateFilter) ? stats.paidTotal : stats.monthPaid)}
+                  </span>
+                  <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100/90 text-amber-800 border border-amber-200">
+                    Due: {formatINR(isDateFilterActive(dateFilter) ? stats.pendingTotal : stats.monthDue)}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-600 font-semibold">
+                  {isDateFilterActive(dateFilter) ? stats.allTimeCount : stats.monthCount} Bills
+                </span>
               </div>
 
               {/* Organic Bottom-Right Corner Wave Accent */}
@@ -806,8 +908,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               </div>
 
               {/* Bottom Row: Subtext */}
-              <div className="mt-2 pt-1 relative z-10">
-                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
+              <div className="mt-2 pt-1.5 relative z-10">
+                <p className="text-[11px] sm:text-xs text-slate-700 font-semibold leading-tight truncate">
                   Paid: {formatINR(stats.paidTotal)} • Total: {formatINR(stats.allTimeTotal)}
                 </p>
               </div>
@@ -921,19 +1023,20 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 label="Filter Date"
               />
 
-              {/* Vendor Filter */}
-              <select
-                value={vendorFilter}
-                onChange={(e) => setVendorFilter(e.target.value)}
-                className="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] font-medium cursor-pointer"
-              >
-                <option value="all">All Vendors</option>
-                {availableVendors.map(vendor => (
-                  <option key={vendor} value={vendor}>
-                    {vendor}
-                  </option>
-                ))}
-              </select>
+              {/* Vendor Filter (Searchable) */}
+              <div className="min-w-[200px] sm:w-[230px]">
+                <SearchableSelect
+                  options={[
+                    { value: 'all', label: 'All Vendors' },
+                    ...availableVendors.map(vendor => ({ value: vendor, label: vendor })),
+                  ]}
+                  value={vendorFilter}
+                  onChange={setVendorFilter}
+                  placeholder="All Vendors"
+                  searchPlaceholder="Search vendor..."
+                  triggerClassName="h-9 rounded-xl border-slate-200 text-xs font-medium py-0"
+                />
+              </div>
 
               {/* Payment Method Filter */}
               <select
@@ -968,7 +1071,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                   onClick={() => {
                     setSearchQuery('');
                     setSiteFilter('all');
-                    setDateFilter(DEFAULT_DATE_FILTER);
+                    setDateFilter(getLast30DaysDateFilter());
                     setVendorFilter('all');
                     setPaymentMethodFilter('all');
                     setStatusFilter('all');
@@ -989,7 +1092,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               <tr>
                 <th className="px-3.5 py-2.5 text-center">S.No</th>
                 <th className="px-3.5 py-2.5">Site / Building</th>
-                <th className="px-3.5 py-2.5">Expense Code & Date</th>
+                <th className="px-3.5 py-2.5">Expense Date</th>
                 <th className="px-3.5 py-2.5">Expense Title & Purpose</th>
                 <th className="px-3.5 py-2.5">Category</th>
                 <th className="px-3.5 py-2.5">Paid To / Vendor</th>
@@ -1056,29 +1159,18 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                         })()}
                       </td>
 
-                      {/* Code & 12-hr Mumbai Time */}
+                      {/* Expense Date */}
                       <td className="px-3.5 py-2.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setViewingExpense(exp);
-                              setIsVoucherModalOpen(true);
-                            }}
-                            className="font-mono font-bold text-xs text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
-                            title="Click to view & download bill voucher"
-                          >
-                            {exp.expense_code}
-                          </button>
+                          <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5" title="Expense Date">
+                            <Calendar className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                            <span>{formatMumbaiDate(exp.expense_date)}</span>
+                          </span>
                           {isToday && (
                             <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full border border-emerald-200">
                               Today
                             </span>
                           )}
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1" title="Expense Date">
-                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span>{formatMumbaiDate(exp.expense_date)}</span>
                         </div>
                       </td>
 
@@ -1214,96 +1306,130 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                         })()}
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Record Balance / Mark Paid (for Pending or Partial bills) */}
-                          {getExpensePaymentBreakdown(exp).pending > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenSettleModal(exp)}
-                              className="h-7 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                              title="Record balance payment / Mark as Paid (preserves first payment date)"
+                      {/* Actions (3-dots Menu) */}
+                      <td className="px-4 py-3 text-right relative">
+                        {(() => {
+                          const atts = getExpenseAttachments(exp);
+                          const hasDue = getExpensePaymentBreakdown(exp).pending > 0;
+                          const isMenuOpen = openActionMenuId === exp.id;
+                          return (
+                            <div
+                              className="inline-flex items-center justify-end relative"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <CreditCard className="w-3 h-3" />
-                              <span>Pay Due</span>
-                            </button>
-                          )}
-                          {/* View Uploaded Bill Copy (supports iOS HEIC, PDF, images) */}
-                          {(() => {
-                            const atts = getExpenseAttachments(exp);
-                            if (atts.length === 0) return null;
-                            return (
                               <button
                                 type="button"
-                                onClick={() => setBillViewerState({
-                                  isOpen: true,
-                                  fileUrl: atts[0].url,
-                                  fileName: atts[0].name || 'Bill-Receipt',
-                                  voucherNumber: exp.expense_code,
-                                })}
-                                className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105 relative"
-                                title={`View attached bill copy (${atts.length} file${atts.length > 1 ? 's' : ''})`}
+                                onClick={() => setOpenActionMenuId(isMenuOpen ? null : exp.id)}
+                                className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all cursor-pointer relative ${
+                                  isMenuOpen
+                                    ? 'bg-[#653ef1] text-white border-[#653ef1]'
+                                    : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200'
+                                }`}
+                                title="Actions"
+                                aria-label="Row actions"
                               >
-                                <Paperclip className="w-3.5 h-3.5 text-[#6338eb]" />
-                                {atts.length > 1 && (
-                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#653ef1] text-white text-[8px] font-bold flex items-center justify-center">
+                                <MoreVertical className="w-4 h-4" />
+                                {atts.length > 0 && (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#653ef1] text-white text-[8px] font-bold flex items-center justify-center ring-2 ring-white">
                                     {atts.length}
                                   </span>
                                 )}
                               </button>
-                            );
-                          })()}
 
-                          {/* Preview Voucher Slip */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setViewingExpense(exp);
-                              setIsVoucherModalOpen(true);
-                            }}
-                            className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
-                            title="View & Preview Bill Voucher Slip"
-                          >
-                            <Receipt className="w-3.5 h-3.5 text-[#6338eb]" />
-                          </button>
+                              {isMenuOpen && (
+                                <div className="absolute right-0 top-9 z-40 w-52 bg-white rounded-xl border border-slate-200 shadow-xl py-1.5 text-left animate-in fade-in duration-100">
+                                  {hasDue && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionMenuId(null);
+                                        handleOpenSettleModal(exp);
+                                      }}
+                                      className="w-full px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2.5 cursor-pointer"
+                                    >
+                                      <CreditCard className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>Pay Due Balance</span>
+                                    </button>
+                                  )}
 
-                          {/* Open Bill directly in Blob URL tab (No download) */}
-                          <button
-                            type="button"
-                            onClick={() => viewSingleExpenseVoucherInNewTab(exp, project?.name || 'Noori Crest Tower')}
-                            className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
-                            title="Open Bill Voucher directly in Blob URL tab (No file download)"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-[#6338eb]" />
-                          </button>
+                                  {atts.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionMenuId(null);
+                                        setBillViewerState({
+                                          isOpen: true,
+                                          fileUrl: atts[0].url,
+                                          fileName: atts[0].name || 'Bill-Receipt',
+                                          attachments: atts,
+                                          voucherNumber: exp.expense_code,
+                                        });
+                                      }}
+                                      className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#653ef1] flex items-center gap-2.5 cursor-pointer"
+                                    >
+                                      <Paperclip className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                                      <span>View Attachments ({atts.length})</span>
+                                    </button>
+                                  )}
 
-                          {/* Edit Expense Details */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExpenseToEdit(exp);
-                              setIsAddModalOpen(true);
-                            }}
-                            className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
-                            title="Edit expense details"
-                          >
-                            <Edit2 className="w-3.5 h-3.5 text-[#6338eb]" />
-                          </button>
+                                  {/* Voucher options hidden for now per user request */}
+                                  {/* <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null);
+                                      setViewingExpense(exp);
+                                      setIsVoucherModalOpen(true);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#653ef1] flex items-center gap-2.5 cursor-pointer"
+                                  >
+                                    <Receipt className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                                    <span>Preview Voucher Slip</span>
+                                  </button>
 
-                          {/* Delete Expense (Moves to Recycle Bin via Confirmation Modal) */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExpenseToDelete(exp);
-                              setIsDeleteModalOpen(true);
-                            }}
-                            className="w-7 h-7 rounded-xl bg-[#fff0f2] hover:bg-[#ffe2e6] text-[#e11d48] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
-                            title="Move expense to Recycle Bin"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null);
+                                      viewSingleExpenseVoucherInNewTab(exp, project?.name || 'Noori Crest Tower');
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#653ef1] flex items-center gap-2.5 cursor-pointer"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                                    <span>Open Voucher in Tab</span>
+                                  </button> */}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null);
+                                      setExpenseToEdit(exp);
+                                      setIsAddModalOpen(true);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#653ef1] flex items-center gap-2.5 cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                                    <span>Edit Bill</span>
+                                  </button>
+
+                                  <div className="my-1 border-t border-slate-100" />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null);
+                                      setExpenseToDelete(exp);
+                                      setIsDeleteModalOpen(true);
+                                    }}
+                                    className="w-full px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                    <span>Move to Recycle Bin</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );
@@ -1362,7 +1488,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3">Site / Building</th>
-                    <th className="px-4 py-3">Expense Code & Date</th>
+                    <th className="px-4 py-3">Expense Date</th>
                     <th className="px-4 py-3">Title & Purpose</th>
                     <th className="px-4 py-3">Category</th>
                     <th className="px-4 py-3">Paid To / Vendor</th>
@@ -1401,10 +1527,9 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                             );
                           })()}
                         </td>
-                        <td className="px-3.5 py-2.5">
-                          <span className="font-mono font-bold text-slate-900 block">{exp.expense_code}</span>
-                          <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                          <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <span>{formatMumbaiDate(exp.expense_date)}</span>
                           </span>
                         </td>
@@ -1660,6 +1785,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         onClose={() => setBillViewerState(prev => ({ ...prev, isOpen: false }))}
         fileUrl={billViewerState.fileUrl}
         fileName={billViewerState.fileName}
+        attachments={billViewerState.attachments}
         voucherNumber={billViewerState.voucherNumber}
       />
     </div>
