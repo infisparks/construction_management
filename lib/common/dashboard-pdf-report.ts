@@ -264,14 +264,14 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     doc.setDrawColor(226, 232, 240);
     doc.roundedRect(MARGIN_X, cursorY, chartW, chartH, 2, 2, 'FD');
 
-    // Legend top-right
+    // Legend top-right (Armee Letterhead Navy & Gold)
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.setFillColor(101, 62, 241);
+    doc.setFillColor(15, 37, 74);
     doc.rect(MARGIN_X + chartW - 44, cursorY + 3.5, 3, 3, 'F');
-    doc.setTextColor(55, 65, 81);
+    doc.setTextColor(15, 37, 74);
     doc.text('Paid', MARGIN_X + chartW - 39.5, cursorY + 6);
-    doc.setFillColor(245, 158, 11);
+    doc.setFillColor(234, 179, 46);
     doc.rect(MARGIN_X + chartW - 26, cursorY + 3.5, 3, 3, 'F');
     doc.text('Pending', MARGIN_X + chartW - 21.5, cursorY + 6);
 
@@ -297,11 +297,11 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
       const pendH = Math.max(totalH - paidH, 0);
 
       if (paidH > 0) {
-        doc.setFillColor(101, 62, 241);
+        doc.setFillColor(15, 37, 74);
         doc.rect(barX, plotBottom - paidH, barW, paidH, 'F');
       }
       if (pendH > 0) {
-        doc.setFillColor(245, 158, 11);
+        doc.setFillColor(234, 179, 46);
         doc.rect(barX, plotBottom - paidH - pendH, barW, pendH, 'F');
       }
       if (m.total === 0) {
@@ -371,22 +371,22 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
       cursorY + 5.5
     );
 
-    doc.setFillColor(245, 158, 11);
+    doc.setFillColor(234, 179, 46);
     doc.roundedRect(barLeft, cursorY + 7.5, fullBarW, 4, 1, 1, 'F');
     if (paidRatio > 0) {
-      doc.setFillColor(16, 185, 129);
+      doc.setFillColor(15, 37, 74);
       doc.roundedRect(barLeft, cursorY + 7.5, Math.max(fullBarW * paidRatio, 2), 4, 1, 1, 'F');
     }
 
-    // Mode Horizontal Bars
+    // Mode Horizontal Bars (Armee Letterhead Navy, Steel Blue & Gold)
     const modeBarStart = MARGIN_X + 38;
     const modeBarMaxW = CONTENT_W - 82;
     const modeColors: [number, number, number][] = [
-      [101, 62, 241],
-      [14, 165, 233],
-      [16, 185, 129],
-      [245, 158, 11],
-      [236, 72, 153],
+      [15, 37, 74],
+      [44, 76, 126],
+      [234, 179, 46],
+      [71, 85, 105],
+      [180, 120, 18],
     ];
 
     input.paymentModes.forEach((m, idx) => {
@@ -449,11 +449,11 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.setFillColor(101, 62, 241);
+    doc.setFillColor(15, 37, 74);
     doc.rect(MARGIN_X + 4, cursorY + 3.5, 3, 3, 'F');
-    doc.setTextColor(55, 65, 81);
+    doc.setTextColor(15, 37, 74);
     doc.text('Total Spend', MARGIN_X + 8.5, cursorY + 6);
-    doc.setFillColor(245, 158, 11);
+    doc.setFillColor(234, 179, 46);
     doc.rect(MARGIN_X + 30, cursorY + 3.5, 3, 3, 'F');
     doc.text('Pending Due', MARGIN_X + 34.5, cursorY + 6);
 
@@ -470,12 +470,12 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
       const totalW = Math.max((s.billTotal / maxSiteSpend) * sBarMaxW, s.billTotal > 0 ? 2 : 0);
       if (totalW > 0) {
-        doc.setFillColor(101, 62, 241);
+        doc.setFillColor(15, 37, 74);
         doc.roundedRect(sBarStart, rowY, totalW, 3.6, 1, 1, 'F');
       }
       if (s.billPending > 0 && s.billTotal > 0) {
         const pendW = Math.max((s.billPending / maxSiteSpend) * sBarMaxW, 1.5);
-        doc.setFillColor(245, 158, 11);
+        doc.setFillColor(234, 179, 46);
         doc.roundedRect(sBarStart + Math.max(totalW - pendW, 0), rowY, Math.min(pendW, totalW), 3.6, 1, 1, 'F');
       }
 
@@ -532,26 +532,26 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
     let sx = MARGIN_X + 4;
     if (okW > 0) {
-      doc.setFillColor(16, 185, 129);
+      doc.setFillColor(15, 37, 74);
       doc.rect(sx, cursorY + 8, okW, 3.8, 'F');
       sx += okW;
     }
     if (lowW > 0) {
-      doc.setFillColor(245, 158, 11);
+      doc.setFillColor(234, 179, 46);
       doc.rect(sx, cursorY + 8, lowW, 3.8, 'F');
       sx += lowW;
     }
     if (outW > 0) {
-      doc.setFillColor(239, 68, 68);
+      doc.setFillColor(185, 28, 28);
       doc.rect(sx, cursorY + 8, outW, 3.8, 'F');
     }
 
-    // 3 Movement Summary Pill Boxes
+    // 3 Movement Summary Pill Boxes (Armee Navy, Gold & Slate tints)
     const cardW = (CONTENT_W - 16) / 3;
     const moves = [
-      { label: 'INWARD VOUCHERS', val: String(input.storeStats.inCount), bg: [236, 253, 245] as [number, number, number], tc: [6, 95, 70] as [number, number, number] },
-      { label: 'OUTWARD ISSUES', val: String(input.storeStats.outCount), bg: [245, 243, 255] as [number, number, number], tc: [91, 33, 182] as [number, number, number] },
-      { label: 'RETURNS / DAMAGES', val: String(input.storeStats.defectReturnCount), bg: [255, 251, 235] as [number, number, number], tc: [146, 64, 14] as [number, number, number] },
+      { label: 'INWARD VOUCHERS', val: String(input.storeStats.inCount), bg: [239, 244, 251] as [number, number, number], tc: [15, 37, 74] as [number, number, number] },
+      { label: 'OUTWARD ISSUES', val: String(input.storeStats.outCount), bg: [254, 249, 231] as [number, number, number], tc: [146, 98, 10] as [number, number, number] },
+      { label: 'RETURNS / DAMAGES', val: String(input.storeStats.defectReturnCount), bg: [241, 245, 249] as [number, number, number], tc: [51, 65, 85] as [number, number, number] },
     ];
     moves.forEach((mv, idx) => {
       const mx = MARGIN_X + 4 + idx * (cardW + 4);
@@ -633,10 +633,5 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
   const pdfBlob = doc.output('blob');
   const blobUrl = URL.createObjectURL(pdfBlob);
-  const opened = window.open(blobUrl, '_blank', 'noopener,noreferrer');
-  if (!opened) {
-    const safeSiteSlug = input.siteName.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
-    const dateSlug = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-    doc.save(`Armee_Executive_Report_${safeSiteSlug}_${dateSlug}.pdf`);
-  }
+  window.open(blobUrl, '_blank');
 }
