@@ -30,10 +30,10 @@ export function isPurchaseRole(role?: string | null): boolean {
 }
 
 /**
- * Checks if the user role has restricted access (onlyallow or account).
+ * Checks if the user role has restricted access (onlyallow, account, or purchase).
  */
 export function isRestrictedRole(role?: string | null): boolean {
-  return isOnlyAllowRole(role) || isAccountRole(role);
+  return isOnlyAllowRole(role) || isAccountRole(role) || isPurchaseRole(role);
 }
 
 /**
@@ -71,38 +71,13 @@ export function isViewAllowed(
   role?: string | null,
   pageValue?: string | null
 ): boolean {
-  // 1. Account Role: strictly allow Bill, Store, Document; disallow Timeline
-  if (isAccountRole(role)) {
+  // 1. Account & Purchase Roles: allow all modules except Home ('dashboard')
+  if (isAccountRole(role) || isPurchaseRole(role)) {
     const target = view.toLowerCase().trim();
-    // Bill / Commercial views
-    if (
-      target === 'expenses' ||
-      target === 'subcontractor-bills' ||
-      target === 'contractor-work-orders' ||
-      target === 'customer-purchases' ||
-      target === 'billing' ||
-      target === 'commercial'
-    ) {
-      return true;
+    if (target === 'dashboard' || target === 'home') {
+      return false;
     }
-    // Store / Materials / Inventory
-    if (target === 'materials' || target === 'store' || target === 'inventory') {
-      return true;
-    }
-    // Document / Files Archive
-    if (target === 'files-archive' || target === 'archive' || target === 'documents') {
-      return true;
-    }
-    // Quotations / Quote Builder
-    if (target === 'quotations' || target === 'quotes' || target === 'quote') {
-      return true;
-    }
-    // Purchase Outflow (Requisitions & Quotations)
-    if (target === 'purchase-outflow' || target === 'purchase') {
-      return true;
-    }
-    // All timeline views (list, gantt, critical, milestones, progress, planning) are disallowed
-    return false;
+    return true;
   }
 
   if (!isOnlyAllowRole(role)) return true;
@@ -195,16 +170,13 @@ export function isModuleAllowed(
   role?: string | null,
   pageValue?: string | null
 ): boolean {
-  // 1. Account Role: allow only Bill ('commercial'), Store ('materials'), Document ('archive'), Quotations ('quotations')
-  if (isAccountRole(role)) {
+  // 1. Account & Purchase Roles: hide Home ('dashboard'), allow all other modules
+  if (isAccountRole(role) || isPurchaseRole(role)) {
     const mod = moduleId.toLowerCase().trim();
-    if (mod === 'commercial' || mod === 'expenses') return true; // Bill
-    if (mod === 'materials') return true;                         // Store
-    if (mod === 'archive') return true;                           // Document
-    if (mod === 'quotations' || mod === 'quotes') return true;    // Quotations
-    if (mod === 'purchase') return true;                          // Purchase Outflow
-    // Timeline ('planning'), execution, controls are hidden
-    return false;
+    if (mod === 'dashboard' || mod === 'home') {
+      return false;
+    }
+    return true;
   }
 
   if (!isOnlyAllowRole(role)) return true;
@@ -287,9 +259,12 @@ export function getFirstAllowedView(
   role?: string | null,
   pageValue?: string | null
 ): ViewMode | null {
-  // If user role is account, primary view is always Bill ('expenses')
+  // If user role is account or purchase, redirect away from Home to Expenses / Purchase Outflow
   if (isAccountRole(role)) {
     return 'expenses';
+  }
+  if (isPurchaseRole(role)) {
+    return 'purchase-outflow';
   }
 
   const allowedList = parseAllowedPages(pageValue);

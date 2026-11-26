@@ -75,7 +75,7 @@ import {
   fetchAllActiveSites 
 } from '@/lib/supabase/site-storage';
 import { CheckCircle2, AlertTriangle, X, Building2, ShieldAlert, Menu } from 'lucide-react';
-import { isViewAllowed, isOnlyAllowRole, isAccountRole, getFirstAllowedView } from '@/lib/auth/role-access';
+import { isViewAllowed, isRestrictedRole, isAccountRole, isPurchaseRole, getFirstAllowedView } from '@/lib/auth/role-access';
 import { 
   DateFilterState, 
   DEFAULT_DATE_FILTER, 
@@ -491,24 +491,22 @@ export default function ConstructionPlanningPage() {
     };
   }, [userRole, activeDbProject]);
 
-  // Guard currentView against restricted role access (onlyallow or account)
+  // Guard currentView against restricted role access (onlyallow, account, or purchase)
   useEffect(() => {
-    if (userRole && (isOnlyAllowRole(userRole.role) || isAccountRole(userRole.role))) {
+    if (userRole && isRestrictedRole(userRole.role)) {
       if (!isViewAllowed(currentView, userRole.role, userRole.page)) {
         const first = getFirstAllowedView(userRole.role, userRole.page) || 'expenses';
         setCurrentView(first);
-        if (isAccountRole(userRole.role)) {
-          showToast('Timeline is restricted for Account role. Redirected to Bills & Expenses.');
-        }
       }
     }
   }, [userRole, currentView]);
 
   const handleViewChange = (newView: ViewMode) => {
     if (userRole && !isViewAllowed(newView, userRole.role, userRole.page)) {
-      if (isAccountRole(userRole.role)) {
-        showToast('Timeline is restricted for Account role. Redirected to Bills & Expenses.');
-        setCurrentView('expenses');
+      if (isAccountRole(userRole.role) || isPurchaseRole(userRole.role)) {
+        const fallback = getFirstAllowedView(userRole.role, userRole.page) || 'expenses';
+        showToast('Home Dashboard is hidden for your role. Redirected.');
+        setCurrentView(fallback);
         return;
       }
       showToast(`Access Restricted: Your role (${userRole.role}) does not have permission to access "${newView}".`);
@@ -1629,7 +1627,7 @@ export default function ConstructionPlanningPage() {
 
           {/* Active View Container */}
           <section className="transition-all duration-200 w-full">
-            {userRole && (isOnlyAllowRole(userRole.role) || isAccountRole(userRole.role)) && !isViewAllowed(currentView, userRole.role, userRole.page) ? (
+            {userRole && isRestrictedRole(userRole.role) && !isViewAllowed(currentView, userRole.role, userRole.page) ? (
               <div className="bg-white rounded-2xl border border-rose-200/80 p-8 sm:p-12 text-center max-w-lg mx-auto my-12 shadow-sm">
                 <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100">
                   <ShieldAlert className="w-7 h-7" />
@@ -1638,8 +1636,8 @@ export default function ConstructionPlanningPage() {
                   Access Restricted ({userRole.role})
                 </h3>
                 <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-                  {isAccountRole(userRole.role)
-                    ? 'Your account role is restricted to Bill, Store, and Document only. Timeline is not accessible.'
+                  {isAccountRole(userRole.role) || isPurchaseRole(userRole.role)
+                    ? 'Home Dashboard is restricted for your role. All other modules are accessible.'
                     : `Your account is restricted to designated views only (${userRole.page || 'None configured'}). You do not have permission to view the "${currentView}" module.`}
                 </p>
                 {getFirstAllowedView(userRole.role, userRole.page) && (
