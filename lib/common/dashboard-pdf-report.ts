@@ -77,6 +77,14 @@ function fmtRs(val: number): string {
   return `Rs. ${new Intl.NumberFormat('en-IN').format(n)}`;
 }
 
+function fmtCompact(val: number): string {
+  const num = Number(val) || 0;
+  if (num >= 10000000) return `${(num / 10000000).toFixed(2)}Cr`;
+  if (num >= 100000) return `${(num / 100000).toFixed(1)}L`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return `${Math.round(num)}`;
+}
+
 async function loadImageAsDataUrl(src: string): Promise<string | null> {
   try {
     const res = await fetch(src);
@@ -246,8 +254,78 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
   });
   cursorY = (doc as any).lastAutoTable.finalY + 7;
 
-  // 2. Monthly Bills & Expenses Trend (6 Months)
+  // 2. Monthly Bills & Expenses Trend (6 Months) — Bar Chart + Table
   drawSectionTitle('2. MONTHLY BILLS & EXPENSES TREND (LAST 6 MONTHS)');
+  ensureSpace(52);
+  {
+    const chartH = 44;
+    const chartW = CONTENT_W;
+    doc.setFillColor(250, 251, 253);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(MARGIN_X, cursorY, chartW, chartH, 2, 2, 'FD');
+
+    // Legend top-right
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(101, 62, 241);
+    doc.rect(MARGIN_X + chartW - 44, cursorY + 3.5, 3, 3, 'F');
+    doc.setTextColor(55, 65, 81);
+    doc.text('Paid', MARGIN_X + chartW - 39.5, cursorY + 6);
+    doc.setFillColor(245, 158, 11);
+    doc.rect(MARGIN_X + chartW - 26, cursorY + 3.5, 3, 3, 'F');
+    doc.text('Pending', MARGIN_X + chartW - 21.5, cursorY + 6);
+
+    const plotTop = cursorY + 10;
+    const plotBottom = cursorY + chartH - 8;
+    const plotH = plotBottom - plotTop;
+    const maxVal = Math.max(...input.monthlyTrend.map((m) => m.total), 1);
+
+    // Baseline
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.25);
+    doc.line(MARGIN_X + 6, plotBottom, MARGIN_X + chartW - 6, plotBottom);
+
+    const count = Math.max(input.monthlyTrend.length, 1);
+    const slotW = (chartW - 16) / count;
+    const barW = Math.min(16, slotW * 0.55);
+
+    input.monthlyTrend.forEach((m, idx) => {
+      const centerX = MARGIN_X + 8 + slotW * idx + slotW / 2;
+      const barX = centerX - barW / 2;
+      const totalH = m.total > 0 ? Math.max((m.total / maxVal) * plotH, 2.5) : 0.8;
+      const paidH = m.total > 0 ? (m.paid / m.total) * totalH : 0;
+      const pendH = Math.max(totalH - paidH, 0);
+
+      if (paidH > 0) {
+        doc.setFillColor(101, 62, 241);
+        doc.rect(barX, plotBottom - paidH, barW, paidH, 'F');
+      }
+      if (pendH > 0) {
+        doc.setFillColor(245, 158, 11);
+        doc.rect(barX, plotBottom - paidH - pendH, barW, pendH, 'F');
+      }
+      if (m.total === 0) {
+        doc.setFillColor(226, 232, 240);
+        doc.rect(barX, plotBottom - 0.8, barW, 0.8, 'F');
+      }
+
+      // Value above bar
+      doc.setFontSize(6.8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(17, 24, 39);
+      doc.text(m.total > 0 ? fmtCompact(m.total) : '0', centerX, plotBottom - totalH - 1.5, {
+        align: 'center',
+      });
+
+      // Month label below
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(75, 85, 99);
+      doc.text(m.label, centerX, plotBottom + 4.5, { align: 'center' });
+    });
+
+    cursorY += chartH + 4;
+  }
+
   autoTable(doc, {
     ...commonTableConfig,
     startY: cursorY,
@@ -268,9 +346,74 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
   });
   cursorY = (doc as any).lastAutoTable.finalY + 7;
 
-  // 3. Payment Mode Split
+  // 3. Payment Settlement & Mode Split — Visual Bars + Table
   if (input.paymentModes.length > 0) {
-    drawSectionTitle('3. PAYMENT MODE & CASHFLOW SPLIT');
+    drawSectionTitle('3. PAYMENT SETTLEMENT & MODE SPLIT');
+    const chartBoxH = 18 + input.paymentModes.length * 7;
+    ensureSpace(chartBoxH + 8);
+
+    doc.setFillColor(250, 251, 253);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, chartBoxH, 2, 2, 'FD');
+
+    // Overall Paid vs Pending Stacked Bar
+    const totalExp = Math.max(input.expenseStats.total, 1);
+    const paidRatio = Math.min(input.expenseStats.paid / totalExp, 1);
+    const barLeft = MARGIN_X + 4;
+    const fullBarW = CONTENT_W - 8;
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 37, 74);
+    doc.text(
+      `Settlement Health: ${input.expenseStats.paidPct}% Paid (${fmtRs(input.expenseStats.paid)})   |   Pending: ${fmtRs(input.expenseStats.unpaidTotal)}`,
+      barLeft,
+      cursorY + 5.5
+    );
+
+    doc.setFillColor(245, 158, 11);
+    doc.roundedRect(barLeft, cursorY + 7.5, fullBarW, 4, 1, 1, 'F');
+    if (paidRatio > 0) {
+      doc.setFillColor(16, 185, 129);
+      doc.roundedRect(barLeft, cursorY + 7.5, Math.max(fullBarW * paidRatio, 2), 4, 1, 1, 'F');
+    }
+
+    // Mode Horizontal Bars
+    const modeBarStart = MARGIN_X + 38;
+    const modeBarMaxW = CONTENT_W - 82;
+    const modeColors: [number, number, number][] = [
+      [101, 62, 241],
+      [14, 165, 233],
+      [16, 185, 129],
+      [245, 158, 11],
+      [236, 72, 153],
+    ];
+
+    input.paymentModes.forEach((m, idx) => {
+      const rowY = cursorY + 17 + idx * 7;
+      const color = modeColors[idx % modeColors.length];
+      doc.setFontSize(7.2);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(55, 65, 81);
+      doc.text(m.mode.replace('_', ' ').toUpperCase(), barLeft, rowY + 2.8);
+
+      doc.setFillColor(229, 231, 235);
+      doc.roundedRect(modeBarStart, rowY, modeBarMaxW, 3.2, 1, 1, 'F');
+      const fillW = Math.max((m.pct / 100) * modeBarMaxW, m.amount > 0 ? 2 : 0);
+      if (fillW > 0) {
+        doc.setFillColor(color[0], color[1], color[2]);
+        doc.roundedRect(modeBarStart, rowY, fillW, 3.2, 1, 1, 'F');
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(17, 24, 39);
+      doc.text(`${fmtRs(m.amount)} (${m.pct}%)`, MARGIN_X + CONTENT_W - 4, rowY + 2.8, {
+        align: 'right',
+      });
+    });
+
+    cursorY += chartBoxH + 4;
+
     autoTable(doc, {
       ...commonTableConfig,
       startY: cursorY,
@@ -290,9 +433,59 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     cursorY = (doc as any).lastAutoTable.finalY + 7;
   }
 
-  // 4. Site-wise Comparison
+  // 4. Site-wise Comparison — Visual Horizontal Bar Graph + Table
   if (input.siteComparison.length > 0) {
     drawSectionTitle('4. SITE-WISE SPEND & DOCUMENTS COMPARISON');
+    const siteGraphH = 12 + input.siteComparison.length * 8;
+    ensureSpace(siteGraphH + 8);
+
+    doc.setFillColor(250, 251, 253);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, siteGraphH, 2, 2, 'FD');
+
+    const maxSiteSpend = Math.max(...input.siteComparison.map((s) => s.billTotal), 1);
+    const sBarStart = MARGIN_X + 54;
+    const sBarMaxW = CONTENT_W - 96;
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(101, 62, 241);
+    doc.rect(MARGIN_X + 4, cursorY + 3.5, 3, 3, 'F');
+    doc.setTextColor(55, 65, 81);
+    doc.text('Total Spend', MARGIN_X + 8.5, cursorY + 6);
+    doc.setFillColor(245, 158, 11);
+    doc.rect(MARGIN_X + 30, cursorY + 3.5, 3, 3, 'F');
+    doc.text('Pending Due', MARGIN_X + 34.5, cursorY + 6);
+
+    input.siteComparison.forEach((s, idx) => {
+      const rowY = cursorY + 11 + idx * 8;
+      doc.setFontSize(7.2);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(17, 24, 39);
+      const shortName = s.name.length > 26 ? `${s.name.slice(0, 24)}..` : s.name;
+      doc.text(shortName, MARGIN_X + 4, rowY + 3);
+
+      doc.setFillColor(229, 231, 235);
+      doc.roundedRect(sBarStart, rowY, sBarMaxW, 3.6, 1, 1, 'F');
+
+      const totalW = Math.max((s.billTotal / maxSiteSpend) * sBarMaxW, s.billTotal > 0 ? 2 : 0);
+      if (totalW > 0) {
+        doc.setFillColor(101, 62, 241);
+        doc.roundedRect(sBarStart, rowY, totalW, 3.6, 1, 1, 'F');
+      }
+      if (s.billPending > 0 && s.billTotal > 0) {
+        const pendW = Math.max((s.billPending / maxSiteSpend) * sBarMaxW, 1.5);
+        doc.setFillColor(245, 158, 11);
+        doc.roundedRect(sBarStart + Math.max(totalW - pendW, 0), rowY, Math.min(pendW, totalW), 3.6, 1, 1, 'F');
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(17, 24, 39);
+      doc.text(fmtRs(s.billTotal), MARGIN_X + CONTENT_W - 4, rowY + 3, { align: 'right' });
+    });
+
+    cursorY += siteGraphH + 4;
+
     autoTable(doc, {
       ...commonTableConfig,
       startY: cursorY,
@@ -314,9 +507,70 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     cursorY = (doc as any).lastAutoTable.finalY + 7;
   }
 
-  // 5. Top Vendors by Spend
+  // 4B. Store Inventory Health & Movement Visual
+  drawSectionTitle('5. STORE INVENTORY HEALTH & STOCK MOVEMENT');
+  ensureSpace(30);
+  {
+    const boxH = 26;
+    doc.setFillColor(250, 251, 253);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, boxH, 2, 2, 'FD');
+
+    const totalSkus = Math.max(input.storeStats.totalProducts, 1);
+    const okW = ((input.storeStats.healthyCount / totalSkus) * (CONTENT_W - 8));
+    const lowW = ((input.storeStats.lowStockCount / totalSkus) * (CONTENT_W - 8));
+    const outW = Math.max((CONTENT_W - 8) - okW - lowW, 0);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 37, 74);
+    doc.text(
+      `Catalog Stock Readiness (${input.storeStats.totalProducts} Items):   In Stock: ${input.storeStats.healthyCount}   |   Low Stock: ${input.storeStats.lowStockCount}   |   Depleted: ${input.storeStats.outOfStockCount}`,
+      MARGIN_X + 4,
+      cursorY + 5.5
+    );
+
+    let sx = MARGIN_X + 4;
+    if (okW > 0) {
+      doc.setFillColor(16, 185, 129);
+      doc.rect(sx, cursorY + 8, okW, 3.8, 'F');
+      sx += okW;
+    }
+    if (lowW > 0) {
+      doc.setFillColor(245, 158, 11);
+      doc.rect(sx, cursorY + 8, lowW, 3.8, 'F');
+      sx += lowW;
+    }
+    if (outW > 0) {
+      doc.setFillColor(239, 68, 68);
+      doc.rect(sx, cursorY + 8, outW, 3.8, 'F');
+    }
+
+    // 3 Movement Summary Pill Boxes
+    const cardW = (CONTENT_W - 16) / 3;
+    const moves = [
+      { label: 'INWARD VOUCHERS', val: String(input.storeStats.inCount), bg: [236, 253, 245] as [number, number, number], tc: [6, 95, 70] as [number, number, number] },
+      { label: 'OUTWARD ISSUES', val: String(input.storeStats.outCount), bg: [245, 243, 255] as [number, number, number], tc: [91, 33, 182] as [number, number, number] },
+      { label: 'RETURNS / DAMAGES', val: String(input.storeStats.defectReturnCount), bg: [255, 251, 235] as [number, number, number], tc: [146, 64, 14] as [number, number, number] },
+    ];
+    moves.forEach((mv, idx) => {
+      const mx = MARGIN_X + 4 + idx * (cardW + 4);
+      doc.setFillColor(mv.bg[0], mv.bg[1], mv.bg[2]);
+      doc.roundedRect(mx, cursorY + 14.5, cardW, 9, 1.5, 1.5, 'F');
+      doc.setFontSize(6.8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mv.tc[0], mv.tc[1], mv.tc[2]);
+      doc.text(mv.label, mx + cardW / 2, cursorY + 18, { align: 'center' });
+      doc.setFontSize(9);
+      doc.text(mv.val, mx + cardW / 2, cursorY + 22, { align: 'center' });
+    });
+
+    cursorY += boxH + 7;
+  }
+
+  // 6. Top Vendors by Spend
   if (input.topVendors.length > 0) {
-    drawSectionTitle('5. TOP VENDORS BY SPEND');
+    drawSectionTitle('6. TOP VENDORS BY SPEND');
     autoTable(doc, {
       ...commonTableConfig,
       startY: cursorY,
@@ -338,9 +592,9 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     cursorY = (doc as any).lastAutoTable.finalY + 7;
   }
 
-  // 6. Pending & Unpaid Bills
+  // 7. Pending & Unpaid Bills
   if (input.pendingBills.length > 0) {
-    drawSectionTitle('6. PENDING / UNPAID BILLS REQUIRING SETTLEMENT');
+    drawSectionTitle('7. PENDING / UNPAID BILLS REQUIRING SETTLEMENT');
     autoTable(doc, {
       ...commonTableConfig,
       startY: cursorY,
