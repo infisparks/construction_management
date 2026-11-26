@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus, DbProject } from '@/lib/supabase/types';
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
+import { fetchProfileVendors } from '@/lib/supabase/profile-services';
 import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
 import { ProjectInfo } from '@/lib/construction-planning/types';
 import { formatMumbaiDate } from '@/lib/common/date-format';
@@ -266,6 +267,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   useEffect(() => {
     loadExpenses();
   }, [projectId, siteFilter, dateFilter]);
+
+  useEffect(() => {
+    fetchProfileVendors();
+  }, []);
 
   useEffect(() => {
     loadDeletedExpenses();

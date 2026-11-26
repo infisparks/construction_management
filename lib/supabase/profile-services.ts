@@ -126,6 +126,7 @@ export async function deleteProfileProduct(id: string): Promise<{ error: any }> 
       .update({ is_deleted: true, updated_at: new Date().toISOString() })
       .eq('id', id);
 
+    if (!error) invalidateProfileVendorsCache();
     return { error };
   } catch (err) {
     console.error('Failed to delete profile_product:', err);
@@ -160,6 +161,7 @@ export async function restoreProfileProduct(id: string): Promise<{ error: any }>
       .update({ is_deleted: false, updated_at: new Date().toISOString() })
       .eq('id', id);
 
+    if (!error) invalidateProfileVendorsCache();
     return { error };
   } catch (err) {
     console.error('Failed to restore profile_product:', err);
@@ -171,23 +173,67 @@ export async function restoreProfileProduct(id: string): Promise<{ error: any }>
 // Vendor Profiles Service (profile_vendor)
 // ==========================================
 
-export async function fetchProfileVendors(): Promise<ProfileVendor[]> {
-  try {
-    const { data, error } = await supabase
-      .from('profile_vendor')
-      .select('*')
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
+const VENDOR_CACHE_TTL_MS = 60_000;
+let cachedVendors: ProfileVendor[] | null = null;
+let cachedVendorsAt = 0;
+let inFlightVendorsPromise: Promise<ProfileVendor[]> | null = null;
 
-    if (error) {
-      console.error('Error fetching profile_vendor from Supabase:', error);
-      return [];
-    }
-    return (data || []) as ProfileVendor[];
-  } catch (err) {
-    console.error('Failed to fetch profile_vendor:', err);
-    return [];
+export function getCachedProfileVendors(): ProfileVendor[] | null {
+  return cachedVendors;
+}
+
+export function invalidateProfileVendorsCache(): void {
+  cachedVendors = null;
+  cachedVendorsAt = 0;
+}
+
+export async function fetchProfileVendors(options?: {
+  forceRefresh?: boolean;
+  throwOnError?: boolean;
+}): Promise<ProfileVendor[]> {
+  const forceRefresh = Boolean(options?.forceRefresh);
+  const throwOnError = Boolean(options?.throwOnError);
+
+  if (!forceRefresh && cachedVendors && Date.now() - cachedVendorsAt < VENDOR_CACHE_TTL_MS) {
+    return cachedVendors;
   }
+
+  if (!forceRefresh && inFlightVendorsPromise) {
+    return inFlightVendorsPromise;
+  }
+
+  const request = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profile_vendor')
+        .select('*')
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching profile_vendor from Supabase:', error);
+        if (throwOnError) throw error;
+        return cachedVendors || [];
+      }
+
+      const list = (data || []) as ProfileVendor[];
+      cachedVendors = list;
+      cachedVendorsAt = Date.now();
+      return list;
+    } catch (err) {
+      console.error('Failed to fetch profile_vendor:', err);
+      if (throwOnError) throw err;
+      return cachedVendors || [];
+    } finally {
+      inFlightVendorsPromise = null;
+    }
+  })();
+
+  if (!forceRefresh) {
+    inFlightVendorsPromise = request;
+  }
+
+  return request;
 }
 
 export async function createProfileVendor(
@@ -225,6 +271,7 @@ export async function createProfileVendor(
       .select()
       .single();
 
+    if (!error) invalidateProfileVendorsCache();
     return { data: data as ProfileVendor, error };
   } catch (err) {
     console.error('Failed to create profile_vendor:', err);
@@ -247,6 +294,7 @@ export async function updateProfileVendor(
       .select()
       .single();
 
+    if (!error) invalidateProfileVendorsCache();
     return { data: data as ProfileVendor, error };
   } catch (err) {
     console.error('Failed to update profile_vendor:', err);
@@ -262,6 +310,7 @@ export async function deleteProfileVendor(id: string): Promise<{ error: any }> {
       .update({ is_deleted: true, updated_at: new Date().toISOString() })
       .eq('id', id);
 
+    if (!error) invalidateProfileVendorsCache();
     return { error };
   } catch (err) {
     console.error('Failed to delete profile_vendor:', err);
@@ -276,6 +325,7 @@ export async function restoreProfileVendor(id: string): Promise<{ error: any }> 
       .update({ is_deleted: false, updated_at: new Date().toISOString() })
       .eq('id', id);
 
+    if (!error) invalidateProfileVendorsCache();
     return { error };
   } catch (err) {
     console.error('Failed to restore profile_vendor:', err);

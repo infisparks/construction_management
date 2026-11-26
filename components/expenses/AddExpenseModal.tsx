@@ -20,7 +20,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { SiteExpense, ExpenseAttachment, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
-import { ProfileVendor, fetchProfileVendors, createProfileVendor } from '@/lib/supabase/profile-services';
+import { ProfileVendor, fetchProfileVendors, getCachedProfileVendors, createProfileVendor } from '@/lib/supabase/profile-services';
 import {
   fetchDropdownCategory,
   addCustomCategory,
@@ -84,7 +84,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
 
   // Vendors from Supabase profile_vendor
-  const [vendors, setVendors] = useState<ProfileVendor[]>([]);
+  const [vendors, setVendors] = useState<ProfileVendor[]>(() => getCachedProfileVendors() || []);
+  const [isLoadingVendors, setIsLoadingVendors] = useState(false);
+  const [vendorLoadError, setVendorLoadError] = useState<string | null>(null);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
   const [customPayeeName, setCustomPayeeName] = useState('');
   const [customPayeeType, setCustomPayeeType] = useState<'vendor' | 'contractor'>('vendor');
@@ -128,11 +130,28 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ title?: boolean; amount?: boolean }>({});
 
+  const loadVendors = async (forceRefresh = false) => {
+    const cached = getCachedProfileVendors();
+    if (!forceRefresh && cached && cached.length > 0) {
+      setVendors(cached);
+    }
+    setIsLoadingVendors(!cached || cached.length === 0 || forceRefresh);
+    setVendorLoadError(null);
+    try {
+      const list = await fetchProfileVendors({ forceRefresh, throwOnError: true });
+      setVendors(list);
+    } catch {
+      setVendorLoadError('Network issue loading vendors.');
+    } finally {
+      setIsLoadingVendors(false);
+    }
+  };
+
   // Load Vendors & Categories on open
   useEffect(() => {
     if (!isOpen) return;
 
-    fetchProfileVendors().then(setVendors);
+    loadVendors(false);
     fetchDropdownCategory('expense_category', DEFAULT_EXPENSE_CATEGORIES).then((cats) => {
       if (cats && cats.length > 0) {
         setCategories(cats);
@@ -873,6 +892,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               }}
               placeholder="Select Payee / Vendor..."
               searchPlaceholder="Search vendor or contractor..."
+              loading={isLoadingVendors}
+              loadingMessage="Loading vendors..."
+              error={vendorLoadError}
+              onRetry={() => loadVendors(true)}
             />
             <p className="text-[10px] text-slate-400">
               Select from existing Store vendors/contractors (new vendor profiles are created from Store).

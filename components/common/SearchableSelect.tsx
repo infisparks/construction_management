@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, ChevronDown, X, Check, Trash2, Plus } from 'lucide-react';
+import { Search, ChevronDown, X, Check, Trash2, Plus, Loader2, RefreshCw } from 'lucide-react';
 
 export interface SearchableOption {
   value: string;
@@ -27,6 +27,10 @@ export interface SearchableSelectProps {
   required?: boolean;
   onDeleteOption?: (value: string) => void;
   onCreateOption?: (newLabel: string) => void;
+  loading?: boolean;
+  loadingMessage?: string;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -44,6 +48,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   required = false,
   onDeleteOption,
   onCreateOption,
+  loading = false,
+  loadingMessage = 'Loading...',
+  error = null,
+  onRetry,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -164,6 +172,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               <X className="w-3.5 h-3.5" />
             </span>
           )}
+          {loading && (
+            <Loader2 className="w-3.5 h-3.5 text-purple-600 animate-spin shrink-0" />
+          )}
           <ChevronDown
             className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
               isOpen ? 'rotate-180 text-purple-600' : ''
@@ -218,6 +229,32 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
           {/* Options Scrollable List */}
           <div className="max-h-56 overflow-y-auto p-1 divide-y divide-slate-50">
+            {loading && (
+              <div className="px-2.5 py-2.5 flex items-center gap-2 text-xs text-purple-700 bg-purple-50/70 rounded-lg mb-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-purple-600" />
+                <span className="font-medium">{loadingMessage}</span>
+              </div>
+            )}
+
+            {!loading && error && (
+              <div className="px-2.5 py-2 flex items-center justify-between gap-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg mb-1">
+                <span className="truncate">{error}</span>
+                {onRetry && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetry();
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold shrink-0 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Retry
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Quick Add New from Search Input if not exists */}
             {onCreateOption && query.trim() && !options.some((o) => !o.isAction && o.label.toLowerCase() === query.trim().toLowerCase()) && (
               <div className="p-1 pb-1.5">

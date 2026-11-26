@@ -36,7 +36,7 @@ import {
 import { SubcontractorRetentionModal } from './SubcontractorRetentionModal';
 import { SubcontractorDeductionModal } from './SubcontractorDeductionModal';
 import { VendorProfileDrawer } from './VendorProfileDrawer';
-import { fetchProfileVendors, fetchProfileProducts, ProfileVendor, ProfileProduct } from '@/lib/supabase/profile-services';
+import { fetchProfileVendors, getCachedProfileVendors, fetchProfileProducts, ProfileVendor, ProfileProduct } from '@/lib/supabase/profile-services';
 import { fetchBillItemCatalog, saveBillItemToCatalog, BillItemTemplate } from '@/lib/supabase/category-services';
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { useAuth } from '@/lib/supabase/auth-context';
@@ -429,7 +429,9 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
   const [projectsList, setProjectsList] = useState<ProjectOption[]>(availableProjects);
 
   // Remote Database Data States
-  const [dbVendors, setDbVendors] = useState<ProfileVendor[]>([]);
+  const [dbVendors, setDbVendors] = useState<ProfileVendor[]>(() => getCachedProfileVendors() || []);
+  const [isLoadingVendors, setIsLoadingVendors] = useState(false);
+  const [vendorLoadError, setVendorLoadError] = useState<string | null>(null);
   const [dbProducts, setDbProducts] = useState<ProfileProduct[]>([]);
   const [catalogItems, setCatalogItems] = useState<BillItemTemplate[]>([]);
 
@@ -485,15 +487,30 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
   // Attachments
   const [attachments, setAttachments] = useState<{ name: string; size?: string; type: 'image' | 'doc'; url?: string }[]>([]);
 
+  const loadDialogVendors = async (forceRefresh = false) => {
+    const cached = getCachedProfileVendors();
+    if (!forceRefresh && cached && cached.length > 0) {
+      setDbVendors(cached);
+    }
+    setIsLoadingVendors(!cached || cached.length === 0 || forceRefresh);
+    setVendorLoadError(null);
+    try {
+      const vendors = await fetchProfileVendors({ forceRefresh, throwOnError: true });
+      if (vendors && vendors.length > 0) {
+        setDbVendors(vendors);
+      }
+    } catch {
+      setVendorLoadError('Network issue loading vendors.');
+    } finally {
+      setIsLoadingVendors(false);
+    }
+  };
+
   // Fetch Supabase Vendors, Products & Catalog on Dialog Open
   useEffect(() => {
     if (!isOpen) return;
 
-    fetchProfileVendors().then((vendors) => {
-      if (vendors && vendors.length > 0) {
-        setDbVendors(vendors);
-      }
-    });
+    loadDialogVendors(false);
 
     fetchProfileProducts().then((prods) => {
       if (prods && prods.length > 0) {
@@ -1079,6 +1096,10 @@ export const SubcontractorBillDialog: React.FC<SubcontractorBillDialogProps> = (
                     onChange={handleVendorSelect}
                     placeholder="Select Subcontractor / Vendor..."
                     searchPlaceholder="Search subcontractor or vendor..."
+                    loading={isLoadingVendors}
+                    loadingMessage="Loading vendors..."
+                    error={vendorLoadError}
+                    onRetry={() => loadDialogVendors(true)}
                   />
 
                   <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
