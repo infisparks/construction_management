@@ -6,6 +6,8 @@ const FALLBACK_STORAGE_BUCKET = 'expense-documents';
 
 export interface VendorQuotationItem {
   id: string;
+  heading?: string;
+  description?: string;
   vendor_name: string;
   quoted_amount?: number | null;
   file_url: string;
@@ -55,6 +57,9 @@ export interface PurchaseRequisition {
   req_code: string;
   project_id?: string | null;
   title: string;
+  description?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
   form_data: Record<string, any>;
   approval_stage: ApprovalStage;
   approval_history: ApprovalHistoryEntry[];
@@ -208,6 +213,14 @@ export async function softDeletePurchaseQuotation(id: string): Promise<boolean> 
   return !error;
 }
 
+export async function permanentDeletePurchaseQuotation(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('purchase_quotations')
+    .delete()
+    .eq('id', id);
+  return !error;
+}
+
 // ==========================================
 // 2. Purchase Requisitions & 3-Step Approval
 // ==========================================
@@ -245,27 +258,48 @@ export async function fetchPurchaseRequisitions(
 export async function createPurchaseRequisition(payload: {
   project_id?: string | null;
   title: string;
+  description?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
   form_data: Record<string, any>;
   submitted_by_email?: string | null;
   submitted_by_role?: string | null;
 }): Promise<{ data: PurchaseRequisition | null; error: string | null }> {
   try {
     const code = `PR-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`;
-    const { data, error } = await supabase
+    const insertRow: Record<string, any> = {
+      req_code: code,
+      project_id: payload.project_id && payload.project_id !== 'all' ? payload.project_id : null,
+      title: payload.title.trim(),
+      description: payload.description?.trim() || null,
+      file_url: payload.file_url || null,
+      file_name: payload.file_name || null,
+      form_data: payload.form_data || {},
+      approval_stage: 'pending_purchase',
+      approval_history: [],
+      submitted_by_email: payload.submitted_by_email || null,
+      submitted_by_role: payload.submitted_by_role || 'user',
+      is_deleted: false,
+    };
+
+    let { data, error } = await supabase
       .from('purchase_requisitions')
-      .insert({
-        req_code: code,
-        project_id: payload.project_id && payload.project_id !== 'all' ? payload.project_id : null,
-        title: payload.title.trim(),
-        form_data: payload.form_data || {},
-        approval_stage: 'pending_purchase',
-        approval_history: [],
-        submitted_by_email: payload.submitted_by_email || null,
-        submitted_by_role: payload.submitted_by_role || 'user',
-        is_deleted: false,
-      })
+      .insert(insertRow)
       .select()
       .single();
+
+    if (error && (error.message?.includes('file_url') || error.message?.includes('description'))) {
+      delete insertRow.file_url;
+      delete insertRow.file_name;
+      delete insertRow.description;
+      const retry = await supabase
+        .from('purchase_requisitions')
+        .insert(insertRow)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) return { data: null, error: error.message };
     return { data: data as PurchaseRequisition, error: null };
@@ -336,6 +370,14 @@ export async function softDeletePurchaseRequisition(id: string): Promise<boolean
   const { error } = await supabase
     .from('purchase_requisitions')
     .update({ is_deleted: true, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  return !error;
+}
+
+export async function permanentDeletePurchaseRequisition(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('purchase_requisitions')
+    .delete()
     .eq('id', id);
   return !error;
 }

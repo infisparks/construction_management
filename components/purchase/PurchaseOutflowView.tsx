@@ -19,6 +19,8 @@ import {
   X,
   ClipboardCheck,
   UserCheck,
+  ArrowLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { DbProject } from '@/lib/supabase/types';
 import {
@@ -79,6 +81,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
 
   // Quotations State
   const [inquiries, setInquiries] = useState<PurchaseQuotationInquiry[]>([]);
+  const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
   const [isLoadingQuotes, setIsLoadingQuotes] = useState(true);
   const [quoteSetupError, setQuoteSetupError] = useState<string | null>(null);
 
@@ -118,13 +121,8 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
   const [isNewReqOpen, setIsNewReqOpen] = useState(false);
   const [reqSiteId, setReqSiteId] = useState<string>(projectId || '');
   const [reqTitle, setReqTitle] = useState('');
-  const [reqCategory, setReqCategory] = useState('Equipment / Appliance');
-  const [reqQuantity, setReqQuantity] = useState('1');
-  const [reqUnit, setReqUnit] = useState('Nos');
-  const [reqEstimatedCost, setReqEstimatedCost] = useState('');
-  const [reqUrgency, setReqUrgency] = useState<'Normal' | 'Urgent' | 'Critical'>('Normal');
-  const [reqJustification, setReqJustification] = useState('');
-  const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
+  const [reqDescription, setReqDescription] = useState('');
+  const [reqFile, setReqFile] = useState<File | null>(null);
   const [isSavingReq, setIsSavingReq] = useState(false);
 
   // Approval Action Modal
@@ -195,7 +193,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
     );
   }, [requisitions, searchQuery]);
 
-  // Create New Quotation Inquiry
+  // Create New Quotation Inquiry Profile (Step 1: Heading + Description only)
   const handleCreateInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inqHeading.trim()) {
@@ -203,36 +201,13 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
       return;
     }
 
-    const validRows = draftQuotes.filter((r) => r.vendor_name.trim() && r.file);
-    if (validRows.length === 0) {
-      showToast?.('Please add at least 1 vendor quotation with vendor name and PDF/Image file.', 'error');
-      return;
-    }
-
     setIsSavingInquiry(true);
     try {
-      const uploadedItems: VendorQuotationItem[] = await Promise.all(
-        validRows.map(async (row, idx) => {
-          const uploaded = await uploadPurchaseQuotationFile(row.file!);
-          return {
-            id: `${Date.now()}_${idx}`,
-            vendor_name: row.vendor_name.trim(),
-            quoted_amount: row.quoted_amount ? Number(row.quoted_amount) : null,
-            file_url: uploaded.publicUrl,
-            file_name: uploaded.fileName,
-            file_type: uploaded.fileType,
-            notes: row.notes.trim() || undefined,
-            is_finalized: false,
-            uploaded_at: new Date().toISOString(),
-          };
-        })
-      );
-
       const res = await createPurchaseQuotation({
         project_id: inqSiteId || null,
         heading: inqHeading,
         description: inqDesc,
-        quotations: uploadedItems,
+        quotations: [],
         created_by_email: userEmail || null,
       });
 
@@ -240,17 +215,14 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         showToast?.(res.error, 'error');
       } else if (res.data) {
         setInquiries((prev) => [res.data!, ...prev]);
-        showToast?.('Purchase inquiry & quotations saved!', 'success');
+        showToast?.('Inquiry profile created! Upload your quotations inside.', 'success');
         setIsNewInquiryOpen(false);
         setInqHeading('');
         setInqDesc('');
-        setDraftQuotes([
-          { id: '1', vendor_name: '', quoted_amount: '', notes: '', file: null },
-          { id: '2', vendor_name: '', quoted_amount: '', notes: '', file: null },
-        ]);
+        setSelectedInquiryId(res.data.id);
       }
     } catch (err: any) {
-      showToast?.(err?.message || 'Failed to upload quotations.', 'error');
+      showToast?.(err?.message || 'Failed to create inquiry profile.', 'error');
     } finally {
       setIsSavingInquiry(false);
     }
@@ -283,10 +255,11 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
       showToast?.(res.error, 'error');
     } else if (res.data) {
       setInquiries((prev) => prev.map((item) => (item.id === res.data!.id ? res.data! : item)));
+      const label = target.heading || target.vendor_name;
       showToast?.(
         !target.is_finalized
-          ? `Finalized quotation from ${target.vendor_name}`
-          : `Removed finalization for ${target.vendor_name}`,
+          ? `Finalized quotation "${label}"`
+          : `Removed finalization for "${label}"`,
         'success'
       );
     }
@@ -295,7 +268,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
   const handleAddExtraQuotation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addQuoteTarget || !extraVendorName.trim() || !extraFile) {
-      showToast?.('Vendor name and quotation file are required.', 'error');
+      showToast?.('Quotation heading and PDF/Image file are required.', 'error');
       return;
     }
 
@@ -304,8 +277,9 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
       const uploaded = await uploadPurchaseQuotationFile(extraFile);
       const newItem: VendorQuotationItem = {
         id: `${Date.now()}`,
+        heading: extraVendorName.trim(),
+        description: extraNotes.trim() || undefined,
         vendor_name: extraVendorName.trim(),
-        quoted_amount: extraAmount ? Number(extraAmount) : null,
         file_url: uploaded.publicUrl,
         file_name: uploaded.fileName,
         file_type: uploaded.fileType,
@@ -323,10 +297,9 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         showToast?.(res.error, 'error');
       } else if (res.data) {
         setInquiries((prev) => prev.map((item) => (item.id === res.data!.id ? res.data! : item)));
-        showToast?.('Quotation added!', 'success');
-        setAddQuoteTarget(null);
+        setAddQuoteTarget(res.data);
+        showToast?.('Quotation uploaded! You can upload another or close.', 'success');
         setExtraVendorName('');
-        setExtraAmount('');
         setExtraNotes('');
         setExtraFile(null);
       }
@@ -337,36 +310,34 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
     }
   };
 
-  // Submit Purchase Requisition (flexible JSONB)
+  // Submit Purchase Requisition (Heading + Uploaded PDF/Image)
   const handleCreateRequisition = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqTitle.trim()) {
-      showToast?.('Please enter a requisition title.', 'error');
+      showToast?.('Please enter a requisition heading.', 'error');
+      return;
+    }
+    if (!reqFile) {
+      showToast?.('Please upload the requisition PDF or image.', 'error');
       return;
     }
 
     setIsSavingReq(true);
     try {
-      const customObj: Record<string, string> = {};
-      customFields.forEach((f) => {
-        if (f.key.trim() && f.value.trim()) {
-          customObj[f.key.trim()] = f.value.trim();
-        }
-      });
-
+      const uploaded = await uploadPurchaseQuotationFile(reqFile, 'requisitions');
       const formData = {
-        category: reqCategory,
-        quantity: reqQuantity,
-        unit: reqUnit,
-        estimated_cost: reqEstimatedCost ? Number(reqEstimatedCost) : null,
-        urgency: reqUrgency,
-        justification: reqJustification.trim() || null,
-        ...customObj,
+        description: reqDescription.trim() || null,
+        file_url: uploaded.publicUrl,
+        file_name: uploaded.fileName,
+        file_type: uploaded.fileType,
       };
 
       const res = await createPurchaseRequisition({
         project_id: reqSiteId || null,
         title: reqTitle,
+        description: reqDescription.trim() || null,
+        file_url: uploaded.publicUrl,
+        file_name: uploaded.fileName,
         form_data: formData,
         submitted_by_email: userEmail || null,
         submitted_by_role: userRole || 'user',
@@ -376,14 +347,14 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         showToast?.(res.error, 'error');
       } else if (res.data) {
         setRequisitions((prev) => [res.data!, ...prev]);
-        showToast?.('Purchase Requisition submitted for Purchase Approval!', 'success');
+        showToast?.('Purchase Requisition PDF submitted for Purchase Approval!', 'success');
         setIsNewReqOpen(false);
         setReqTitle('');
-        setReqQuantity('1');
-        setReqEstimatedCost('');
-        setReqJustification('');
-        setCustomFields([]);
+        setReqDescription('');
+        setReqFile(null);
       }
+    } catch (err: any) {
+      showToast?.(err?.message || 'Failed to upload requisition PDF.', 'error');
     } finally {
       setIsSavingReq(false);
     }
@@ -539,115 +510,123 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         </div>
       </div>
 
-      {/* 3. TAB 1: VENDOR QUOTATIONS & FINALIZATION */}
-      {activeTab === 'quotations' && (
-        <div className="space-y-3">
-          {isLoadingQuotes ? (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-12 text-center text-xs text-slate-500">
-              Loading vendor quotations...
-            </div>
-          ) : filteredInquiries.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-12 text-center">
-              <FileText className="w-9 h-9 text-slate-300 mx-auto mb-2" />
-              <div className="text-sm font-semibold text-slate-800">No Purchase Inquiries Yet</div>
-              <p className="text-xs text-slate-500 mt-1">
-                Create a purchase inquiry, upload multiple vendor quotations (PDF/Image), and finalize 1 or 2 vendors.
-              </p>
-            </div>
-          ) : (
-            filteredInquiries.map((inq) => {
-              const finalizedCount = inq.quotations.filter((q) => q.is_finalized).length;
-              const viewerAtts: BillViewerAttachment[] = inq.quotations.map((q) => ({
-                url: q.file_url,
-                name: `${q.vendor_name} — ${q.file_name}`,
-                type: q.file_type,
-              }));
+      {/* 3. TAB 1: VENDOR QUOTATIONS & FINALIZATION (List -> Separate Detail View) */}
+      {activeTab === 'quotations' && (() => {
+        const selectedInquiry = selectedInquiryId
+          ? inquiries.find((i) => i.id === selectedInquiryId) || null
+          : null;
 
-              return (
-                <div
-                  key={inq.id}
-                  className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs space-y-3.5"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-[#653ef1] border border-purple-200">
-                          {inq.inquiry_code}
-                        </span>
-                        {inq.project_id && projectMap.get(inq.project_id) && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                            <Building2 className="w-3 h-3 text-[#653ef1]" />
-                            {projectMap.get(inq.project_id)}
-                          </span>
-                        )}
-                        <span
-                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                            finalizedCount > 0
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}
-                        >
-                          {finalizedCount > 0 ? `${finalizedCount} Finalized` : 'Comparing Quotes'}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-bold text-[#111827] mt-1.5">{inq.heading}</h3>
-                      {inq.description && (
-                        <p className="text-xs text-[#6B7280] mt-0.5">{inq.description}</p>
-                      )}
-                    </div>
+        if (selectedInquiry) {
+          const finalizedCount = selectedInquiry.quotations.filter((q) => q.is_finalized).length;
+          const viewerAtts: BillViewerAttachment[] = selectedInquiry.quotations.map((q) => ({
+            url: q.file_url,
+            name: `${q.heading || q.vendor_name} — ${q.file_name}`,
+            type: q.file_type,
+          }));
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setAddQuoteTarget(inq)}
-                        className="h-8 px-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-[#653ef1] text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Quote</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (await softDeletePurchaseQuotation(inq.id)) {
-                            setInquiries((prev) => prev.filter((item) => item.id !== inq.id));
-                            showToast?.('Inquiry moved to trash.', 'info');
-                          }
-                        }}
-                        className="w-8 h-8 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer"
-                        title="Delete inquiry"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+          return (
+            <div className="space-y-4">
+              {/* Back + Inquiry Detail Header */}
+              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInquiryId(null)}
+                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Inquiries List</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddQuoteTarget(selectedInquiry)}
+                      className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Quotation</span>
+                    </button>
                   </div>
+                </div>
 
-                  {/* Quotations Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
-                    {inq.quotations.map((qt, qIdx) => (
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-[#653ef1] border border-purple-200">
+                      {selectedInquiry.inquiry_code}
+                    </span>
+                    {selectedInquiry.project_id && projectMap.get(selectedInquiry.project_id) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                        <Building2 className="w-3 h-3 text-[#653ef1]" />
+                        {projectMap.get(selectedInquiry.project_id)}
+                      </span>
+                    )}
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        finalizedCount > 0
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}
+                    >
+                      {finalizedCount > 0 ? `${finalizedCount} Finalized` : 'Comparing Quotes'}
+                    </span>
+                  </div>
+                  <h2 className="text-lg font-bold text-[#111827] mt-1.5">{selectedInquiry.heading}</h2>
+                  {selectedInquiry.description && (
+                    <p className="text-xs text-[#6B7280] mt-1">{selectedInquiry.description}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Uploaded Quotations Inside This Inquiry */}
+              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-[#111827]">
+                    Uploaded Quotations ({selectedInquiry.quotations.length})
+                  </h3>
+                  <span className="text-[11px] text-[#6B7280]">
+                    Select 1 or 2 quotations to finalize
+                  </span>
+                </div>
+
+                {selectedInquiry.quotations.length === 0 ? (
+                  <div className="p-8 rounded-xl border border-dashed border-purple-200 bg-purple-50/30 text-center">
+                    <Upload className="w-8 h-8 text-[#653ef1] mx-auto mb-2 opacity-80" />
+                    <div className="text-xs font-semibold text-slate-800">No Quotations Uploaded Yet</div>
+                    <p className="text-[11px] text-slate-500 mt-0.5 mb-3">
+                      Upload vendor quotations (PDF or Image) with heading and description.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setAddQuoteTarget(selectedInquiry)}
+                      className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload First Quotation</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {selectedInquiry.quotations.map((qt, qIdx) => (
                       <div
                         key={qt.id}
-                        className={`p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5 ${
+                        className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between gap-2.5 ${
                           qt.is_finalized
                             ? 'bg-emerald-50/50 border-emerald-400 ring-1 ring-emerald-400/40'
                             : 'bg-slate-50/60 border-slate-200 hover:border-purple-300'
                         }`}
                       >
                         <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-xs font-bold text-[#111827] truncate">
-                                {qt.vendor_name}
-                              </div>
-                              <div className="text-[11px] text-[#6B7280] truncate">{qt.file_name}</div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-[#111827] truncate">
+                              {qt.heading || qt.vendor_name}
                             </div>
-                            {qt.quoted_amount != null && (
-                              <span className="text-xs font-bold text-[#111827] bg-white px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
-                                ₹{Number(qt.quoted_amount).toLocaleString('en-IN')}
-                              </span>
-                            )}
+                            <div className="text-[11px] text-[#6B7280] truncate mt-0.5">{qt.file_name}</div>
                           </div>
-                          {qt.notes && (
-                            <p className="text-[11px] text-slate-600 mt-1.5 line-clamp-2">{qt.notes}</p>
+                          {(qt.description || qt.notes) && (
+                            <p className="text-[11px] text-slate-600 mt-1.5 line-clamp-2">
+                              {qt.description || qt.notes}
+                            </p>
                           )}
                         </div>
 
@@ -659,7 +638,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                                 isOpen: true,
                                 attachments: viewerAtts,
                                 initialIndex: qIdx,
-                                voucherNumber: inq.inquiry_code,
+                                voucherNumber: selectedInquiry.inquiry_code,
                               })
                             }
                             className="h-7 px-2.5 rounded-lg bg-white border border-slate-200 hover:border-[#653ef1] text-xs font-semibold text-slate-700 hover:text-[#653ef1] flex items-center gap-1 cursor-pointer"
@@ -670,7 +649,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
 
                           <button
                             type="button"
-                            onClick={() => handleToggleFinalize(inq, qt.id)}
+                            onClick={() => handleToggleFinalize(selectedInquiry, qt.id)}
                             className={`h-7 px-3 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                               qt.is_finalized
                                 ? 'bg-emerald-600 text-white shadow-2xs'
@@ -684,185 +663,313 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                       </div>
                     ))}
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
+                )}
+              </div>
+            </div>
+          );
+        }
 
-      {/* 4. TAB 2: PURCHASE REQUISITIONS & 3-STEP APPROVAL */}
+        // Clean Inquiries List Table (click row to open separate detail view)
+        return (
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-2xs overflow-hidden">
+            {isLoadingQuotes ? (
+              <div className="p-12 text-center text-xs text-slate-500">Loading purchase inquiries...</div>
+            ) : filteredInquiries.length === 0 ? (
+              <div className="p-12 text-center">
+                <FileText className="w-9 h-9 text-slate-300 mx-auto mb-2" />
+                <div className="text-sm font-semibold text-slate-800">No Purchase Inquiries Yet</div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Click &quot;+ New Purchase Inquiry&quot; to create a profile, then click it to upload quotations.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 text-center w-12">Sr.</th>
+                      <th className="px-4 py-3">Inquiry Code</th>
+                      <th className="px-4 py-3">Site</th>
+                      <th className="px-4 py-3">Heading &amp; Description</th>
+                      <th className="px-4 py-3 text-center">Quotations</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredInquiries.map((inq, idx) => {
+                      const finalizedCount = inq.quotations.filter((q) => q.is_finalized).length;
+                      return (
+                        <tr
+                          key={inq.id}
+                          onClick={() => setSelectedInquiryId(inq.id)}
+                          className="hover:bg-purple-50/30 transition-colors cursor-pointer group"
+                        >
+                          <td className="px-4 py-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-[#653ef1] border border-purple-200">
+                              {inq.inquiry_code}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-slate-700">
+                              {(inq.project_id && projectMap.get(inq.project_id)) || 'General'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-[#111827] group-hover:text-[#653ef1] transition-colors">
+                              {inq.heading}
+                            </div>
+                            {inq.description && (
+                              <div className="text-[11px] text-[#6B7280] truncate max-w-md">
+                                {inq.description}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                              {inq.quotations.length} {inq.quotations.length === 1 ? 'File' : 'Files'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                finalizedCount > 0
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}
+                            >
+                              {finalizedCount > 0 ? `${finalizedCount} Finalized` : 'Open'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedInquiryId(inq.id)}
+                                className="h-7 px-2.5 rounded-lg bg-purple-50 hover:bg-[#653ef1] text-[#653ef1] hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <span>Open</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (await softDeletePurchaseQuotation(inq.id)) {
+                                    setInquiries((prev) => prev.filter((item) => item.id !== inq.id));
+                                    showToast?.('Inquiry deleted.', 'info');
+                                  }
+                                }}
+                                className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer"
+                                title="Delete inquiry"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* 4. TAB 2: PURCHASE REQUISITIONS & 3-STEP APPROVAL TABLE */}
       {activeTab === 'requisitions' && (
-        <div className="space-y-3">
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-2xs overflow-hidden">
           {isLoadingReqs ? (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-12 text-center text-xs text-slate-500">
+            <div className="p-12 text-center text-xs text-slate-500">
               Loading purchase requisitions...
             </div>
           ) : filteredRequisitions.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-12 text-center">
+            <div className="p-12 text-center">
               <ClipboardCheck className="w-9 h-9 text-slate-300 mx-auto mb-2" />
               <div className="text-sm font-semibold text-slate-800">No Purchase Requisitions Yet</div>
               <p className="text-xs text-slate-500 mt-1">
-                Anyone can submit a requirement (e.g. Split AC). Approvals flow through Purchase → Director → Accounts.
+                Upload a requisition PDF with heading. Approvals flow in table: Purchase → Director → Accounts.
               </p>
             </div>
           ) : (
-            filteredRequisitions.map((req) => {
-              const historyMap = new Map(req.approval_history.map((h) => [h.stage, h]));
-              const canAct = canApproveStage(req.approval_stage);
-              const formEntries = Object.entries(req.form_data || {}).filter(
-                ([, val]) => val !== null && val !== undefined && val !== ''
-              );
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-3.5 py-3 text-center w-10">Sr.</th>
+                    <th className="px-3.5 py-3">Req &amp; Date</th>
+                    <th className="px-3.5 py-3">Site</th>
+                    <th className="px-3.5 py-3">Heading &amp; Requisition PDF</th>
+                    <th className="px-3.5 py-3">1. Purchase</th>
+                    <th className="px-3.5 py-3">2. Director</th>
+                    <th className="px-3.5 py-3">3. Accounts</th>
+                    <th className="px-3.5 py-3 text-center">Status</th>
+                    <th className="px-3.5 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredRequisitions.map((req, idx) => {
+                    const historyMap = new Map(req.approval_history.map((h) => [h.stage, h]));
+                    const canAct = canApproveStage(req.approval_stage);
+                    const fileUrl = req.file_url || req.form_data?.file_url || '';
+                    const fileName = req.file_name || req.form_data?.file_name || 'Requisition.pdf';
+                    const fileType = req.form_data?.file_type || undefined;
+                    const desc = req.description || req.form_data?.description || '';
 
-              return (
-                <div
-                  key={req.id}
-                  className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs space-y-4"
-                >
-                  {/* Top Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-[#653ef1] border border-purple-200">
-                          {req.req_code}
-                        </span>
-                        {req.project_id && projectMap.get(req.project_id) && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                            <Building2 className="w-3 h-3 text-[#653ef1]" />
-                            {projectMap.get(req.project_id)}
-                          </span>
-                        )}
-                        <span
-                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                            req.approval_stage === 'approved'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : req.approval_stage === 'rejected'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : 'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}
-                        >
-                          {STAGE_LABEL[req.approval_stage]}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-bold text-[#111827] mt-1.5">{req.title}</h3>
-                      <p className="text-[11px] text-[#6B7280] mt-0.5">
-                        Submitted by <strong>{req.submitted_by_email || 'Staff'}</strong> •{' '}
-                        {formatMumbaiDate(req.created_at)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {canAct && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setApprovalTarget({ req, decision: 'approved' })}
-                            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Approve</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setApprovalTarget({ req, decision: 'rejected' })}
-                            className="h-8 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Reject</span>
-                          </button>
-                        </>
-                      )}
-
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (await softDeletePurchaseRequisition(req.id)) {
-                              setRequisitions((prev) => prev.filter((r) => r.id !== req.id));
-                              showToast?.('Requisition deleted.', 'info');
-                            }
-                          }}
-                          className="w-8 h-8 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer"
-                          title="Delete requisition"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Flexible JSONB Form Data Summary */}
-                  {formEntries.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                      {formEntries.map(([key, val]) => (
-                        <div key={key} className="min-w-0">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280] truncate">
-                            {key.replace(/_/g, ' ')}
+                    const renderStepCell = (
+                      stepKey: 'purchase' | 'director' | 'accounts',
+                      pendingStage: ApprovalStage
+                    ) => {
+                      const entry = historyMap.get(stepKey);
+                      const isCurrent = req.approval_stage === pendingStage;
+                      if (entry?.decision === 'approved') {
+                        return (
+                          <div className="text-[11px]">
+                            <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              Approved
+                            </span>
+                            <div className="text-[10px] text-slate-500 truncate max-w-[130px]" title={entry.by_email}>
+                              {entry.by_email}
+                            </div>
                           </div>
-                          <div className="text-xs font-semibold text-[#111827] truncate mt-0.5">
-                            {key === 'estimated_cost'
-                              ? `₹${Number(val).toLocaleString('en-IN')}`
-                              : String(val)}
+                        );
+                      }
+                      if (entry?.decision === 'rejected') {
+                        return (
+                          <div className="text-[11px]">
+                            <span className="inline-flex items-center gap-1 font-bold text-rose-700">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              Rejected
+                            </span>
+                            <div className="text-[10px] text-slate-500 truncate max-w-[130px]" title={entry.by_email}>
+                              {entry.by_email}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 3-Step Sequential Approval Stepper */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {(
-                      [
-                        { key: 'purchase', title: '1. Purchase Approval', roleHint: 'Purchase Role', pendingStage: 'pending_purchase' },
-                        { key: 'director', title: '2. Director Approval', roleHint: 'Admin / Director', pendingStage: 'pending_director' },
-                        { key: 'accounts', title: '3. Accounts Approval', roleHint: 'Account Role', pendingStage: 'pending_accounts' },
-                      ] as const
-                    ).map((step) => {
-                      const entry = historyMap.get(step.key);
-                      const isCurrent = req.approval_stage === step.pendingStage;
-
+                        );
+                      }
                       return (
-                        <div
-                          key={step.key}
-                          className={`p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
-                            entry?.decision === 'approved'
-                              ? 'bg-emerald-50/70 border-emerald-300'
-                              : entry?.decision === 'rejected'
-                              ? 'bg-rose-50/70 border-rose-300'
-                              : isCurrent
-                              ? 'bg-purple-50/70 border-[#653ef1]/50'
-                              : 'bg-slate-50 border-slate-200 opacity-75'
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+                            isCurrent ? 'text-[#653ef1]' : 'text-slate-400'
                           }`}
                         >
-                          {entry?.decision === 'approved' ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          ) : entry?.decision === 'rejected' ? (
-                            <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                          ) : isCurrent ? (
-                            <Clock className="w-4 h-4 text-[#653ef1] shrink-0 mt-0.5" />
-                          ) : (
-                            <UserCheck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-bold text-[#111827]">{step.title}</div>
-                            {entry ? (
-                              <div className="text-[10px] text-[#6B7280] mt-0.5">
-                                <span className="capitalize font-semibold">{entry.decision}</span> by {entry.by_email}
-                                {entry.remarks ? ` — "${entry.remarks}"` : ''}
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-[#6B7280] mt-0.5">
-                                {isCurrent ? `Waiting (${step.roleHint})` : `Pending (${step.roleHint})`}
-                              </div>
+                          <Clock className="w-3 h-3 shrink-0" />
+                          {isCurrent ? 'Waiting' : 'Pending'}
+                        </span>
+                      );
+                    };
+
+                    return (
+                      <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-3.5 py-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-[#653ef1] border border-purple-200 block w-fit">
+                            {req.req_code}
+                          </span>
+                          <span className="text-[10px] text-slate-500 mt-1 block">
+                            {formatMumbaiDate(req.created_at)}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          <span className="text-xs font-semibold text-slate-700">
+                            {(req.project_id && projectMap.get(req.project_id)) || 'General'}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <div className="font-bold text-[#111827]">{req.title}</div>
+                          {desc && <div className="text-[11px] text-[#6B7280] truncate max-w-[220px]">{desc}</div>}
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            By: {req.submitted_by_email || 'Staff'}
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          {renderStepCell('purchase', 'pending_purchase')}
+                        </td>
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          {renderStepCell('director', 'pending_director')}
+                        </td>
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          {renderStepCell('accounts', 'pending_accounts')}
+                        </td>
+                        <td className="px-3.5 py-3 text-center whitespace-nowrap">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              req.approval_stage === 'approved'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : req.approval_stage === 'rejected'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}
+                          >
+                            {STAGE_LABEL[req.approval_stage]}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            {fileUrl && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setViewerState({
+                                    isOpen: true,
+                                    attachments: [{ url: fileUrl, name: fileName, type: fileType }],
+                                    initialIndex: 0,
+                                    voucherNumber: req.req_code,
+                                  })
+                                }
+                                className="h-7 px-2.5 rounded-lg bg-purple-50 hover:bg-[#653ef1] text-[#653ef1] hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                title="View uploaded requisition PDF"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View PDF</span>
+                              </button>
+                            )}
+                            {canAct && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setApprovalTarget({ req, decision: 'approved' })}
+                                  className="h-7 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Approve</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setApprovalTarget({ req, decision: 'rejected' })}
+                                  className="h-7 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                              </>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (await softDeletePurchaseRequisition(req.id)) {
+                                    setRequisitions((prev) => prev.filter((r) => r.id !== req.id));
+                                    showToast?.('Requisition deleted.', 'info');
+                                  }
+                                }}
+                                className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer"
+                                title="Delete requisition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -924,99 +1031,12 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                   Description / Specifications
                 </label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={inqDesc}
                   onChange={(e) => setInqDesc(e.target.value)}
                   placeholder="Enter technical specs, brand preference, delivery notes..."
                   className="w-full p-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
                 />
-              </div>
-
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#111827]">
-                    Vendor Quotations (PDF or Image) <span className="text-rose-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDraftQuotes((prev) => [
-                        ...prev,
-                        { id: `${Date.now()}`, vendor_name: '', quoted_amount: '', notes: '', file: null },
-                      ])
-                    }
-                    className="text-xs font-semibold text-[#653ef1] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Another Quote
-                  </button>
-                </div>
-
-                {draftQuotes.map((row, idx) => (
-                  <div key={row.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-[#653ef1]">Quotation #{idx + 1}</span>
-                      {draftQuotes.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setDraftQuotes((prev) => prev.filter((r) => r.id !== row.id))}
-                          className="text-[11px] text-rose-600 hover:underline cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        placeholder="Vendor Name *"
-                        value={row.vendor_name}
-                        onChange={(e) =>
-                          setDraftQuotes((prev) =>
-                            prev.map((r) => (r.id === row.id ? { ...r, vendor_name: e.target.value } : r))
-                          )
-                        }
-                        className="h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Quoted Amount (Rs.)"
-                        value={row.quoted_amount}
-                        onChange={(e) =>
-                          setDraftQuotes((prev) =>
-                            prev.map((r) => (r.id === row.id ? { ...r, quoted_amount: e.target.value } : r))
-                          )
-                        }
-                        className="h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900"
-                      />
-                      <label className="h-9 px-2.5 rounded-lg border border-dashed border-[#653ef1]/50 bg-white hover:bg-purple-50 text-xs text-[#653ef1] font-semibold flex items-center gap-1.5 cursor-pointer truncate">
-                        <Upload className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{row.file ? row.file.name : 'Upload PDF / Image *'}</span>
-                        <input
-                          type="file"
-                          accept="image/*,.pdf,.heic,.heif"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] || null;
-                            setDraftQuotes((prev) =>
-                              prev.map((r) => (r.id === row.id ? { ...r, file: f } : r))
-                            );
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Optional note (warranty, delivery time...)"
-                      value={row.notes}
-                      onChange={(e) =>
-                        setDraftQuotes((prev) =>
-                          prev.map((r) => (r.id === row.id ? { ...r, notes: e.target.value } : r))
-                        )
-                      }
-                      className="w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900"
-                    />
-                  </div>
-                ))}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1032,7 +1052,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                   disabled={isSavingInquiry}
                   className="h-9 px-5 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold cursor-pointer disabled:opacity-60"
                 >
-                  {isSavingInquiry ? 'Uploading...' : 'Save Inquiry & Quotations'}
+                  {isSavingInquiry ? 'Creating...' : 'Create Profile & Upload Quotations'}
                 </button>
               </div>
             </form>
@@ -1040,47 +1060,55 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         </div>
       )}
 
-      {/* MODAL 2: Add Extra Quotation to Existing Inquiry */}
+      {/* MODAL 2: Upload Quotation to Existing Inquiry (Heading + Description + File, NO Amount) */}
       {addQuoteTarget && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#111827]">
-                Add Quotation — {addQuoteTarget.inquiry_code}
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-[#111827]">
+                  Upload Quotation — {addQuoteTarget.inquiry_code}
+                </h3>
+                <p className="text-[11px] text-[#6B7280] truncate max-w-[280px]">
+                  {addQuoteTarget.heading} ({addQuoteTarget.quotations.length} uploaded)
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setAddQuoteTarget(null)}
-                className="text-xs text-slate-500 cursor-pointer"
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
               >
-                Close
+                Done
               </button>
             </div>
             <form onSubmit={handleAddExtraQuotation} className="p-5 space-y-3">
-              <input
-                type="text"
-                required
-                placeholder="Vendor Name *"
-                value={extraVendorName}
-                onChange={(e) => setExtraVendorName(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs"
-              />
-              <input
-                type="number"
-                placeholder="Quoted Amount (Rs.)"
-                value={extraAmount}
-                onChange={(e) => setExtraAmount(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs"
-              />
-              <input
-                type="text"
-                placeholder="Notes (optional)"
-                value={extraNotes}
-                onChange={(e) => setExtraNotes(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs"
-              />
-              <label className="w-full h-10 px-3 rounded-lg border border-dashed border-[#653ef1] text-xs font-semibold text-[#653ef1] flex items-center gap-2 cursor-pointer">
-                <Upload className="w-4 h-4" />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Quotation Heading <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. ABC Electronics - Daikin Quote"
+                  value={extraVendorName}
+                  onChange={(e) => setExtraVendorName(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#653ef1]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Description (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Terms, warranty, delivery notes..."
+                  value={extraNotes}
+                  onChange={(e) => setExtraNotes(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#653ef1]"
+                />
+              </div>
+              <label className="w-full h-10 px-3 rounded-lg border border-dashed border-[#653ef1] bg-purple-50/30 text-xs font-semibold text-[#653ef1] flex items-center gap-2 cursor-pointer">
+                <Upload className="w-4 h-4 shrink-0" />
                 <span className="truncate">{extraFile ? extraFile.name : 'Choose PDF or Image *'}</span>
                 <input
                   type="file"
@@ -1095,14 +1123,14 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                   onClick={() => setAddQuoteTarget(null)}
                   className="h-9 px-4 rounded-xl border border-slate-200 text-xs font-semibold cursor-pointer"
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
                   type="submit"
                   disabled={isAddingExtraQuote}
-                  className="h-9 px-4 rounded-xl bg-[#653ef1] text-white text-xs font-bold cursor-pointer disabled:opacity-60"
+                  className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold cursor-pointer disabled:opacity-60"
                 >
-                  {isAddingExtraQuote ? 'Uploading...' : 'Add Quotation'}
+                  {isAddingExtraQuote ? 'Uploading...' : 'Upload Quotation'}
                 </button>
               </div>
             </form>
@@ -1110,13 +1138,13 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         </div>
       )}
 
-      {/* MODAL 3: New Purchase Requisition (Flexible JSONB Form) */}
+      {/* MODAL 3: New Purchase Requisition (Heading + Upload PDF/Image) */}
       {isNewReqOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-[#111827]">Submit Purchase Requisition</h2>
+                <h2 className="text-base font-bold text-[#111827]">Upload Purchase Requisition</h2>
                 <p className="text-xs text-[#6B7280]">
                   Approval Flow: Purchase → Director → Accounts
                 </p>
@@ -1130,155 +1158,66 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateRequisition} className="p-5 space-y-3.5 overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Requirement Title <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={reqTitle}
-                    onChange={(e) => setReqTitle(e.target.value)}
-                    placeholder="e.g. Need Split AC for Site Office"
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Site / Project
-                  </label>
-                  <select
-                    value={reqSiteId}
-                    onChange={(e) => setReqSiteId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#653ef1]"
-                  >
-                    <option value="">General / All Sites</option>
-                    {allProjects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <form onSubmit={handleCreateRequisition} className="p-5 space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Requisition Heading <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={reqTitle}
+                  onChange={(e) => setReqTitle(e.target.value)}
+                  placeholder="e.g. Split AC for Site Office"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={reqCategory}
-                    onChange={(e) => setReqCategory(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Quantity</label>
-                  <input
-                    type="text"
-                    value={reqQuantity}
-                    onChange={(e) => setReqQuantity(e.target.value)}
-                    className="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Unit</label>
-                  <input
-                    type="text"
-                    value={reqUnit}
-                    onChange={(e) => setReqUnit(e.target.value)}
-                    placeholder="Nos / Bags"
-                    className="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Est. Cost (Rs.)</label>
-                  <input
-                    type="number"
-                    value={reqEstimatedCost}
-                    onChange={(e) => setReqEstimatedCost(e.target.value)}
-                    placeholder="45000"
-                    className="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Site / Project
+                </label>
+                <select
+                  value={reqSiteId}
+                  onChange={(e) => setReqSiteId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#653ef1]"
+                >
+                  <option value="">General / All Sites</option>
+                  {allProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Urgency</label>
-                  <select
-                    value={reqUrgency}
-                    onChange={(e) => setReqUrgency(e.target.value as any)}
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs bg-white"
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="Critical">Critical</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Justification / Purpose
-                  </label>
-                  <input
-                    type="text"
-                    value={reqJustification}
-                    onChange={(e) => setReqJustification(e.target.value)}
-                    placeholder="Reason for purchase..."
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Description / Note (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={reqDescription}
+                  onChange={(e) => setReqDescription(e.target.value)}
+                  placeholder="Any remarks or urgency note..."
+                  className="w-full p-2.5 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                />
               </div>
 
-              {/* Dynamic Custom Fields (saved in JSONB) */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-700">
-                    Additional Fields (Saved in JSONB)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCustomFields((prev) => [...prev, { key: '', value: '' }])}
-                    className="text-xs font-semibold text-[#653ef1] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Field
-                  </button>
-                </div>
-                {customFields.map((cf, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <input
-                      type="text"
-                      placeholder="Field Name (e.g. Brand)"
-                      value={cf.key}
-                      onChange={(e) =>
-                        setCustomFields((prev) =>
-                          prev.map((item, i) => (i === idx ? { ...item, key: e.target.value } : item))
-                        )
-                      }
-                      className="col-span-5 h-8 px-2.5 rounded-lg border border-slate-200 text-xs"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Value (e.g. Daikin 5 Star)"
-                      value={cf.value}
-                      onChange={(e) =>
-                        setCustomFields((prev) =>
-                          prev.map((item, i) => (i === idx ? { ...item, value: e.target.value } : item))
-                        )
-                      }
-                      className="col-span-6 h-8 px-2.5 rounded-lg border border-slate-200 text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setCustomFields((prev) => prev.filter((_, i) => i !== idx))}
-                      className="col-span-1 text-rose-600 text-xs font-bold cursor-pointer"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Requisition PDF / Document <span className="text-rose-500">*</span>
+                </label>
+                <label className="w-full h-11 px-3 rounded-lg border border-dashed border-[#653ef1] bg-purple-50/30 text-xs font-semibold text-[#653ef1] flex items-center gap-2 cursor-pointer">
+                  <Upload className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{reqFile ? reqFile.name : 'Choose Requisition PDF or Image *'}</span>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*,.heic,.heif"
+                    className="hidden"
+                    onChange={(e) => setReqFile(e.target.files?.[0] || null)}
+                  />
+                </label>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1294,7 +1233,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                   disabled={isSavingReq}
                   className="h-9 px-5 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold cursor-pointer disabled:opacity-60"
                 >
-                  {isSavingReq ? 'Submitting...' : 'Submit Requisition'}
+                  {isSavingReq ? 'Uploading...' : 'Submit for Approval'}
                 </button>
               </div>
             </form>
