@@ -7,8 +7,6 @@ export const DEFAULT_DOCUMENT_CATEGORIES: string[] = [
   'MEP drawings',
   'BOQs and cost estimates',
   'Contracts and agreements',
-  'Bills, invoices and payment records',
-  'Quotations and purchase orders',
   'Legal and statutory documents',
   'Meeting minutes and correspondence',
   'Quality, safety and handover documents',

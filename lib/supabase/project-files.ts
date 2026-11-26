@@ -1,6 +1,7 @@
 import { supabase } from './client';
 import { ProjectFile } from '@/lib/construction-planning/types';
 import { sortProjectsBySequence } from './site-storage';
+import { compressFileBeforeUpload } from '../common/file-compression';
 
 export interface ProjectOption {
   id: string;
@@ -158,12 +159,13 @@ export async function uploadFileToStorage(
   file: File,
   projectFolder: string = 'general'
 ): Promise<{ publicUrl: string; filePath: string }> {
-  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const preparedFile = await compressFileBeforeUpload(file);
+  const cleanFileName = preparedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
   const filePath = `${projectFolder}/${Date.now()}_${cleanFileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .upload(filePath, file, {
+    .upload(filePath, preparedFile, {
       cacheControl: '3600',
       upsert: false,
     });

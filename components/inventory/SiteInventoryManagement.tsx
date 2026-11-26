@@ -78,6 +78,7 @@ import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/
 
 import { ProductProfileView } from './ProductProfileView';
 import { VendorProfileView } from './VendorProfileView';
+import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 
 import {
   fetchInventoryTransactions,
@@ -1921,10 +1922,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
       {/* TAB 1: LIVE STOCK CATALOG */}
       {activeTab === 'catalog' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">Sr.</th>
                   <th className="px-4 py-3">Material Code & Name</th>
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Storage Godown / Yard</th>
@@ -1936,7 +1938,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={7} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading inventory from Supabase...</span>
@@ -1946,19 +1948,22 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : filteredMaterials.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No construction materials found in Supabase.</p>
                       <p className="text-xs text-slate-400 mt-1">Click &quot;+ Product&quot; above to create your first product profile.</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredMaterials.map((m) => {
+                  filteredMaterials.map((m, idx) => {
                     const isLow = m.currentStock <= m.minimumAlertStock && m.currentStock > 0;
                     const isDepleted = m.currentStock <= 0;
 
                     return (
                       <tr key={m.id} className="hover:bg-purple-50/20 transition-colors">
+                        <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500">
+                          {idx + 1}
+                        </td>
                         {/* Code & Name */}
                         <td className="px-4 py-3">
                           <button
@@ -2195,7 +2200,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         </div>
       )}
 
@@ -2217,10 +2222,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">Sr.</th>
                   <th className="px-4 py-3">GRN Voucher #</th>
                   <th className="px-4 py-3">Date & Time</th>
                   <th className="px-4 py-3">Supplier Agency</th>
@@ -2235,7 +2241,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={10} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading inward receipts from Supabase...</span>
@@ -2244,15 +2250,18 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : inwardTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-slate-400">
                       <ArrowDownLeft className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No inward deliveries recorded yet.</p>
                       <p className="text-xs text-slate-400 mt-1">Click &quot;Record Check In (GRN)&quot; to log incoming delivery.</p>
                     </td>
                   </tr>
                 ) : (
-                  inwardTransactions.map((tx) => (
+                  inwardTransactions.map((tx, idx) => (
                     <tr key={tx.id} className="hover:bg-purple-50/20 transition-colors">
+                      <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500">
+                        {idx + 1}
+                      </td>
                       <td className="px-4 py-3 font-mono font-bold text-purple-700">
                         {tx.voucherNumber}
                       </td>
@@ -2350,7 +2359,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         </div>
       )}
 
@@ -2372,10 +2381,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">Sr.</th>
                   <th className="px-4 py-3">MIN Voucher #</th>
                   <th className="px-4 py-3">Date & Time</th>
                   <th className="px-4 py-3">Subcontractor Agency</th>
@@ -2390,7 +2400,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={10} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading site dispatches from Supabase...</span>
@@ -2399,15 +2409,18 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : outwardTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-slate-400">
                       <ArrowUpRight className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No material dispatches recorded yet.</p>
                       <p className="text-xs text-slate-400 mt-1">Click &quot;Issue Material (MIN)&quot; to issue stock to site work.</p>
                     </td>
                   </tr>
                 ) : (
-                  outwardTransactions.map((tx) => (
+                  outwardTransactions.map((tx, idx) => (
                     <tr key={tx.id} className="hover:bg-purple-50/20 transition-colors">
+                      <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500">
+                        {idx + 1}
+                      </td>
                       <td className="px-4 py-3 font-mono font-bold text-indigo-700">
                         {tx.voucherNumber}
                       </td>
@@ -2513,7 +2526,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         </div>
       )}
 
@@ -2547,10 +2560,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">Sr.</th>
                   <th className="px-4 py-3">Voucher #</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Type</th>
@@ -2564,7 +2578,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading returns & defects from Supabase...</span>
@@ -2573,17 +2587,20 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : returnsAndDamagesTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                       <RotateCcw className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No returns or damaged items recorded.</p>
                       <p className="text-xs text-slate-400 mt-1">All vendor returns and scrap write-offs will be tracked here.</p>
                     </td>
                   </tr>
                 ) : (
-                  returnsAndDamagesTransactions.map((tx) => {
+                  returnsAndDamagesTransactions.map((tx, idx) => {
                     const isRet = tx.type === 'return';
                     return (
                       <tr key={tx.id} className="hover:bg-purple-50/20 transition-colors">
+                        <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500">
+                          {idx + 1}
+                        </td>
                         <td className="px-4 py-3 font-mono font-bold text-slate-900">
                           {tx.voucherNumber}
                         </td>
@@ -2689,7 +2706,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         </div>
       )}
 
@@ -2706,10 +2723,11 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-3 w-10 text-center">Sr.</th>
                   <th className="px-4 py-3">Date & Time</th>
                   <th className="px-4 py-3">Voucher #</th>
                   <th className="px-4 py-3">Type</th>
@@ -2724,7 +2742,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
               <tbody className="divide-y divide-slate-100">
                 {isLoadingDb ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={10} className="px-4 py-16 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
                         <span className="text-xs font-semibold text-slate-700">Loading audit ledger from Supabase...</span>
@@ -2733,13 +2751,13 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                   </tr>
                 ) : filteredLedger.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-slate-400">
                       <History className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="font-semibold text-slate-600">No history transactions found in Supabase.</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredLedger.map((tx) => {
+                  filteredLedger.map((tx, idx) => {
                     const isCheckIn = tx.type === 'check_in';
                     const isCheckOut = tx.type === 'check_out';
                     const isReturn = tx.type === 'return';
@@ -2747,6 +2765,9 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
 
                     return (
                       <tr key={tx.id} className="hover:bg-purple-50/20 transition-colors">
+                        <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500">
+                          {idx + 1}
+                        </td>
                         <td className="px-4 py-3 text-slate-600">
                           <div>{tx.date}</div>
                           <div className="text-[11px] text-slate-400">{tx.time}</div>
@@ -2865,7 +2886,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         </div>
       )}
 

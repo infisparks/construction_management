@@ -60,6 +60,7 @@ import { QuotationsListView } from '@/components/quotations/QuotationsListView';
 import { SiteInventoryManagement } from '@/components/inventory/SiteInventoryManagement';
 import { SiteExpensesView } from '@/components/expenses/SiteExpensesView';
 import { CommercialBillsAndExpensesView } from '@/components/expenses/CommercialBillsAndExpensesView';
+import { DirectorDashboardView } from '@/components/dashboard/DirectorDashboardView';
 import { useAuth } from '@/lib/supabase/auth-context';
 import { useRouter } from 'next/navigation';
 import { LoginPage } from '@/components/auth/LoginPage';
@@ -347,7 +348,7 @@ export default function ConstructionPlanningPage() {
   }, [activeProjectId, user, isAuthLoading]);
 
   // Active View & Filter State (initialized SSR-safely, synced from URL on client mount)
-  const [currentView, setCurrentView] = useState<ViewMode>('list');
+  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [hasInitializedUrl, setHasInitializedUrl] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ScheduleStatus | 'all'>('all');
@@ -409,6 +410,7 @@ export default function ConstructionPlanningPage() {
       const params = new URLSearchParams(window.location.search);
       const urlView = params.get('view');
       const validViews: ViewMode[] = [
+        'dashboard',
         'list',
         'gantt',
         'critical',
@@ -1650,6 +1652,19 @@ export default function ConstructionPlanningPage() {
               </div>
             ) : (
               <>
+                {currentView === 'dashboard' && (
+                  <DirectorDashboardView
+                    activeProjectId={activeProjectId}
+                    userEmail={user.email || undefined}
+                    userRole={userRole?.role}
+                    onNavigateView={handleViewChange}
+                    onSelectSiteInWorkspace={(siteId) => {
+                      const found = allDbProjects.find((p) => p.id === siteId);
+                      if (found) handleSelectDbProject(found);
+                    }}
+                  />
+                )}
+
                 {currentView === 'list' && (
                   <ConstructionTaskTable
                     tasks={displayedFlattenedTasks}

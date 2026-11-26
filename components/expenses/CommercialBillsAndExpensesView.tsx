@@ -86,8 +86,8 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
               <span>Daily Bills & Expenses</span>
             </button>
 
-            {/* Tab 2: Contractor Work Orders */}
-            <button
+            {/* Tab 2: Contractor Work Orders (Hidden per user request) */}
+            {/* <button
               type="button"
               onClick={() => handleSelectTab('contractor-work-orders')}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -98,7 +98,7 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
             >
               <Wrench className={`w-3.5 h-3.5 ${activeTab === 'contractor-work-orders' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
               <span>Work Orders</span>
-            </button>
+            </button> */}
 
             {/* Tab 3: Customer Purchases & Inflow */}
             <button

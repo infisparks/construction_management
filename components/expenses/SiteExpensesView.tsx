@@ -40,16 +40,20 @@ import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus, DbProject } fr
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillViewerModal } from './ExpenseBillViewerModal';
 import { ProjectInfo } from '@/lib/construction-planning/types';
-import { formatMumbaiDateTime } from '@/lib/common/date-format';
+import { formatMumbaiDate } from '@/lib/common/date-format';
 import {
   fetchSiteExpenses,
   fetchDeletedSiteExpenses,
   deleteSiteExpense,
   restoreSiteExpense,
   calculateExpenseSummary,
+  getExpenseAttachments,
+  getExpensePaymentBreakdown,
+  recordExpensePayment,
   ExpenseSummaryStats
 } from '@/lib/supabase/expense-services';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
+import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 import { 
   DateFilterControl, 
   DateFilterState, 
@@ -127,7 +131,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilterState>(DEFAULT_DATE_FILTER);
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [vendorFilter, setVendorFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -145,6 +149,59 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
   const [expenseToDelete, setExpenseToDelete] = useState<SiteExpense | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Settle / Record Balance Payment Modal State
+  const [settleExpense, setSettleExpense] = useState<SiteExpense | null>(null);
+  const [settleAmountInput, setSettleAmountInput] = useState<string>('');
+  const [settleDate, setSettleDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [settleMethod, setSettleMethod] = useState<ExpensePaymentMethod>('cash');
+  const [settleNote, setSettleNote] = useState<string>('');
+  const [isSettling, setIsSettling] = useState<boolean>(false);
+
+  const handleOpenSettleModal = (exp: SiteExpense) => {
+    const { pending } = getExpensePaymentBreakdown(exp);
+    setSettleExpense(exp);
+    setSettleAmountInput(pending > 0 ? String(pending) : '');
+    setSettleDate(new Date().toISOString().split('T')[0]);
+    setSettleMethod(exp.payment_method || 'cash');
+    setSettleNote('');
+  };
+
+  const handleConfirmSettlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settleExpense) return;
+    const payAmt = parseFloat(settleAmountInput);
+    if (isNaN(payAmt) || payAmt <= 0) {
+      showToast?.('Please enter a valid payment amount greater than 0.', 'error');
+      return;
+    }
+
+    setIsSettling(true);
+    try {
+      const res = await recordExpensePayment(
+        settleExpense,
+        payAmt,
+        settleDate,
+        settleMethod,
+        settleNote
+      );
+      if (res.error) {
+        showToast?.(res.error, 'error');
+      } else if (res.data) {
+        setExpenses(prev => prev.map(item => item.id === res.data!.id ? res.data! : item));
+        const { pending } = getExpensePaymentBreakdown(res.data);
+        showToast?.(
+          pending <= 0
+            ? `Bill ${res.data.expense_code} marked as Fully Paid! Original date preserved.`
+            : `Recorded ₹${payAmt.toLocaleString('en-IN')} payment on ${res.data.expense_code}. Remaining: ₹${pending.toLocaleString('en-IN')}`,
+          'success'
+        );
+        setSettleExpense(null);
+      }
+    } finally {
+      setIsSettling(false);
+    }
+  };
 
   // Load expenses from Supabase (supports 'all' for multi-site overview)
   const loadExpenses = async () => {
@@ -205,16 +262,14 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
     }
   };
 
-  // KPI Calculations
-  const stats: ExpenseSummaryStats = useMemo(() => {
-    return calculateExpenseSummary(expenses);
-  }, [expenses]);
-
-  // Unique Categories from loaded expenses
-  const availableCategories = useMemo(() => {
+  // Unique Vendors from loaded expenses
+  const availableVendors = useMemo(() => {
     const set = new Set<string>();
-    expenses.forEach(e => e.category && set.add(e.category));
-    return Array.from(set);
+    expenses.forEach(e => {
+      const v = e.vendor_name?.trim();
+      if (v) set.add(v);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [expenses]);
 
   // Filtered expenses
@@ -243,8 +298,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         return false;
       }
 
-      // 3. Category Filter
-      if (categoryFilter !== 'all' && exp.category !== categoryFilter) {
+      // 3. Vendor Filter
+      if (vendorFilter !== 'all' && (exp.vendor_name?.trim() || '') !== vendorFilter) {
         return false;
       }
 
@@ -260,12 +315,17 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
       return true;
     }).sort((a, b) => {
-      const timeA = new Date(a.created_at || a.expense_date || 0).getTime();
-      const timeB = new Date(b.created_at || b.expense_date || 0).getTime();
-      if (timeB !== timeA) return timeB - timeA;
+      const dateA = new Date(a.expense_date || 0).getTime();
+      const dateB = new Date(b.expense_date || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
       return (b.serial_no || 0) - (a.serial_no || 0);
     });
-  }, [expenses, searchQuery, siteFilter, dateFilter, categoryFilter, paymentMethodFilter, statusFilter]);
+  }, [expenses, searchQuery, siteFilter, dateFilter, vendorFilter, paymentMethodFilter, statusFilter]);
+
+  // KPI Calculations (strictly based on active date / vendor / site filters)
+  const stats: ExpenseSummaryStats = useMemo(() => {
+    return calculateExpenseSummary(filteredExpenses);
+  }, [filteredExpenses]);
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -347,7 +407,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
     } else if (action === 'filter_all') {
       setDateFilter(DEFAULT_DATE_FILTER);
       setStatusFilter('all');
-      setCategoryFilter('all');
+      setVendorFilter('all');
       setPaymentMethodFilter('all');
       setSearchQuery('');
     } else if (action === 'preview_pdf') {
@@ -358,7 +418,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
       handleExportCSV();
     } else if (action.startsWith('category:')) {
       const cat = action.replace('category:', '');
-      setCategoryFilter(cat);
+      setSearchQuery(cat);
     }
   }, [externalActionTrigger]);
 
@@ -477,8 +537,8 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               <span>Daily Bills & Expenses</span>
             </button>
 
-            {/* Tab 2: Work Orders */}
-            <button
+            {/* Tab 2: Work Orders (Hidden per user request) */}
+            {/* <button
               type="button"
               onClick={() => onSelectCommercialTab?.('contractor-work-orders')}
               className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -489,7 +549,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
             >
               <Wrench className="w-3.5 h-3.5 text-slate-500" />
               <span>Work Orders</span>
-            </button>
+            </button> */}
 
             {/* Tab 3: Customer Purchases & Inflow */}
             <button
@@ -705,15 +765,21 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               </div>
             </div>
 
-            {/* Card 3: All-Time Site Bills */}
-            <div className="rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] border-[#baf2cf] hover:border-emerald-300 hover:shadow-md hover:-translate-y-1">
+            {/* Card 3: Total Pending / Due Bills */}
+            <div
+              onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+              className={`rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] border-[#baf2cf] hover:border-emerald-300 hover:shadow-md hover:-translate-y-1 cursor-pointer ${
+                statusFilter === 'pending' ? 'ring-2 ring-emerald-500/40 border-emerald-500' : ''
+              }`}
+              title="Click to filter pending/due bills"
+            >
               {/* Card Body: Left 3D Icon, Right Metric Info */}
               <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
                 {/* 3D Glossy Icon */}
                 <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/bill/Receipt with Green Checkmark.png"
-                    alt="All-Time Site Bills"
+                    alt="Total Due Bills"
                     className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
                   />
                 </div>
@@ -721,15 +787,19 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 {/* Metric Info Column */}
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
-                    All-Time Site Bills
+                    Total Due / Pending
                   </span>
 
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
-                      {formatINR(stats.allTimeTotal)}
+                      {formatINR(stats.pendingTotal)}
                     </span>
-                    <span className="text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap bg-emerald-100 text-emerald-800 border border-emerald-200/90">
-                      Audited
+                    <span className={`text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap ${
+                      stats.pendingTotal > 0
+                        ? 'bg-amber-100 text-amber-800 border border-amber-200/90'
+                        : 'bg-emerald-100 text-emerald-800 border border-emerald-200/90'
+                    }`}>
+                      {stats.pendingTotal > 0 ? 'Due Balance' : 'All Cleared'}
                     </span>
                   </div>
                 </div>
@@ -738,7 +808,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               {/* Bottom Row: Subtext */}
               <div className="mt-2 pt-1 relative z-10">
                 <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
-                  Paid: {formatINR(stats.paidTotal)} • Pending: {formatINR(stats.pendingTotal)}
+                  Paid: {formatINR(stats.paidTotal)} • Total: {formatINR(stats.allTimeTotal)}
                 </p>
               </div>
 
@@ -851,16 +921,16 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 label="Filter Date"
               />
 
-              {/* Category Filter */}
+              {/* Vendor Filter */}
               <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
+                value={vendorFilter}
+                onChange={(e) => setVendorFilter(e.target.value)}
                 className="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] font-medium cursor-pointer"
               >
-                <option value="all">All Categories</option>
-                {availableCategories.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                <option value="all">All Vendors</option>
+                {availableVendors.map(vendor => (
+                  <option key={vendor} value={vendor}>
+                    {vendor}
                   </option>
                 ))}
               </select>
@@ -887,19 +957,19 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               >
                 <option value="all">All Statuses</option>
                 <option value="paid">Paid</option>
+                <option value="partial">Partial Paid</option>
                 <option value="pending">Pending</option>
-                <option value="reimbursable">Reimbursement</option>
               </select>
 
               {/* Clear Filters (if any active) */}
-              {(searchQuery || siteFilter !== 'all' || isDateFilterActive(dateFilter) || categoryFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all') && (
+              {(searchQuery || siteFilter !== 'all' || isDateFilterActive(dateFilter) || vendorFilter !== 'all' || paymentMethodFilter !== 'all' || statusFilter !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
                     setSiteFilter('all');
                     setDateFilter(DEFAULT_DATE_FILTER);
-                    setCategoryFilter('all');
+                    setVendorFilter('all');
                     setPaymentMethodFilter('all');
                     setStatusFilter('all');
                   }}
@@ -913,13 +983,13 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
       {/* 4. Table View */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+        <ScrollableTableContainer>
           <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-3.5 py-2.5 text-center">S.No</th>
                 <th className="px-3.5 py-2.5">Site / Building</th>
-                <th className="px-3.5 py-2.5">Expense Code & Time</th>
+                <th className="px-3.5 py-2.5">Expense Code & Date</th>
                 <th className="px-3.5 py-2.5">Expense Title & Purpose</th>
                 <th className="px-3.5 py-2.5">Category</th>
                 <th className="px-3.5 py-2.5">Paid To / Vendor</th>
@@ -1005,26 +1075,10 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                               Today
                             </span>
                           )}
-                          {exp.receipt_url && (
-                            <button
-                              type="button"
-                              onClick={() => setBillViewerState({
-                                isOpen: true,
-                                fileUrl: exp.receipt_url || null,
-                                fileName: exp.receipt_file_name || 'Bill-Receipt',
-                                voucherNumber: exp.expense_code,
-                              })}
-                              className="inline-flex items-center gap-0.5 text-[9px] font-bold text-[#653ef1] bg-[#653ef1]/10 hover:bg-[#653ef1]/20 px-1.5 py-0.5 rounded border border-[#653ef1]/30 transition-colors cursor-pointer"
-                              title={`View uploaded bill copy (${exp.receipt_file_name || 'Receipt'})`}
-                            >
-                              <Paperclip className="w-2.5 h-2.5 text-[#653ef1]" />
-                              <span>Bill</span>
-                            </button>
-                          )}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1" title="Created / Expense Date (Mumbai 12-hr IST)">
+                        <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1" title="Expense Date">
                           <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span>{formatMumbaiDateTime(exp.created_at || exp.expense_date)}</span>
+                          <span>{formatMumbaiDate(exp.expense_date)}</span>
                         </div>
                       </td>
 
@@ -1086,56 +1140,120 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
 
                       {/* Payment Mode */}
                       <td className="px-4 py-3 text-center">
-                        <span className="text-[10px] uppercase font-bold font-mono px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-600">
-                          {exp.payment_method}
-                        </span>
+                        {exp.payment_status === 'pending' ? (
+                          <span className="text-[11px] text-slate-400 font-medium">—</span>
+                        ) : (
+                          <span className="text-[10px] uppercase font-bold font-mono px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-600">
+                            {exp.payment_method}
+                          </span>
+                        )}
                       </td>
 
                       {/* Amount */}
                       <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                        <span className="font-bold text-slate-900 text-sm whitespace-nowrap inline-block">
-                          {formatINR(exp.amount)}
-                        </span>
+                        {(() => {
+                          const { paid, pending, isPartial } = getExpensePaymentBreakdown(exp);
+                          return (
+                            <div className="flex flex-col items-end">
+                              <span className="font-bold text-slate-900 text-sm whitespace-nowrap inline-block">
+                                {formatINR(exp.amount)}
+                              </span>
+                              {isPartial && (
+                                <div className="flex items-center gap-1 mt-0.5 text-[10px] font-semibold">
+                                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    Paid: {formatINR(paid)}
+                                  </span>
+                                  <span className="text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                    Due: {formatINR(pending)}
+                                  </span>
+                                </div>
+                              )}
+                              {exp.first_payment_date && exp.settlement_date && exp.first_payment_date !== exp.settlement_date && (
+                                <span className="text-[9px] text-slate-400 mt-0.5">
+                                  1st: {formatMumbaiDate(exp.first_payment_date)} • Paid: {formatMumbaiDate(exp.settlement_date)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Status */}
                       <td className="px-4 py-3 text-center">
-                        {exp.payment_status === 'paid' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Paid
-                          </span>
-                        ) : exp.payment_status === 'pending' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                            <Clock className="w-3 h-3 text-amber-600" />
-                            Pending
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                            Reimbursable
-                          </span>
-                        )}
+                        {(() => {
+                          const { isPartial, isFullyPaid } = getExpensePaymentBreakdown(exp);
+                          if (isPartial || exp.payment_status === 'partial') {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-[#653ef1] border border-purple-200">
+                                <Clock className="w-3 h-3 text-[#653ef1]" />
+                                Partial Paid
+                              </span>
+                            );
+                          }
+                          if (isFullyPaid || exp.payment_status === 'paid') {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                Paid
+                              </span>
+                            );
+                          }
+                          if (exp.payment_status === 'pending') {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Pending
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                              Reimbursable
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* View Uploaded Bill Copy (supports iOS HEIC, PDF, images) */}
-                          {exp.receipt_url && (
+                          {/* Record Balance / Mark Paid (for Pending or Partial bills) */}
+                          {getExpensePaymentBreakdown(exp).pending > 0 && (
                             <button
                               type="button"
-                              onClick={() => setBillViewerState({
-                                isOpen: true,
-                                fileUrl: exp.receipt_url || null,
-                                fileName: exp.receipt_file_name || 'Bill-Receipt',
-                                voucherNumber: exp.expense_code,
-                              })}
-                              className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105"
-                              title={`View attached bill copy (${exp.receipt_file_name || 'Document'})`}
+                              onClick={() => handleOpenSettleModal(exp)}
+                              className="h-7 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                              title="Record balance payment / Mark as Paid (preserves first payment date)"
                             >
-                              <Paperclip className="w-3.5 h-3.5 text-[#6338eb]" />
+                              <CreditCard className="w-3 h-3" />
+                              <span>Pay Due</span>
                             </button>
                           )}
+                          {/* View Uploaded Bill Copy (supports iOS HEIC, PDF, images) */}
+                          {(() => {
+                            const atts = getExpenseAttachments(exp);
+                            if (atts.length === 0) return null;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setBillViewerState({
+                                  isOpen: true,
+                                  fileUrl: atts[0].url,
+                                  fileName: atts[0].name || 'Bill-Receipt',
+                                  voucherNumber: exp.expense_code,
+                                })}
+                                className="w-7 h-7 rounded-xl bg-[#f0ecff] hover:bg-[#e4ddff] text-[#6338eb] flex items-center justify-center transition-all cursor-pointer shadow-2xs hover:scale-105 relative"
+                                title={`View attached bill copy (${atts.length} file${atts.length > 1 ? 's' : ''})`}
+                              >
+                                <Paperclip className="w-3.5 h-3.5 text-[#6338eb]" />
+                                {atts.length > 1 && (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#653ef1] text-white text-[8px] font-bold flex items-center justify-center">
+                                    {atts.length}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })()}
 
                           {/* Preview Voucher Slip */}
                           <button
@@ -1210,7 +1328,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               </tfoot>
             )}
           </table>
-        </div>
+        </ScrollableTableContainer>
       </div>
       </>
       ) : (
@@ -1287,7 +1405,7 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                           <span className="font-mono font-bold text-slate-900 block">{exp.expense_code}</span>
                           <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
                             <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{formatMumbaiDateTime(exp.created_at || exp.expense_date)}</span>
+                            <span>{formatMumbaiDate(exp.expense_date)}</span>
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -1382,6 +1500,159 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         expense={viewingExpense}
         projectName={project?.name || 'Noori Crest Tower'}
       />
+
+      {/* Record Balance / Settle Partial Payment Modal */}
+      {settleExpense && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Record Balance Payment</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {settleExpense.expense_code} • {settleExpense.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettleExpense(null)}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmSettlePayment} className="p-5 space-y-4">
+              {(() => {
+                const { total, paid, pending } = getExpensePaymentBreakdown(settleExpense);
+                return (
+                  <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                    <div>
+                      <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Bill</div>
+                      <div className="text-xs font-bold text-slate-900 mt-0.5">{formatINR(total)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold text-emerald-700 uppercase">Paid</div>
+                      <div className="text-xs font-bold text-emerald-700 mt-0.5">{formatINR(paid)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold text-amber-700 uppercase">Pending</div>
+                      <div className="text-xs font-bold text-amber-700 mt-0.5">{formatINR(pending)}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="text-[11px] text-slate-500 bg-purple-50/60 border border-purple-200/70 rounded-lg px-3 py-2">
+                First Payment / Bill Date:{' '}
+                <strong className="text-slate-800">
+                  {formatMumbaiDate(settleExpense.first_payment_date || settleExpense.expense_date)}
+                </strong>{' '}
+                (will be preserved)
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Amount Paying Now (Rs.) <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setSettleAmountInput(String(getExpensePaymentBreakdown(settleExpense).pending))}
+                    className="text-[11px] font-semibold text-[#653ef1] hover:underline cursor-pointer"
+                  >
+                    Full Pending ({formatINR(getExpensePaymentBreakdown(settleExpense).pending)})
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={getExpensePaymentBreakdown(settleExpense).pending}
+                  value={settleAmountInput}
+                  onChange={(e) => setSettleAmountInput(e.target.value)}
+                  required
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Payment Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={settleDate}
+                    onChange={(e) => setSettleDate(e.target.value)}
+                    required
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Payment Mode
+                  </label>
+                  <select
+                    value={settleMethod}
+                    onChange={(e) => setSettleMethod(e.target.value as ExpensePaymentMethod)}
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#653ef1]"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI / GPay</option>
+                    <option value="petty_cash">Petty Cash</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {settleMethod === 'upi'
+                    ? 'UPI Number / Transaction Ref'
+                    : settleMethod === 'cheque'
+                    ? 'Cheque Number & Bank Name'
+                    : settleMethod === 'bank_transfer'
+                    ? 'Bank Name & UTR / Reference No.'
+                    : 'Payment Note (Optional)'}
+                </label>
+                <input
+                  type="text"
+                  value={settleNote}
+                  onChange={(e) => setSettleNote(e.target.value)}
+                  placeholder={
+                    settleMethod === 'upi'
+                      ? 'e.g. UPI Ref 432819... or 98xxx@ybl'
+                      : settleMethod === 'cheque'
+                      ? 'e.g. Cheque #004512 - HDFC Bank'
+                      : settleMethod === 'bank_transfer'
+                      ? 'e.g. SBI NEFT - UTR 123456...'
+                      : 'e.g. Final balance cleared in cash'
+                  }
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSettleExpense(null)}
+                  className="h-9 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSettling}
+                  className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold cursor-pointer disabled:opacity-60"
+                >
+                  {isSettling ? 'Saving...' : 'Confirm Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Uploaded Bill / Document Viewer Modal (supports iOS HEIC, PDF, images) */}
       <ExpenseBillViewerModal

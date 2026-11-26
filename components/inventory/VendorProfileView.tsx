@@ -33,6 +33,7 @@ import {
   restoreProfileVendor,
   fetchDeletedProfileVendors
 } from '@/lib/supabase/profile-services';
+import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 
 interface VendorProfileViewProps {
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
@@ -363,10 +364,11 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
 
       {/* 2. Vendors Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        <ScrollableTableContainer>
           <table className="w-full text-left border-collapse text-xs">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-slate-50">
               <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                <th className="py-3 px-3 w-10 text-center">Sr.</th>
                 <th className="py-3 px-4">Vendor / Party Name</th>
                 <th className="py-3 px-4">Classification</th>
                 <th className="py-3 px-4">Contact Person</th>
@@ -380,14 +382,14 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600" />
                     <p className="font-semibold text-slate-600">Loading vendor profiles from Supabase...</p>
                   </td>
                 </tr>
               ) : filteredVendors.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="font-semibold text-slate-600">
                       {activeDirectoryTab === 'active'
@@ -407,8 +409,11 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredVendors.map((v) => (
+                filteredVendors.map((v, idx) => (
                   <tr key={v.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-3 text-center font-mono font-semibold text-slate-500">
+                      {idx + 1}
+                    </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-xs shrink-0 ${
@@ -537,7 +542,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
               )}
             </tbody>
           </table>
-        </div>
+        </ScrollableTableContainer>
       </div>
 
       {/* 3. Add / Edit Vendor Profile Modal */}

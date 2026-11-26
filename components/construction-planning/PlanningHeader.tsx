@@ -37,6 +37,7 @@ import { DbProject } from '@/lib/supabase/types';
 import { isViewAllowed, isModuleAllowed } from '@/lib/auth/role-access';
 
 const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementType }> = {
+  dashboard: { title: 'Director Dashboard', icon: Building2 },
   list: { title: 'Armee Enterprises', icon: Building2 },
   gantt: { title: 'Gantt Schedule Timeline', icon: Calendar },
   critical: { title: 'Critical Path (CPM)', icon: Route },
@@ -149,6 +150,19 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
     currentView === 'progress'
   );
 
+  // Hide top PlanningHeader completely on Store & Bills views (they have their own dedicated headers)
+  const isStoreOrBillsView =
+    currentView === 'materials' ||
+    currentView === 'expenses' ||
+    currentView === 'billing' ||
+    currentView === 'subcontractor-bills' ||
+    currentView === 'customer-purchases' ||
+    currentView === 'contractor-work-orders';
+
+  if (isStoreOrBillsView) {
+    return null;
+  }
+
   const headerMeta = currentView && VIEW_HEADER_CONFIG[currentView]
     ? VIEW_HEADER_CONFIG[currentView]
     : { title: 'Armee Enterprises', icon: Building2 };
@@ -179,7 +193,8 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                 <span>{headerMeta.title}</span>
               </h1>
 
-              {/* Interactive Site Switcher Dropdown */}
+              {/* Interactive Site Switcher Dropdown - ONLY shown on Timeline views */}
+              {isTimelineView && (
               <div className="relative shrink-0" ref={siteSwitcherRef}>
                 <button
                   type="button"
@@ -278,16 +293,12 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
 
-          {/* Right: Manual Search + Clean Unified Actions */}
+          {/* Right: Clean Unified Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap md:flex-nowrap justify-between md:justify-end">
-            
-            {/* Quick Search */}
-            <div className="w-full sm:w-60 md:w-64">
-              <SoftwareManualSearch />
-            </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               

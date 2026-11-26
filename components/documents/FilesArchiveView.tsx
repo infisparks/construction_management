@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   FolderKanban, 
   Folder,
@@ -99,8 +99,6 @@ const BASE_CATEGORIES: { label: string; value: FileCategory | 'all' }[] = [
   { label: 'Contracts & Agreements', value: 'Contracts and agreements' },
   { label: 'Legal & Statutory', value: 'Legal and statutory documents' },
   { label: 'BOQs & Estimates', value: 'BOQs and cost estimates' },
-  { label: 'Quotations & POs', value: 'Quotations and purchase orders' },
-  { label: 'Invoices & Bills', value: 'Bills, invoices and payment records' },
   { label: 'Site Photographs', value: 'Site photographs and reports' },
   { label: 'Meeting Minutes (MoM)', value: 'Meeting minutes and correspondence' },
   { label: 'Quality & Handover', value: 'Quality, safety and handover documents' },
@@ -151,15 +149,18 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
       }
     });
 
+    const isHiddenDocCategory = (cat: string) =>
+      /quotation|purchase order|invoice|bill/i.test(cat);
+
     dynamicCategories.forEach(cat => {
-      if (!seen.has(cat)) {
+      if (!seen.has(cat) && !isHiddenDocCategory(cat)) {
         list.push({ label: cat, value: cat as FileCategory });
         seen.add(cat);
       }
     });
 
     activeFiles.forEach(f => {
-      if (f.category && !seen.has(f.category)) {
+      if (f.category && !seen.has(f.category) && !isHiddenDocCategory(f.category)) {
         list.push({ label: f.category, value: f.category as FileCategory });
         seen.add(f.category);
       }
@@ -201,6 +202,12 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewInitialTab, setPreviewInitialTab] = useState<'viewer' | 'subdocs' | 'details'>('viewer');
   const [subDocsCounts, setSubDocsCounts] = useState<Record<string, number>>({});
+
+  // Synced top + table horizontal scrollbar refs
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [tableScrollWidth, setTableScrollWidth] = useState<number>(0);
+  const isSyncingScrollRef = useRef<boolean>(false);
 
   const loadSubDocsCounts = async () => {
     try {
@@ -961,10 +968,10 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         )}
 
         {/* Controls: Search, Project Foreign Key Filter, Category & View Toggle Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
           
           {/* 1. Search Input */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[180px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -1411,22 +1418,58 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         {/* 2. COMPACT TABLE VIEW */}
         {!isLoading && viewMode === 'table' && filteredFiles.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
+            {/* Top Horizontal Scrollbar (visible when columns overflow horizontally) */}
+            <div
+              ref={topScrollRef}
+              onScroll={() => {
+                if (isSyncingScrollRef.current) return;
+                if (tableScrollRef.current && topScrollRef.current) {
+                  isSyncingScrollRef.current = true;
+                  tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+                  requestAnimationFrame(() => {
+                    isSyncingScrollRef.current = false;
+                  });
+                }
+              }}
+              className="w-full overflow-x-auto overflow-y-hidden border-b border-slate-100 bg-slate-50/60"
+            >
+              <div style={{ width: tableScrollWidth || '100%', height: 1 }} />
+            </div>
+
+            <div
+              ref={(el) => {
+                tableScrollRef.current = el;
+                if (el && el.scrollWidth !== tableScrollWidth) {
+                  setTableScrollWidth(el.scrollWidth);
+                }
+              }}
+              onScroll={() => {
+                if (isSyncingScrollRef.current) return;
+                if (topScrollRef.current && tableScrollRef.current) {
+                  isSyncingScrollRef.current = true;
+                  topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+                  requestAnimationFrame(() => {
+                    isSyncingScrollRef.current = false;
+                  });
+                }
+              }}
+              className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]"
+            >
+              <table className="w-full min-w-[740px] text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
                   <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="py-2.5 px-3">Doc Code & Time</th>
-                    <th className="py-2.5 px-3">Project</th>
-                    <th className="py-2.5 px-3">Document Title & File</th>
-                    <th className="py-2.5 px-3">Category</th>
-                    <th className="py-2.5 px-3">Linked Entity</th>
-                    <th className="py-2.5 px-3">Size</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3 text-right">Actions</th>
+                    <th className="py-2.5 pl-3 pr-2 w-10 text-center">Sr.</th>
+                    <th className="py-2.5 px-2">Doc Code & Time</th>
+                    <th className="py-2.5 px-2">Project</th>
+                    <th className="py-2.5 px-2">Document Title & File</th>
+                    <th className="py-2.5 px-2">Category</th>
+                    <th className="py-2.5 px-2 hidden lg:table-cell">Size</th>
+                    <th className="py-2.5 px-2 hidden md:table-cell">Status</th>
+                    <th className="py-2.5 pl-2 pr-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredFiles.map((file) => (
+                  {filteredFiles.map((file, idx) => (
                     <tr 
                       key={file.id} 
                       className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
@@ -1435,8 +1478,13 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         setIsPreviewOpen(true);
                       }}
                     >
+                      {/* Serial Number */}
+                      <td className="py-2.5 px-2.5 text-center font-mono font-semibold text-slate-500">
+                        {idx + 1}
+                      </td>
+
                       {/* Doc No & Mumbai 12-hr Time */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 whitespace-nowrap">
                         <div className="font-mono font-bold text-xs text-[#653ef1]">
                           {file.document_no}
                         </div>
@@ -1447,9 +1495,9 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       </td>
 
                       {/* Project / Construction Site Tag */}
-                      <td className="py-2.5 px-3 font-semibold text-slate-700">
+                      <td className="py-2.5 px-2.5 font-semibold text-slate-700">
                         <span 
-                          className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200/80 max-w-[210px] truncate shadow-2xs"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200/80 max-w-[160px] truncate shadow-2xs"
                           title={file.project?.name || project.name || 'Site'}
                         >
                           <Building2 className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
@@ -1458,8 +1506,8 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       </td>
 
                       {/* Title & File Name */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2.5">
+                      <td className="py-2.5 px-2.5 max-w-[240px]">
+                        <div className="flex items-center gap-2">
                           {getFileBadge(file.file_type)}
                           <div className="min-w-0">
                             <span className="font-bold text-slate-900 block truncate group-hover:text-[#653ef1] transition-colors">
@@ -1489,25 +1537,20 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       </td>
 
                       {/* Category */}
-                      <td className="py-2.5 px-3 text-slate-600 font-medium">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-[11px] font-bold text-slate-700">
-                          <Layers className="w-3.5 h-3.5 text-[#653ef1]" />
-                          <span>{file.category}</span>
+                      <td className="py-2.5 px-2.5 text-slate-600 font-medium">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xl bg-purple-50/60 border border-purple-100 text-[11px] font-bold text-slate-700 max-w-[160px] truncate">
+                          <Layers className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
+                          <span className="truncate">{file.category}</span>
                         </span>
                       </td>
 
-                      {/* Linked Entity */}
-                      <td className="py-2.5 px-3 text-slate-500">
-                        {file.building_floor || file.contractor_name || file.task_code || '—'}
-                      </td>
-
                       {/* Size */}
-                      <td className="py-2.5 px-3 font-mono text-slate-500">
+                      <td className="py-2.5 px-2 font-mono text-slate-500 hidden lg:table-cell whitespace-nowrap">
                         {formatFileSize(file.file_size)}
                       </td>
 
                       {/* Status */}
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-2.5 hidden md:table-cell">
                         <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
                           file.status === 'approved' 
                             ? 'bg-[#e6f9ed] text-[#16a34a] border border-[#b8f0ca]' 
@@ -1519,7 +1562,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-2.5 pl-2 pr-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {activeTab === 'vault' ? (
                           <div className="flex items-center justify-end gap-1.5">
                             <button

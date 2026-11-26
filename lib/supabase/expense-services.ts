@@ -1,6 +1,7 @@
 import { supabase } from './client';
-import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from './types';
+import { SiteExpense, ExpenseAttachment, ExpensePaymentEntry, ExpensePaymentMethod, ExpensePaymentStatus } from './types';
 import { ProfileVendor, fetchProfileVendors } from './profile-services';
+import { compressFileBeforeUpload } from '../common/file-compression';
 
 export const EXPENSE_STORAGE_BUCKET = 'expense-documents';
 
@@ -67,12 +68,13 @@ export async function uploadExpenseBillToStorage(
   file: File,
   folder: string = 'receipts'
 ): Promise<{ publicUrl: string; filePath: string; fileName: string }> {
-  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const preparedFile = await compressFileBeforeUpload(file);
+  const cleanFileName = preparedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
   const filePath = `${folder}/${Date.now()}_${cleanFileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(EXPENSE_STORAGE_BUCKET)
-    .upload(filePath, file, {
+    .upload(filePath, preparedFile, {
       cacheControl: '3600',
       upsert: false,
     });
@@ -86,7 +88,7 @@ export async function uploadExpenseBillToStorage(
   return {
     publicUrl,
     filePath,
-    fileName: file.name,
+    fileName: preparedFile.name,
   };
 }
 
@@ -94,6 +96,10 @@ export interface CreateExpensePayload {
   title: string;
   category: string;
   amount: number;
+  paid_amount?: number | null;
+  first_payment_date?: string | null;
+  settlement_date?: string | null;
+  payment_history?: ExpensePaymentEntry[] | null;
   expense_date?: string;
   payment_method?: ExpensePaymentMethod;
   payment_status?: ExpensePaymentStatus;
@@ -103,6 +109,7 @@ export interface CreateExpensePayload {
   bill_number?: string | null;
   receipt_url?: string | null;
   receipt_file_name?: string | null;
+  attachments?: ExpenseAttachment[] | null;
   notes?: string | null;
   project_id?: string | null;
   enterdby?: string | null;
@@ -187,6 +194,74 @@ const isValidUUID = (id?: string | null): boolean => {
 };
 
 /**
+ * Safely resolves all attachments for an expense (merging JSONB `attachments` and legacy `receipt_url`).
+ */
+export function getExpenseAttachments(
+  exp?: Pick<SiteExpense, 'attachments' | 'receipt_url' | 'receipt_file_name'> | null
+): ExpenseAttachment[] {
+  if (!exp) return [];
+  const list: ExpenseAttachment[] = [];
+  const seen = new Set<string>();
+
+  if (Array.isArray(exp.attachments)) {
+    for (const att of exp.attachments) {
+      if (att && att.url) {
+        const resolved = resolveExpenseFileUrl(att.url);
+        if (resolved && !seen.has(resolved)) {
+          seen.add(resolved);
+          list.push({
+            url: resolved,
+            name: att.name || 'Bill Attachment',
+            type: att.type,
+          });
+        }
+      }
+    }
+  }
+
+  if (exp.receipt_url) {
+    const resolved = resolveExpenseFileUrl(exp.receipt_url);
+    if (resolved && !seen.has(resolved)) {
+      seen.add(resolved);
+      list.push({
+        url: resolved,
+        name: exp.receipt_file_name || 'Bill Attachment',
+      });
+    }
+  }
+
+  return list;
+}
+
+/**
+ * Computes exact paid & pending amounts for any expense, safely handling legacy rows
+ * where paid_amount is NULL without disturbing existing data.
+ */
+export function getExpensePaymentBreakdown(
+  exp: Pick<SiteExpense, 'amount' | 'paid_amount' | 'payment_status'>
+): {
+  total: number;
+  paid: number;
+  pending: number;
+  isPartial: boolean;
+  isFullyPaid: boolean;
+} {
+  const total = Number(exp.amount) || 0;
+  let paid: number;
+  if (exp.paid_amount != null && !Number.isNaN(Number(exp.paid_amount))) {
+    paid = Math.min(Math.max(Number(exp.paid_amount), 0), total);
+  } else if (exp.payment_status === 'paid') {
+    paid = total;
+  } else {
+    paid = 0;
+  }
+  const pending = Math.max(total - paid, 0);
+  const isPartial = paid > 0 && pending > 0;
+  const isFullyPaid = pending <= 0 && total > 0;
+  return { total, paid, pending, isPartial, isFullyPaid };
+}
+
+/**
  * Create a new expense record in Supabase site_expenses table.
  */
 export async function createSiteExpense(
@@ -201,7 +276,7 @@ export async function createSiteExpense(
       ? candidateUid!
       : 'a72d7229-1476-4f82-b105-7d38de4e2af3';
 
-    const recordToInsert = {
+    const recordToInsert: any = {
       expense_code: expenseCode,
       project_id: payload.project_id || null,
       title: payload.title.trim(),
@@ -210,22 +285,53 @@ export async function createSiteExpense(
       expense_date: payload.expense_date || todayStr,
       payment_method: payload.payment_method || 'cash',
       payment_status: payload.payment_status || 'paid',
+      paid_amount:
+        payload.paid_amount !== undefined
+          ? payload.paid_amount
+          : payload.payment_status === 'paid'
+          ? Number(payload.amount) || 0
+          : 0,
+      first_payment_date:
+        payload.first_payment_date !== undefined
+          ? payload.first_payment_date
+          : payload.payment_status === 'paid' || payload.payment_status === 'partial'
+          ? payload.expense_date || todayStr
+          : null,
+      settlement_date:
+        payload.settlement_date !== undefined
+          ? payload.settlement_date
+          : payload.payment_status === 'paid'
+          ? payload.expense_date || todayStr
+          : null,
+      payment_history: Array.isArray(payload.payment_history) ? payload.payment_history : [],
       vendor_id: payload.vendor_id || null,
       vendor_name: payload.vendor_name ? payload.vendor_name.trim() : null,
       paid_by: payload.paid_by ? payload.paid_by.trim() : null,
       bill_number: payload.bill_number ? payload.bill_number.trim() : null,
       receipt_url: payload.receipt_url || null,
       receipt_file_name: payload.receipt_file_name || null,
+      attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       notes: payload.notes ? payload.notes.trim() : null,
       enterdby: finalEnterdby,
       is_deleted: false,
     };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('site_expenses')
       .insert(recordToInsert)
       .select()
       .single();
+
+    if (error && error.message && error.message.includes('attachments')) {
+      delete recordToInsert.attachments;
+      const retry = await supabase
+        .from('site_expenses')
+        .insert(recordToInsert)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('[expense-services] Error creating site expense:', error.message);
@@ -286,21 +392,38 @@ export async function updateSiteExpense(
     if (payload.expense_date !== undefined) updateRecord.expense_date = payload.expense_date;
     if (payload.payment_method !== undefined) updateRecord.payment_method = payload.payment_method;
     if (payload.payment_status !== undefined) updateRecord.payment_status = payload.payment_status;
+    if (payload.paid_amount !== undefined) updateRecord.paid_amount = payload.paid_amount;
+    if (payload.first_payment_date !== undefined) updateRecord.first_payment_date = payload.first_payment_date;
+    if (payload.settlement_date !== undefined) updateRecord.settlement_date = payload.settlement_date;
+    if (payload.payment_history !== undefined) updateRecord.payment_history = payload.payment_history;
     if (payload.vendor_id !== undefined) updateRecord.vendor_id = payload.vendor_id || null;
     if (payload.vendor_name !== undefined) updateRecord.vendor_name = payload.vendor_name ? payload.vendor_name.trim() : null;
     if (payload.paid_by !== undefined) updateRecord.paid_by = payload.paid_by ? payload.paid_by.trim() : null;
     if (payload.bill_number !== undefined) updateRecord.bill_number = payload.bill_number ? payload.bill_number.trim() : null;
     if (payload.receipt_url !== undefined) updateRecord.receipt_url = payload.receipt_url || null;
     if (payload.receipt_file_name !== undefined) updateRecord.receipt_file_name = payload.receipt_file_name || null;
+    if (payload.attachments !== undefined) updateRecord.attachments = payload.attachments || [];
     if (payload.notes !== undefined) updateRecord.notes = payload.notes ? payload.notes.trim() : null;
     if (payload.project_id !== undefined) updateRecord.project_id = payload.project_id || null;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('site_expenses')
       .update(updateRecord)
       .eq('id', id)
       .select()
       .single();
+
+    if (error && error.message && error.message.includes('attachments')) {
+      delete updateRecord.attachments;
+      const retry = await supabase
+        .from('site_expenses')
+        .update(updateRecord)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('[expense-services] Error updating site expense:', error.message);
@@ -405,11 +528,9 @@ export function calculateExpenseSummary(expenses: SiteExpense[]): ExpenseSummary
       monthCount += 1;
     }
 
-    if (exp.payment_status === 'paid') {
-      paidTotal += amt;
-    } else {
-      pendingTotal += amt;
-    }
+    const { paid, pending } = getExpensePaymentBreakdown(exp);
+    paidTotal += paid;
+    pendingTotal += pending;
   }
 
   return {
@@ -422,4 +543,58 @@ export function calculateExpenseSummary(expenses: SiteExpense[]): ExpenseSummary
     paidTotal,
     pendingTotal,
   };
+}
+
+/**
+ * Records a partial or final balance payment on an existing expense
+ * while preserving the original expense_date and first_payment_date.
+ */
+export async function recordExpensePayment(
+  expense: SiteExpense,
+  payAmount: number,
+  paymentDate: string,
+  paymentMethod: ExpensePaymentMethod,
+  note?: string
+): Promise<{ data: SiteExpense | null; error: string | null }> {
+  const { total, paid: currentPaid } = getExpensePaymentBreakdown(expense);
+  const safePay = Math.max(0, Number(payAmount) || 0);
+  if (safePay <= 0) {
+    return { data: null, error: 'Payment amount must be greater than 0.' };
+  }
+
+  const newPaid = Math.min(currentPaid + safePay, total);
+  const newPending = Math.max(total - newPaid, 0);
+  const nextStatus: ExpensePaymentStatus = newPending <= 0 ? 'paid' : 'partial';
+
+  const existingHistory: ExpensePaymentEntry[] = Array.isArray(expense.payment_history)
+    ? [...expense.payment_history]
+    : currentPaid > 0
+    ? [
+        {
+          amount: currentPaid,
+          date: expense.first_payment_date || expense.expense_date,
+          method: expense.payment_method,
+          note: 'Initial payment',
+        },
+      ]
+    : [];
+
+  existingHistory.push({
+    amount: Math.min(safePay, total - currentPaid),
+    date: paymentDate,
+    method: paymentMethod,
+    note: note?.trim() || (newPending <= 0 ? 'Final settlement' : 'Installment payment'),
+  });
+
+  const preservedFirstDate =
+    expense.first_payment_date || (currentPaid > 0 ? expense.expense_date : paymentDate);
+
+  return updateSiteExpense(expense.id, {
+    payment_status: nextStatus,
+    paid_amount: newPaid,
+    first_payment_date: preservedFirstDate,
+    settlement_date: newPending <= 0 ? paymentDate : null,
+    payment_history: existingHistory,
+    payment_method: paymentMethod,
+  });
 }

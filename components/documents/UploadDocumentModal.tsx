@@ -56,8 +56,6 @@ const CATEGORIES: FileCategory[] = [
   'MEP drawings',
   'BOQs and cost estimates',
   'Contracts and agreements',
-  'Bills, invoices and payment records',
-  'Quotations and purchase orders',
   'Legal and statutory documents',
   'Meeting minutes and correspondence',
   'Quality, safety and handover documents',
@@ -162,7 +160,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       ]);
       setAvailableProjects(projs);
       if (cats && cats.length > 0) {
-        setCategoriesList(cats);
+        const filtered = cats.filter(
+          (c) => !/quotation|purchase order|invoice|bill/i.test(c)
+        );
+        setCategoriesList(filtered.length > 0 ? filtered : DEFAULT_DOCUMENT_CATEGORIES);
       }
       if (projectId) {
         setSelectedProjectId(projectId);

@@ -130,6 +130,7 @@ export interface RecoveryScenario {
 }
 
 export type ViewMode = 
+  | 'dashboard'
   | 'list' 
   | 'gantt' 
   | 'critical' 

@@ -42,6 +42,7 @@ import { formatMumbaiDateTime } from '@/lib/common/date-format';
 import { CreatePurchaseModal } from './CreatePurchaseModal';
 import { RecordCustomerPaymentModal } from './RecordCustomerPaymentModal';
 import { PurchaseDetailDrawer } from './PurchaseDetailDrawer';
+import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 
 interface CustomerPurchasesViewProps {
   project?: ProjectInfo;
@@ -464,10 +465,11 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-left border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-10 text-center">Sr.</th>
                   <th className="py-3 px-4">Deal # & Date</th>
                   <th className="py-3 px-4">Site / Building</th>
                   <th className="py-3 px-4">Customer Details</th>
@@ -480,7 +482,7 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredPurchases.map((item) => {
+                {filteredPurchases.map((item, idx) => {
                   const deal = item.total_amount || 0;
                   const coll = item.totalCollected || 0;
                   const bal = Math.max(0, deal - coll);
@@ -493,6 +495,9 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
                       className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                       onClick={() => setActivePurchaseForDrawer(item)}
                     >
+                      <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-500">
+                        {idx + 1}
+                      </td>
                       {/* Deal # & Date */}
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         <div className="space-y-0.5">
@@ -627,7 +632,7 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         )}
       </div>
 

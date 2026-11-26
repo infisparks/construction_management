@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { ProfileProduct } from './profile-services';
+import { compressFileBeforeUpload } from '../common/file-compression';
 
 export const INVENTORY_STORAGE_BUCKET = 'inventory-documents';
 
@@ -66,12 +67,13 @@ export async function uploadInventoryBillToStorage(
   file: File,
   folder: string = 'bills'
 ): Promise<{ publicUrl: string; filePath: string; fileName: string }> {
-  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const preparedFile = await compressFileBeforeUpload(file);
+  const cleanFileName = preparedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
   const filePath = `${folder}/${Date.now()}_${cleanFileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(INVENTORY_STORAGE_BUCKET)
-    .upload(filePath, file, {
+    .upload(filePath, preparedFile, {
       cacheControl: '3600',
       upsert: false,
     });
@@ -85,7 +87,7 @@ export async function uploadInventoryBillToStorage(
   return {
     publicUrl,
     filePath,
-    fileName: file.name,
+    fileName: preparedFile.name,
   };
 }
 

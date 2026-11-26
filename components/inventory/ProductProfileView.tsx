@@ -31,6 +31,7 @@ import {
   deleteProfileProduct,
   restoreProfileProduct,
 } from '@/lib/supabase/profile-services';
+import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 
 const DEFAULT_CATEGORIES = [
   'Cement & Binders',
@@ -414,10 +415,11 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
       {/* 2. Main Content: Active Catalog OR Recycle Bin */}
       {viewMode === 'active' ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-left border-collapse text-xs">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-10 text-center">Sr.</th>
                   <th className="py-3 px-4">Code & Material Profile</th>
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Unit</th>
@@ -432,14 +434,14 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <td colSpan={10} className="py-12 text-center text-slate-400">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600" />
                       <p className="font-semibold text-slate-600">Loading product profiles from Supabase...</p>
                     </td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <td colSpan={10} className="py-12 text-center text-slate-400">
                       <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                       <p className="font-semibold text-slate-600">No product profiles found</p>
                       <button
@@ -453,8 +455,11 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p) => (
+                  filteredProducts.map((p, idx) => (
                     <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3 px-3 text-center font-mono font-semibold text-slate-500">
+                        {idx + 1}
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 font-mono font-bold text-xs shrink-0">
@@ -552,7 +557,7 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
                 )}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         </div>
       ) : (
         /* Recycle Bin View */

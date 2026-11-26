@@ -43,6 +43,7 @@ import {
   deleteWorkOrderRevision,
   deleteWorkOrderPayment,
 } from '@/lib/contractor-work-orders/work-order-services';
+import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 import { formatINR, downloadWorkOrderPdf, viewWorkOrderPdfInNewTab } from '@/lib/contractor-work-orders/work-order-invoice-pdf';
 import { formatMumbaiDateTime } from '@/lib/common/date-format';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
@@ -684,10 +685,11 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <ScrollableTableContainer>
             <table className="w-full text-left border-collapse text-xs">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr className="border-b border-slate-200 bg-slate-50/60 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3 px-3 w-10 text-center">Sr.</th>
                   <th className="py-3 px-4">WO # & Barcode</th>
                   <th className="py-3 px-4">Site / Building</th>
                   <th className="py-3 px-4">Work Title & Trade</th>
@@ -702,7 +704,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredOrders.map((order) => {
+                {filteredOrders.map((order, idx) => {
                   const hasExtra = order.extraAmount > 0;
                   const isSettled = order.balanceRemaining <= 0;
                   return (
@@ -711,6 +713,9 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                       onClick={() => setDrawerOrder(order)}
                       className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                     >
+                      <td className="py-3 px-3 text-center font-mono font-semibold text-slate-500">
+                        {idx + 1}
+                      </td>
                       {/* Work Order Number & Barcode */}
                       <td className="py-3 px-4 font-mono font-bold text-purple-700 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
@@ -887,7 +892,7 @@ export const ContractorWorkOrdersView: React.FC<ContractorWorkOrdersViewProps> =
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollableTableContainer>
         )}
       </div>
 

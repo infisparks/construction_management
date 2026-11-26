@@ -9,6 +9,7 @@ import {
   Package, 
   FolderKanban, 
   FileText,
+  LayoutDashboard,
   LogOut, 
   X,
   Sparkles
@@ -16,7 +17,7 @@ import {
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
 import { isModuleAllowed, isAccountRole } from '@/lib/auth/role-access';
 
-export type NavModuleId = 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'sites' | 'quotations';
+export type NavModuleId = 'dashboard' | 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'sites' | 'quotations';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -57,6 +58,15 @@ interface NavModuleDef {
 
 // Clean core modules (Controls module hidden as requested)
 const MODULES: NavModuleDef[] = [
+  {
+    id: 'dashboard',
+    label: 'Director Dashboard',
+    shortLabel: 'Home',
+    icon: LayoutDashboard,
+    badge: 'Live',
+    badgeColor: 'bg-purple-100 text-[#653ef1]',
+    description: 'Executive KPIs, bills, store, docs & graphs',
+  },
   {
     id: 'planning',
     label: 'Timeline & Schedule',
@@ -126,17 +136,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Determine active module based on currentView
   const [activeModule, setActiveModule] = useState<NavModuleId>(() => {
+    if (currentView === 'dashboard') return 'dashboard';
     if (currentView === 'quotations') return 'quotations';
     if (currentView === 'files-archive') return 'archive';
     if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
     if (currentView === 'materials') return 'materials';
     if (isAccountRole(userRole)) return 'commercial';
-    return 'planning';
+    return 'dashboard';
   });
 
   // Sync active module if currentView changes externally
   useEffect(() => {
-    if (currentView === 'quotations') {
+    if (currentView === 'dashboard') {
+      setActiveModule('dashboard');
+    } else if (currentView === 'quotations') {
       setActiveModule('quotations');
     } else if (currentView === 'files-archive') {
       setActiveModule('archive');
@@ -163,7 +176,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setActiveModule(modId);
     onCloseMobile();
 
-    if (modId === 'planning') {
+    if (modId === 'dashboard') {
+      onViewChange('dashboard');
+    } else if (modId === 'planning') {
       onViewChange('list');
     } else if (modId === 'commercial') {
       onViewChange('expenses');

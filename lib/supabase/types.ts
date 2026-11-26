@@ -33,7 +33,20 @@ export interface DbCategory {
 }
 
 export type ExpensePaymentMethod = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'petty_cash';
-export type ExpensePaymentStatus = 'paid' | 'pending' | 'reimbursable';
+export type ExpensePaymentStatus = 'paid' | 'pending' | 'partial' | 'reimbursable';
+
+export interface ExpensePaymentEntry {
+  amount: number;
+  date: string;
+  method: ExpensePaymentMethod;
+  note?: string;
+}
+
+export interface ExpenseAttachment {
+  url: string;
+  name: string;
+  type?: string;
+}
 
 export interface SiteExpense {
   id: string;
@@ -43,6 +56,10 @@ export interface SiteExpense {
   title: string;
   category: string;
   amount: number;
+  paid_amount?: number | null;
+  first_payment_date?: string | null;
+  settlement_date?: string | null;
+  payment_history?: ExpensePaymentEntry[] | null;
   expense_date: string;
   payment_method: ExpensePaymentMethod;
   payment_status: ExpensePaymentStatus;
@@ -51,6 +68,7 @@ export interface SiteExpense {
   paid_by?: string | null;
   receipt_url?: string | null;
   receipt_file_name?: string | null;
+  attachments?: ExpenseAttachment[] | null;
   bill_number?: string | null;
   notes?: string | null;
   enterdby?: string | null;

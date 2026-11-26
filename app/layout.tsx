@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Noori Crest | Construction Planning & Site Execution",
+  title: "Noori Horizon | Construction Planning & Site Execution",
   description: "Enterprise multi-storey building construction schedule, critical path management, and daily progress reporting system.",
 };
 

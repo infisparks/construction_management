@@ -19,7 +19,7 @@ import {
   Trash2,
   Wrench
 } from 'lucide-react';
-import { SiteExpense, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
+import { SiteExpense, ExpenseAttachment, ExpensePaymentMethod, ExpensePaymentStatus } from '@/lib/supabase/types';
 import { ProfileVendor, fetchProfileVendors, createProfileVendor } from '@/lib/supabase/profile-services';
 import {
   fetchDropdownCategory,
@@ -31,6 +31,7 @@ import {
   updateSiteExpense,
   CreateExpensePayload,
   uploadExpenseBillToStorage,
+  getExpenseAttachments,
 } from '@/lib/supabase/expense-services';
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillUploader } from './ExpenseBillUploader';
@@ -110,15 +111,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [expenseDate, setExpenseDate] = useState<string>(todayStr);
   const [paymentMethod, setPaymentMethod] = useState<ExpensePaymentMethod>('cash');
   const [paymentStatus, setPaymentStatus] = useState<ExpensePaymentStatus>('paid');
+  const [paidAmountInput, setPaidAmountInput] = useState<string>('');
+  const [pendingAmountInput, setPendingAmountInput] = useState<string>('');
+  const [firstPaymentDate, setFirstPaymentDate] = useState<string>(todayStr);
+  const [paymentRefNote, setPaymentRefNote] = useState<string>('');
   const [paidBy, setPaidBy] = useState('Site Supervisor');
   const [billNumber, setBillNumber] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Bill / Receipt Attachment (all images including iOS HEIC/HEIF and PDF)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
-  const [existingReceiptFileName, setExistingReceiptFileName] = useState<string | null>(null);
-  const [isRemovingReceipt, setIsRemovingReceipt] = useState<boolean>(false);
+  // Multiple Bill / Receipt Attachments (all images including iOS HEIC/HEIF and PDFs)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<ExpenseAttachment[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -155,12 +158,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setSelectedCategory(expenseToEdit.category || DEFAULT_EXPENSE_CATEGORIES[0]);
       setPaymentMethod(expenseToEdit.payment_method || 'cash');
       setPaymentStatus(expenseToEdit.payment_status || 'paid');
+      const existingPaid =
+        expenseToEdit.paid_amount != null
+          ? Number(expenseToEdit.paid_amount)
+          : expenseToEdit.payment_status === 'paid'
+          ? Number(expenseToEdit.amount || 0)
+          : 0;
+      setPaidAmountInput(String(existingPaid));
+      setPendingAmountInput(String(Math.max((Number(expenseToEdit.amount) || 0) - existingPaid, 0)));
+      setFirstPaymentDate(expenseToEdit.first_payment_date || expenseToEdit.expense_date || new Date().toISOString().split('T')[0]);
+      const firstNote = Array.isArray(expenseToEdit.payment_history) ? expenseToEdit.payment_history[0]?.note : '';
+      setPaymentRefNote(firstNote && firstNote !== 'Full payment' && firstNote !== 'First partial payment' ? firstNote : '');
       setPaidBy(expenseToEdit.paid_by || 'Site Supervisor');
       setBillNumber(expenseToEdit.bill_number || '');
       setNotes(expenseToEdit.notes || '');
-      setExistingReceiptUrl(expenseToEdit.receipt_url || null);
-      setExistingReceiptFileName(expenseToEdit.receipt_file_name || null);
-      setIsRemovingReceipt(false);
+      setExistingAttachments(getExpenseAttachments(expenseToEdit));
       if (expenseToEdit.vendor_id) {
         setSelectedVendorId(expenseToEdit.vendor_id);
         setIsCustomPayee(false);
@@ -179,17 +191,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setSelectedCategory(DEFAULT_EXPENSE_CATEGORIES[0]);
       setPaymentMethod('cash');
       setPaymentStatus('paid');
+      setPaidAmountInput('');
+      setPendingAmountInput('');
+      setFirstPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentRefNote('');
       setPaidBy('Site Supervisor');
       setSelectedVendorId('');
       setCustomPayeeName('');
       setIsCustomPayee(false);
       setBillNumber('');
       setNotes('');
-      setExistingReceiptUrl(null);
-      setExistingReceiptFileName(null);
-      setIsRemovingReceipt(false);
+      setExistingAttachments([]);
     }
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setIsUploading(false);
     setErrorMessage(null);
   }, [isOpen, expenseToEdit?.id]);
@@ -402,17 +416,21 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     }
 
-    let uploadedReceiptUrl: string | null = null;
-    let uploadedReceiptFileName: string | null = null;
+    let newlyUploadedAttachments: ExpenseAttachment[] = [];
 
-    if (selectedFile) {
+    if (selectedFiles.length > 0) {
       try {
         setIsUploading(true);
-        const uploadRes = await uploadExpenseBillToStorage(selectedFile, 'expense_bills');
-        uploadedReceiptUrl = uploadRes.publicUrl;
-        uploadedReceiptFileName = uploadRes.fileName;
+        const uploadResults = await Promise.all(
+          selectedFiles.map((file) => uploadExpenseBillToStorage(file, 'expense_bills'))
+        );
+        newlyUploadedAttachments = uploadResults.map((res, idx) => ({
+          url: res.publicUrl,
+          name: res.fileName,
+          type: selectedFiles[idx]?.type || undefined,
+        }));
       } catch (uploadErr: any) {
-        console.error('Failed to upload expense bill:', uploadErr);
+        console.error('Failed to upload expense bills:', uploadErr);
         setErrorMessage(`Failed to upload attached bill: ${uploadErr?.message || 'Storage error'}`);
         setIsSubmitting(false);
         setIsUploading(false);
@@ -422,9 +440,50 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
     }
 
+    const finalAttachments: ExpenseAttachment[] = [
+      ...existingAttachments,
+      ...newlyUploadedAttachments,
+    ];
+    const primaryAttachment = finalAttachments[0] || null;
+
     const finalProjectId = (selectedProjectId && selectedProjectId !== 'all')
       ? selectedProjectId
       : ((projectId && projectId !== 'all') ? projectId : (availableProjects[0]?.id || null));
+
+    let resolvedStatus: ExpensePaymentStatus = paymentStatus;
+    let resolvedPaidAmount = 0;
+    let resolvedFirstDate: string | null = null;
+    let resolvedSettlementDate: string | null = null;
+
+    if (paymentStatus === 'paid') {
+      resolvedPaidAmount = numAmount;
+      resolvedFirstDate = expenseToEdit?.first_payment_date || expenseDate;
+      resolvedSettlementDate = expenseToEdit?.settlement_date || expenseDate;
+    } else if (paymentStatus === 'partial') {
+      const parsedPaid = Math.min(Math.max(parseFloat(paidAmountInput) || 0, 0), numAmount);
+      if (parsedPaid >= numAmount) {
+        resolvedStatus = 'paid';
+        resolvedPaidAmount = numAmount;
+        resolvedFirstDate = expenseToEdit?.first_payment_date || firstPaymentDate || expenseDate;
+        resolvedSettlementDate = expenseDate;
+      } else if (parsedPaid <= 0) {
+        resolvedStatus = 'pending';
+        resolvedPaidAmount = 0;
+      } else {
+        resolvedStatus = 'partial';
+        resolvedPaidAmount = parsedPaid;
+        resolvedFirstDate = expenseToEdit?.first_payment_date || firstPaymentDate || expenseDate;
+      }
+    }
+
+    const trimmedRef = paymentStatus !== 'pending' ? paymentRefNote.trim() : '';
+    const baseNotes = notes.trim();
+    const combinedNotes =
+      trimmedRef && !baseNotes.includes(trimmedRef)
+        ? baseNotes
+          ? `${baseNotes} | Ref: ${trimmedRef}`
+          : `Ref: ${trimmedRef}`
+        : baseNotes || null;
 
     if (expenseToEdit) {
       const payload: Partial<CreateExpensePayload> = {
@@ -434,21 +493,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         amount: numAmount,
         expense_date: expenseDate,
         payment_method: paymentMethod,
-        payment_status: paymentStatus,
+        payment_status: resolvedStatus,
+        paid_amount: resolvedPaidAmount,
+        first_payment_date: resolvedFirstDate,
+        settlement_date: resolvedSettlementDate,
         vendor_id: finalVendorId,
         vendor_name: finalVendorName,
         paid_by: paidBy.trim() || null,
         bill_number: billNumber.trim() || null,
-        notes: notes.trim() || null,
+        receipt_url: primaryAttachment ? primaryAttachment.url : null,
+        receipt_file_name: primaryAttachment ? primaryAttachment.name : null,
+        attachments: finalAttachments,
+        notes: combinedNotes,
       };
-
-      if (uploadedReceiptUrl) {
-        payload.receipt_url = uploadedReceiptUrl;
-        payload.receipt_file_name = uploadedReceiptFileName;
-      } else if (isRemovingReceipt) {
-        payload.receipt_url = null;
-        payload.receipt_file_name = null;
-      }
 
       const res = await updateSiteExpense(expenseToEdit.id, payload);
       setIsSubmitting(false);
@@ -460,6 +517,18 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         onClose();
       }
     } else {
+      const initialHistory =
+        resolvedPaidAmount > 0
+          ? [
+              {
+                amount: resolvedPaidAmount,
+                date: resolvedFirstDate || expenseDate,
+                method: paymentMethod,
+                note: trimmedRef || (resolvedStatus === 'partial' ? 'First partial payment' : 'Full payment'),
+              },
+            ]
+          : [];
+
       const payload: CreateExpensePayload = {
         project_id: finalProjectId,
         title: title.trim(),
@@ -467,14 +536,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         amount: numAmount,
         expense_date: expenseDate,
         payment_method: paymentMethod,
-        payment_status: paymentStatus,
+        payment_status: resolvedStatus,
+        paid_amount: resolvedPaidAmount,
+        first_payment_date: resolvedFirstDate,
+        settlement_date: resolvedSettlementDate,
+        payment_history: initialHistory,
         vendor_id: finalVendorId,
         vendor_name: finalVendorName,
         paid_by: paidBy.trim() || null,
         bill_number: billNumber.trim() || null,
-        receipt_url: uploadedReceiptUrl,
-        receipt_file_name: uploadedReceiptFileName,
-        notes: notes.trim() || null,
+        receipt_url: primaryAttachment ? primaryAttachment.url : null,
+        receipt_file_name: primaryAttachment ? primaryAttachment.name : null,
+        attachments: finalAttachments,
+        notes: combinedNotes,
         ...(auth.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auth.user.id)
           ? { enterdby: auth.user.id }
           : { enterdby: 'a72d7229-1476-4f82-b105-7d38de4e2af3' }),
@@ -608,7 +682,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Amount (Rs.) <span className="text-rose-500">*</span>
+                  Total Bill Amount (Rs.) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400 select-none">Rs.</span>
@@ -618,7 +692,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     required
                     value={amount}
                     onChange={(e) => {
-                      setAmount(e.target.value);
+                      const val = e.target.value;
+                      setAmount(val);
+                      if (paymentStatus === 'partial') {
+                        const tot = parseFloat(val) || 0;
+                        const pd = parseFloat(paidAmountInput) || 0;
+                        setPendingAmountInput(String(Math.max(tot - pd, 0)));
+                      }
                       if (fieldErrors.amount) setFieldErrors((prev) => ({ ...prev, amount: false }));
                     }}
                     placeholder="0.00"
@@ -893,36 +973,151 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Payment Method
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as ExpensePaymentMethod)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium cursor-pointer"
-                >
-                  <option value="cash">Cash Payment</option>
-                  <option value="upi">UPI / GPay / PhonePe</option>
-                  <option value="petty_cash">Petty Cash Box</option>
-                  <option value="bank_transfer">Bank Transfer (NEFT/RTGS)</option>
-                  <option value="cheque">Cheque</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                   Payment Status
                 </label>
                 <select
                   value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value as ExpensePaymentStatus)}
+                  onChange={(e) => {
+                    const next = e.target.value as ExpensePaymentStatus;
+                    setPaymentStatus(next);
+                    if (next === 'partial' && !paidAmountInput) {
+                      setPaidAmountInput('');
+      setPendingAmountInput('');
+                      setFirstPaymentDate(expenseDate);
+                    }
+                  }}
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium cursor-pointer"
                 >
                   <option value="paid">Paid (Fully Cleared)</option>
+                  <option value="partial">Partial Paid (Paid + Pending Split)</option>
                   <option value="pending">Pending Payment</option>
-                  <option value="reimbursable">Reimbursement Needed</option>
                 </select>
               </div>
+
+              {paymentStatus !== 'pending' ? (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as ExpensePaymentMethod)}
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium cursor-pointer"
+                  >
+                    <option value="cash">Cash Payment</option>
+                    <option value="upi">UPI / GPay / PhonePe</option>
+                    <option value="petty_cash">Petty Cash Box</option>
+                    <option value="bank_transfer">Bank Transfer (NEFT/RTGS)</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="flex items-center px-3 py-2 rounded-lg bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-800">
+                  Payment method &amp; reference will be recorded when payment is made.
+                </div>
+              )}
             </div>
+
+            {paymentStatus !== 'pending' && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  {paymentMethod === 'upi'
+                    ? 'UPI Number / Transaction Ref'
+                    : paymentMethod === 'cheque'
+                    ? 'Cheque Number & Bank Name'
+                    : paymentMethod === 'bank_transfer'
+                    ? 'Bank Name & UTR / Reference No.'
+                    : 'Payment Note / Receipt Ref (Optional)'}
+                </label>
+                <input
+                  type="text"
+                  value={paymentRefNote}
+                  onChange={(e) => setPaymentRefNote(e.target.value)}
+                  placeholder={
+                    paymentMethod === 'upi'
+                      ? 'e.g. UPI Ref 432819... or 98xxx@ybl'
+                      : paymentMethod === 'cheque'
+                      ? 'e.g. Cheque #004512 - HDFC Bank'
+                      : paymentMethod === 'bank_transfer'
+                      ? 'e.g. SBI NEFT - UTR 123456...'
+                      : 'e.g. Cash voucher #12 / paid by supervisor'
+                  }
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                />
+              </div>
+            )}
+
+            {paymentStatus === 'partial' && (
+              <div className="p-3 rounded-xl bg-purple-50/50 border border-purple-200/80 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Paid Now (Rs.) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={paidAmountInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPaidAmountInput(val);
+                        const pd = parseFloat(val) || 0;
+                        const tot = parseFloat(amount) || 0;
+                        if (tot > 0 && tot >= pd) {
+                          setPendingAmountInput(String(Math.max(tot - pd, 0)));
+                        } else {
+                          const pend = parseFloat(pendingAmountInput) || 0;
+                          setAmount(String(pd + pend));
+                        }
+                      }}
+                      placeholder="e.g. 5000"
+                      className="w-full h-9 px-3 rounded-lg border border-purple-300 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600 font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Pending Balance (Rs.)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pendingAmountInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPendingAmountInput(val);
+                        const pend = parseFloat(val) || 0;
+                        const pd = parseFloat(paidAmountInput) || 0;
+                        setAmount(String(pd + pend));
+                      }}
+                      placeholder="e.g. 1000"
+                      className="w-full h-9 px-3 rounded-lg border border-amber-300 bg-amber-50/70 text-xs text-amber-900 font-bold focus:outline-hidden focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      First Payment Date
+                    </label>
+                    <input
+                      type="date"
+                      value={firstPaymentDate}
+                      onChange={(e) => setFirstPaymentDate(e.target.value)}
+                      className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-600 flex items-center justify-between pt-1 border-t border-purple-200/60">
+                  <span>
+                    Total Bill: <strong className="text-slate-900">Rs. {(parseFloat(amount) || 0).toLocaleString('en-IN')}</strong>
+                  </span>
+                  <span>
+                    Paid: <strong className="text-emerald-700">Rs. {(parseFloat(paidAmountInput) || 0).toLocaleString('en-IN')}</strong> + Pending:{' '}
+                    <strong className="text-amber-700">Rs. {(parseFloat(pendingAmountInput) || 0).toLocaleString('en-IN')}</strong>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 4: Audit Trail & Invoicing Reference */}
@@ -963,83 +1158,108 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
           {/* Section 5: Attached Physical Bill / Invoice Copy */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3 shadow-2xs">
-            {/* Show Currently Attached Bill (when editing) */}
-            {existingReceiptUrl && !isRemovingReceipt && (
+            {/* Existing Saved Attachments (when editing) */}
+            {existingAttachments.length > 0 && (
               <div className="p-3 rounded-lg border border-purple-200 bg-purple-50/50 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-purple-900 flex items-center gap-1.5">
                     <Paperclip className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Currently Attached Bill Document</span>
+                    <span>Saved Bill Attachments ({existingAttachments.length})</span>
                   </span>
                   <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                     Saved on Cloud
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-md border border-slate-200 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-purple-600 shrink-0" />
-                    <span className="truncate font-medium text-slate-800">
-                      {existingReceiptFileName || 'Attached_Bill_Document'}
-                    </span>
-                  </div>
+                <div className="space-y-1.5">
+                  {existingAttachments.map((att, idx) => (
+                    <div key={att.url + idx} className="flex items-center justify-between gap-3 bg-white p-2 rounded-md border border-slate-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-purple-600 shrink-0" />
+                        <span className="truncate font-medium text-slate-800">
+                          {att.name || `Attachment ${idx + 1}`}
+                        </span>
+                      </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={existingReceiptUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>View</span>
-                    </a>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <a
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>View</span>
+                        </a>
 
-                    <button
-                      type="button"
-                      onClick={() => setIsRemovingReceipt(true)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold border border-rose-200 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3 text-rose-600" />
-                      <span>Remove Bill</span>
-                    </button>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => setExistingAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold border border-rose-200 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-600" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-[10px] text-slate-500">
-                  You can keep this bill, remove it, or upload a new file below to replace it.
-                </p>
               </div>
             )}
 
-            {/* If user clicked remove receipt, show notice with undo option */}
-            {existingReceiptUrl && isRemovingReceipt && !selectedFile && (
-              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/60 flex items-center justify-between gap-2 text-xs">
-                <span className="text-amber-800 font-medium text-[11px]">
-                  ⚠️ Attached bill will be removed on saving.
+            {/* Multi-file Uploader (Multiple Images or PDFs) */}
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-slate-700">
+                Attach Bills / Receipts (Multiple Images or PDFs Allowed)
+              </label>
+              <label className="flex flex-col items-center justify-center gap-1.5 p-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-400 bg-slate-50/70 hover:bg-purple-50/30 transition-colors cursor-pointer text-center">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.heic,.heif,.pdf,application/pdf"
+                  disabled={isSubmitting || isUploading}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) {
+                      setSelectedFiles((prev) => [...prev, ...files]);
+                    }
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <Paperclip className="w-5 h-5 text-[#653ef1]" />
+                <span className="text-xs font-bold text-slate-700">
+                  Click to select one or multiple Images / PDFs
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setIsRemovingReceipt(false)}
-                  className="px-2.5 py-1 rounded bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold border border-slate-200 transition-colors cursor-pointer"
-                >
-                  Undo (Keep Bill)
-                </button>
-              </div>
-            )}
+                <span className="text-[10px] text-slate-400">
+                  Supports JPG, PNG, iOS HEIC/HEIF, and PDF (up to 25MB each)
+                </span>
+              </label>
 
-            <ExpenseBillUploader
-              file={selectedFile}
-              onFileChange={(f) => {
-                setSelectedFile(f);
-                if (f) {
-                  // User chose a new file to replace or add
-                  setIsRemovingReceipt(false);
-                }
-              }}
-              disabled={isSubmitting || isUploading}
-              label={existingReceiptUrl && !isRemovingReceipt ? "Replace With New Bill / Receipt (Optional)" : "Attach Physical Bill / Cash Memo / Receipt Copy (Optional)"}
-              hint="Supports all image formats (JPG, PNG, iOS HEIC/HEIF) or PDF (up to 25MB)"
-            />
+              {selectedFiles.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="flex items-center justify-between gap-2 bg-purple-50/50 border border-purple-200/80 px-3 py-2 rounded-lg text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-[#653ef1] shrink-0" />
+                        <span className="font-medium text-slate-800 truncate">{file.name}</span>
+                        <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFiles((prev) => prev.filter((_, i) => i !== idx))}
+                        className="p-1 rounded text-rose-500 hover:bg-rose-100 transition-colors cursor-pointer shrink-0"
+                        title="Remove file"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="h-4" />
