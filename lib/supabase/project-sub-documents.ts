@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { STORAGE_BUCKET, resolveFileUrl } from './project-files';
+import { compressFileBeforeUpload } from '../common/file-compression';
 
 export interface ProjectSubDocument {
   id: string;
@@ -120,12 +121,13 @@ export async function fetchSubDocumentsCounts(): Promise<Record<string, number>>
 export async function uploadSubDocumentFile(
   file: File
 ): Promise<{ publicUrl: string; filePath: string }> {
-  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const prepared = await compressFileBeforeUpload(file);
+  const cleanFileName = prepared.name.replace(/[^a-zA-Z0-9.-]/g, '_');
   const filePath = `sub_documents/${Date.now()}_${cleanFileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .upload(filePath, file, {
+    .upload(filePath, prepared, {
       cacheControl: '3600',
       upsert: true,
     });
@@ -137,7 +139,7 @@ export async function uploadSubDocumentFile(
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(prepared);
     });
     return { publicUrl: b64, filePath: '' };
   }

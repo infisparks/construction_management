@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   FileText,
   Users,
+  Download,
 } from 'lucide-react';
 import {
   fetchDirectorDashboardData,
@@ -28,6 +29,7 @@ import {
   fetchSiteExpensesSummaryRpc,
   ExpenseSummaryStats,
 } from '@/lib/supabase/expense-services';
+import { downloadDirectorDashboardPdf } from '@/lib/common/dashboard-pdf-report';
 import { ViewMode } from '@/lib/construction-planning/types';
 import { formatMumbaiDate } from '@/lib/common/date-format';
 
@@ -109,6 +111,7 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
   const [data, setData] = useState<DirectorDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // Default to 'all' sites for Director consolidated view
   const [selectedSiteId, setSelectedSiteId] = useState<string>('all');
@@ -642,6 +645,57 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 text-[#653ef1] ${isRefreshing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
+
+          {/* Download Letterhead Report PDF */}
+          <button
+            type="button"
+            disabled={isDownloadingPdf}
+            onClick={async () => {
+              setIsDownloadingPdf(true);
+              try {
+                await downloadDirectorDashboardPdf({
+                  siteName: selectedSiteName,
+                  periodLabel: PERIOD_LABELS[period],
+                  generatedBy: userEmail || userRole,
+                  expenseStats,
+                  storeStats,
+                  docStats,
+                  monthlyTrend: monthlyTrend.months,
+                  paymentModes: cashflowBreakdown.modes,
+                  siteComparison:
+                    selectedSiteId === 'all'
+                      ? siteComparison
+                      : siteComparison.filter((s) => s.id === selectedSiteId),
+                  topVendors,
+                  pendingBills: pendingBills.map((b) => {
+                    const amt = Number(b.amount) || 0;
+                    const effPaid =
+                      b.payment_status === 'paid'
+                        ? amt
+                        : b.payment_status === 'partial' && b.paid_amount != null
+                        ? Math.min(Math.max(Number(b.paid_amount), 0), amt)
+                        : 0;
+                    return {
+                      expense_code: b.expense_code,
+                      expense_date: b.expense_date,
+                      title: b.title,
+                      vendor_name: b.vendor_name,
+                      payment_status: b.payment_status,
+                      amount: amt,
+                      dueAmount: Math.max(amt - effPaid, 0),
+                    };
+                  }),
+                });
+              } finally {
+                setIsDownloadingPdf(false);
+              }
+            }}
+            className="h-9 px-3.5 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+            title="Download full Director Report PDF on Armee letterhead"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isDownloadingPdf ? 'Generating...' : 'Download Report'}</span>
+          </button>
         </div>
       </div>
 
@@ -814,45 +868,6 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
             </div>
             <span className="inline-flex items-center gap-0.5 font-semibold text-[#653ef1]">
               Vault
-              <ArrowUpRight className="w-3 h-3" />
-            </span>
-          </div>
-        </div>
-
-        {/* KPI 4: Sites & Schedule Progress */}
-        <div
-          onClick={() => onNavigateView('list')}
-          className="bg-white rounded-2xl border border-[#E5E7EB] hover:border-[#653ef1]/50 p-4 shadow-2xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
-                {selectedSiteId === 'all' ? 'Active Sites & Progress' : 'Site Schedule Progress'}
-              </span>
-              <div className="text-2xl font-bold text-[#111827] mt-1 tracking-tight">
-                {scheduleStats.avgProgress}%{' '}
-                <span className="text-sm font-semibold text-[#6B7280]">
-                  ({selectedSiteId === 'all' ? `${data?.projects.length || 0} Sites` : `${scheduleStats.totalTasks} Tasks`})
-                </span>
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-[#653ef1] transition-colors">
-              <TrendingUp className="w-5 h-5 text-emerald-600 group-hover:text-white transition-colors" />
-            </div>
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-emerald-600">
-                Done: {scheduleStats.completed}
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className={`font-semibold ${scheduleStats.delayed > 0 ? 'text-rose-600' : 'text-[#6B7280]'}`}>
-                Delayed: {scheduleStats.delayed}
-              </span>
-            </div>
-            <span className="inline-flex items-center gap-0.5 font-semibold text-[#653ef1]">
-              Timeline
               <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>

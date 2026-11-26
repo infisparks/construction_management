@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client';
 import { CustomerPurchase, CustomerPayment, PurchaseImageAttachment } from './types';
 import { fetchDropdownCategory, addCustomCategory } from '@/lib/supabase/category-services';
+import { compressFileBeforeUpload } from '@/lib/common/file-compression';
 
 const STORAGE_PURCHASES_KEY = 'pms_local_customer_purchases';
 const STORAGE_PAYMENTS_KEY = 'pms_local_customer_payments';
@@ -211,19 +212,20 @@ export async function getNextReceiptNumber(): Promise<string> {
 
 // Upload image file to Supabase storage 'project-documents' (with base64 fallback)
 export async function uploadPurchaseImage(file: File): Promise<{ url: string; name: string; size: number }> {
-  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const prepared = await compressFileBeforeUpload(file);
+  const cleanName = prepared.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `customer-deals/${Date.now()}_${cleanName}`;
 
   try {
     const { data, error } = await supabase.storage
       .from('project-documents')
-      .upload(path, file, { cacheControl: '3600', upsert: true });
+      .upload(path, prepared, { cacheControl: '3600', upsert: true });
 
     if (!error && data?.path) {
       const { data: pubData } = supabase.storage
         .from('project-documents')
         .getPublicUrl(data.path);
-      return { url: pubData.publicUrl, name: file.name, size: file.size };
+      return { url: pubData.publicUrl, name: prepared.name, size: prepared.size };
     }
   } catch (err) {
     console.warn('Storage upload exception, falling back to Data URL:', err);
@@ -233,12 +235,12 @@ export async function uploadPurchaseImage(file: File): Promise<{ url: string; na
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => {
-      resolve({ url: reader.result as string, name: file.name, size: file.size });
+      resolve({ url: reader.result as string, name: prepared.name, size: prepared.size });
     };
     reader.onerror = () => {
-      resolve({ url: '', name: file.name, size: file.size });
+      resolve({ url: '', name: prepared.name, size: prepared.size });
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(prepared);
   });
 }
 

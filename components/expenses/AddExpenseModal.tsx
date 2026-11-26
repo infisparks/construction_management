@@ -162,8 +162,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         expenseToEdit.paid_amount != null
           ? Number(expenseToEdit.paid_amount)
           : expenseToEdit.payment_status === 'paid'
-          ? Number(expenseToEdit.amount || 0)
-          : 0;
+            ? Number(expenseToEdit.amount || 0)
+            : 0;
       setPaidAmountInput(String(existingPaid));
       setPendingAmountInput(String(Math.max((Number(expenseToEdit.amount) || 0) - existingPaid, 0)));
       setFirstPaymentDate(expenseToEdit.first_payment_date || expenseToEdit.expense_date || new Date().toISOString().split('T')[0]);
@@ -245,11 +245,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
             : 'bg-purple-50 text-purple-700 border border-purple-200',
       })),
-      {
-        value: '__custom__',
-        label: '+ Other Payee / Local Shop / Cash Recipient...',
-        isAction: true,
-      },
     ];
   }, [vendors]);
 
@@ -378,8 +373,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         errors.title && errors.amount
           ? 'Please enter both an expense title and a valid amount.'
           : errors.title
-          ? 'Please enter an expense title / description.'
-          : 'Please enter a valid amount greater than 0.'
+            ? 'Please enter an expense title / description.'
+            : 'Please enter a valid amount greater than 0.'
       );
       return;
     }
@@ -520,13 +515,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       const initialHistory =
         resolvedPaidAmount > 0
           ? [
-              {
-                amount: resolvedPaidAmount,
-                date: resolvedFirstDate || expenseDate,
-                method: paymentMethod,
-                note: trimmedRef || (resolvedStatus === 'partial' ? 'First partial payment' : 'Full payment'),
-              },
-            ]
+            {
+              amount: resolvedPaidAmount,
+              date: resolvedFirstDate || expenseDate,
+              method: paymentMethod,
+              note: trimmedRef || (resolvedStatus === 'partial' ? 'First partial payment' : 'Full payment'),
+            },
+          ]
           : [];
 
       const payload: CreateExpensePayload = {
@@ -569,11 +564,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
-      <div 
+      <div
         className="w-full max-w-xl bg-white h-full shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-250 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -588,17 +583,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                   {expenseToEdit ? 'Edit Site Bill & Expense' : 'Record Site Bill & Expense'}
                 </h2>
-                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                  expenseToEdit 
-                    ? 'bg-purple-50 text-purple-700 border border-purple-200' 
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                }`}>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${expenseToEdit
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  }`}>
                   {expenseToEdit ? expenseToEdit.expense_code : 'New Slip'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {expenseToEdit 
-                  ? 'Update details, vendor, amount, or attached bill for this entry' 
+                {expenseToEdit
+                  ? 'Update details, vendor, amount, or attached bill for this entry'
                   : 'Log daily site payments, lunch, petty cash, or vendor bills'}
               </p>
             </div>
@@ -667,11 +661,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: false }));
                 }}
                 placeholder="e.g. Site Labour Lunch & Evening Tea"
-                className={`w-full h-10 px-3 rounded-lg border bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden font-medium transition-colors ${
-                  fieldErrors.title
-                    ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/20'
-                    : 'border-slate-200 focus:border-purple-600 focus:ring-1 focus:ring-purple-600'
-                }`}
+                className={`w-full h-10 px-3 rounded-lg border bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden font-medium transition-colors ${fieldErrors.title
+                  ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/20'
+                  : 'border-slate-200 focus:border-purple-600 focus:ring-1 focus:ring-purple-600'
+                  }`}
               />
               {fieldErrors.title && (
                 <p className="text-[10px] text-rose-500 font-medium mt-1">Please enter an expense title / description.</p>
@@ -702,11 +695,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                       if (fieldErrors.amount) setFieldErrors((prev) => ({ ...prev, amount: false }));
                     }}
                     placeholder="0.00"
-                    className={`w-full h-10 pl-9 pr-3 rounded-lg border bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden font-bold transition-colors ${
-                      fieldErrors.amount
-                        ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/20'
-                        : 'border-slate-200 focus:border-purple-600 focus:ring-1 focus:ring-purple-600'
-                    }`}
+                    className={`w-full h-10 pl-9 pr-3 rounded-lg border bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden font-bold transition-colors ${fieldErrors.amount
+                      ? 'border-rose-400 ring-1 ring-rose-400 bg-rose-50/20'
+                      : 'border-slate-200 focus:border-purple-600 focus:ring-1 focus:ring-purple-600'
+                      }`}
                   />
                 </div>
                 {fieldErrors.amount && (
@@ -873,94 +865,18 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
             <SearchableSelect
               options={payeeOptions}
-              value={isCustomPayee ? '__custom__' : selectedVendorId}
-              onChange={handleVendorSelect}
-              placeholder="Select Payee / Vendor..."
-              searchPlaceholder="Search vendor, contractor or recipient..."
-              onCreateOption={(newLabel) => {
-                setIsCustomPayee(true);
-                setSelectedVendorId('');
-                setCustomPayeeName(newLabel);
+              value={selectedVendorId}
+              onChange={(val) => {
+                setIsCustomPayee(false);
+                setCustomPayeeName('');
+                setSelectedVendorId(val);
               }}
+              placeholder="Select Payee / Vendor..."
+              searchPlaceholder="Search vendor or contractor..."
             />
-
-            {isCustomPayee && (
-              <div className="animate-in fade-in duration-150 pt-2 p-3 bg-purple-50/50 rounded-xl border border-purple-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-slate-800">
-                    Payee / Recipient / Shop Name <span className="text-rose-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomPayee(false);
-                      setCustomPayeeName('');
-                      setSelectedVendorId('');
-                    }}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  value={customPayeeName}
-                  onChange={(e) => setCustomPayeeName(e.target.value)}
-                  placeholder="e.g. Mudassir Electricals, Sharma RCC Gang, Site Canteen"
-                  autoFocus
-                  className="w-full h-10 px-3 rounded-lg border border-purple-300 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600 font-medium"
-                />
-
-                {/* Choose Type: Contractor vs Vendor */}
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 mb-1">
-                    Select Type <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCustomPayeeType('vendor')}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        customPayeeType === 'vendor'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>Vendor (Supplier / Store)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setCustomPayeeType('contractor')}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        customPayeeType === 'contractor'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Wrench className="w-3.5 h-3.5" />
-                      <span>Contractor (Labour / Work)</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] text-slate-500">
-                    Registers as <strong>{customPayeeType === 'contractor' ? 'Contractor' : 'Vendor'}</strong> in Supabase
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!customPayeeName.trim() || isSavingNewPayee}
-                    onClick={handleSaveAndSelectNewPayee}
-                    className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 shadow-2xs"
-                  >
-                    {isSavingNewPayee ? 'Saving...' : 'Save & Link to Supabase'}
-                  </button>
-                </div>
-              </div>
-            )}
+            <p className="text-[10px] text-slate-400">
+              Select from existing Store vendors/contractors (new vendor profiles are created from Store).
+            </p>
           </div>
 
           {/* Section 3: Payment & Accounting Mode */}
@@ -982,7 +898,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     setPaymentStatus(next);
                     if (next === 'partial' && !paidAmountInput) {
                       setPaidAmountInput('');
-      setPendingAmountInput('');
+                      setPendingAmountInput('');
                       setFirstPaymentDate(expenseDate);
                     }
                   }}
@@ -1024,10 +940,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   {paymentMethod === 'upi'
                     ? 'UPI Number / Transaction Ref'
                     : paymentMethod === 'cheque'
-                    ? 'Cheque Number & Bank Name'
-                    : paymentMethod === 'bank_transfer'
-                    ? 'Bank Name & UTR / Reference No.'
-                    : 'Payment Note / Receipt Ref (Optional)'}
+                      ? 'Cheque Number & Bank Name'
+                      : paymentMethod === 'bank_transfer'
+                        ? 'Bank Name & UTR / Reference No.'
+                        : 'Payment Note / Receipt Ref (Optional)'}
                 </label>
                 <input
                   type="text"
@@ -1037,10 +953,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     paymentMethod === 'upi'
                       ? 'e.g. UPI Ref 432819... or 98xxx@ybl'
                       : paymentMethod === 'cheque'
-                      ? 'e.g. Cheque #004512 - HDFC Bank'
-                      : paymentMethod === 'bank_transfer'
-                      ? 'e.g. SBI NEFT - UTR 123456...'
-                      : 'e.g. Cash voucher #12 / paid by supervisor'
+                        ? 'e.g. Cheque #004512 - HDFC Bank'
+                        : paymentMethod === 'bank_transfer'
+                          ? 'e.g. SBI NEFT - UTR 123456...'
+                          : 'e.g. Cash voucher #12 / paid by supervisor'
                   }
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                 />
