@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Building2, 
   Calendar, 
@@ -107,6 +108,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
   userPage,
   onSignOut,
 }) => {
+  const router = useRouter();
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
 
@@ -569,25 +571,15 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
 
                       {/* Navigation & Action Links */}
                       <div className="p-1.5 space-y-0.5">
-                        {canViewSettings && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsProfileMenuOpen(false);
-                              onOpenSettings();
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-colors cursor-pointer text-left"
-                          >
-                            <Settings className="w-4 h-4 text-slate-500" />
-                            <span>Project Baseline Settings</span>
-                          </button>
-                        )}
-
                         <button
                           type="button"
                           onClick={() => {
                             setIsProfileMenuOpen(false);
-                            setIsSiteSwitcherOpen(true);
+                            if (onOpenSitesManager) {
+                              onOpenSitesManager();
+                            } else {
+                              router.push('/sites');
+                            }
                           }}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-colors cursor-pointer text-left"
                         >
