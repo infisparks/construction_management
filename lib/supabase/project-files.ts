@@ -112,10 +112,10 @@ export async function fetchAvailableProjects(): Promise<ProjectOption[]> {
  * @param projectId Optional project ID filter (or 'all')
  * @param isDeleted Filter by active (false) or deleted (true)
  */
-export async function fetchProjectFiles(
+export async function fetchProjectFilesWithStatus(
   projectId?: string,
   isDeleted: boolean = false
-): Promise<ProjectFile[]> {
+): Promise<{ data: ProjectFile[]; error: string | null }> {
   try {
     let query = supabase
       .from('project_files')
@@ -127,11 +127,29 @@ export async function fetchProjectFiles(
       query = query.eq('project_id', projectId);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    // Fallback without relational join if the join query fails
+    if (error) {
+      console.warn('Primary project_files query failed, retrying without join:', error.message);
+      let fallbackQuery = supabase
+        .from('project_files')
+        .select('*')
+        .eq('is_deleted', isDeleted)
+        .order('created_at', { ascending: false });
+
+      if (projectId && projectId !== 'all') {
+        fallbackQuery = fallbackQuery.eq('project_id', projectId);
+      }
+
+      const fallbackRes = await fallbackQuery;
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (error) {
       console.error('Error fetching project files:', error);
-      return [];
+      return { data: [], error: error.message || 'Failed to load documents from database' };
     }
 
     // Map rows: attach clean storage_path and dynamically resolve file_url based on active domain
@@ -144,11 +162,19 @@ export async function fetchProjectFiles(
       } as ProjectFile;
     });
 
-    return resolvedData;
-  } catch (err) {
+    return { data: resolvedData, error: null };
+  } catch (err: any) {
     console.error('Failed to fetch project files:', err);
-    return [];
+    return { data: [], error: err?.message || 'Network error while loading documents' };
   }
+}
+
+export async function fetchProjectFiles(
+  projectId?: string,
+  isDeleted: boolean = false
+): Promise<ProjectFile[]> {
+  const res = await fetchProjectFilesWithStatus(projectId, isDeleted);
+  return res.data;
 }
 
 /**

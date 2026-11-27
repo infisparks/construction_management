@@ -51,6 +51,7 @@ import { ProjectInfo, ProjectFile, FileCategory, FileType } from '@/lib/construc
 import { formatMumbaiDate } from '@/lib/common/date-format';
 import { 
   fetchProjectFiles, 
+  fetchProjectFilesWithStatus,
   softDeleteProjectFile,
   restoreProjectFile,
   permanentDeleteProjectFile,
@@ -118,6 +119,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   const [activeFiles, setActiveFiles] = useState<ProjectFile[]>([]);
   const [deletedFiles, setDeletedFiles] = useState<ProjectFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Available Projects (Foreign Keys) - Default to 'all' to show all construction sites
   const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([]);
@@ -234,17 +236,22 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   // Load active and deleted files from Supabase
   const loadAllFiles = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const targetProj = projectFilter === 'all' ? undefined : projectFilter;
-      const [actives, deleteds] = await Promise.all([
-        fetchProjectFiles(targetProj, false),
-        fetchProjectFiles(targetProj, true),
+      const [activeRes, deletedRes] = await Promise.all([
+        fetchProjectFilesWithStatus(targetProj, false),
+        fetchProjectFilesWithStatus(targetProj, true),
       ]);
-      setActiveFiles(actives);
-      setDeletedFiles(deleteds);
+      setActiveFiles(activeRes.data);
+      setDeletedFiles(deletedRes.data);
+      if (activeRes.error) {
+        setLoadError(activeRes.error);
+      }
       loadSubDocsCounts();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading files:', err);
+      setLoadError(err?.message || 'Network error while loading documents');
     } finally {
       setIsLoading(false);
     }
@@ -1062,8 +1069,31 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           </div>
         )}
 
+        {/* Visible Error State (helpful on mobile where console is hidden) */}
+        {!isLoading && loadError && (
+          <div className="p-6 sm:p-8 text-center bg-rose-50/70 rounded-xl border border-rose-200 space-y-3">
+            <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-rose-900">
+              Could Not Load Documents
+            </h3>
+            <p className="text-xs text-rose-700 max-w-md mx-auto break-words font-mono bg-white/80 px-3 py-2 rounded-lg border border-rose-200">
+              {loadError}
+            </p>
+            <button
+              type="button"
+              onClick={loadAllFiles}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry Loading</span>
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!isLoading && viewMode !== 'folder' && filteredFiles.length === 0 && (
+        {!isLoading && !loadError && viewMode !== 'folder' && filteredFiles.length === 0 && (
           <div className="p-12 text-center bg-white rounded-xl border border-slate-200 space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
               {activeTab === 'bin' ? <Trash2 className="w-6 h-6 text-slate-400" /> : <FolderKanban className="w-6 h-6 text-[#653ef1]" />}
@@ -1074,17 +1104,46 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               {activeTab === 'bin' 
                 ? 'There are no deleted files in the bin. Any files you delete will be kept here safely so you can restore them.'
-                : 'No documents matched the selected filters. Click "+ Upload Document" to add files.'}
+                : activeFiles.length > 0
+                  ? `${activeFiles.length} document(s) loaded, but hidden by active filters (Category, Search, or Date).`
+                  : 'No documents matched the selected filters. Click "+ Upload Document" to add files.'}
             </p>
             {activeTab === 'vault' && (
-              <button
-                type="button"
-                onClick={() => setIsUploadModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer mt-1"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload Document</span>
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+                {activeFiles.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      handleCategorySelect('all');
+                      setSelectedFileType('all');
+                      setOnlyStarred(false);
+                      setDateFilter(DEFAULT_DATE_FILTER);
+                      setProjectFilter('all');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-[#653ef1] bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-all cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Clear All Filters</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={loadAllFiles}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Retry</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] transition-all shadow-sm shadow-[#653ef1]/25 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Document</span>
+                </button>
+              </div>
             )}
           </div>
         )}
