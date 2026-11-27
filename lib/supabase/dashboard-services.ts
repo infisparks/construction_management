@@ -61,9 +61,21 @@ export interface DashboardTaskRow {
   planned_end_date: string | null;
 }
 
+export interface DashboardOperatingExpenseRow {
+  id: string;
+  expense_type: 'petty_cash' | 'other_expense';
+  project_id: string | null;
+  title: string;
+  category: string;
+  amount: number;
+  expense_date: string;
+  payment_method: string;
+}
+
 export interface DirectorDashboardData {
   projects: DbProject[];
   expenses: DashboardExpenseRow[];
+  operatingExpenses: DashboardOperatingExpenseRow[];
   products: DashboardProductRow[];
   inventoryTx: DashboardInventoryTxRow[];
   documents: DashboardDocumentRow[];
@@ -79,6 +91,7 @@ export async function fetchDirectorDashboardData(): Promise<DirectorDashboardDat
   const [
     projectsRes,
     expensesRes,
+    operatingRes,
     productsRes,
     inventoryTxRes,
     documentsRes,
@@ -93,6 +106,12 @@ export async function fetchDirectorDashboardData(): Promise<DirectorDashboardDat
     supabase
       .from('site_expenses')
       .select('id, project_id, expense_code, title, category, amount, paid_amount, expense_date, payment_method, payment_status, vendor_name')
+      .eq('is_deleted', false)
+      .order('expense_date', { ascending: false }),
+
+    supabase
+      .from('operating_expenses')
+      .select('id, expense_type, project_id, title, category, amount, expense_date, payment_method')
       .eq('is_deleted', false)
       .order('expense_date', { ascending: false }),
 
@@ -123,6 +142,7 @@ export async function fetchDirectorDashboardData(): Promise<DirectorDashboardDat
 
   if (projectsRes.error) console.error('[dashboard] projects error:', projectsRes.error.message);
   if (expensesRes.error) console.error('[dashboard] expenses error:', expensesRes.error.message);
+  if (operatingRes.error) console.warn('[dashboard] operating_expenses note:', operatingRes.error.message);
   if (productsRes.error) console.error('[dashboard] products error:', productsRes.error.message);
   if (inventoryTxRes.error) console.error('[dashboard] inventoryTx error:', inventoryTxRes.error.message);
   if (documentsRes.error) console.error('[dashboard] documents error:', documentsRes.error.message);
@@ -134,6 +154,10 @@ export async function fetchDirectorDashboardData(): Promise<DirectorDashboardDat
   return {
     projects,
     expenses: (expensesRes.data || []) as DashboardExpenseRow[],
+    operatingExpenses: (operatingRes.error ? [] : operatingRes.data || []).map((o: any) => ({
+      ...o,
+      amount: Number(o.amount ?? 0),
+    })) as DashboardOperatingExpenseRow[],
     products: (productsRes.data || []).map((p: any) => ({
       ...p,
       minimum_alert_stock: Number(p.minimum_alert_stock ?? 0),

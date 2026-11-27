@@ -1263,6 +1263,14 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                           alt={file.title}
                           draggable={false}
                           className="max-h-[75vh] max-w-[85vw] object-contain rounded-xl shadow-2xl pointer-events-none"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.retried) {
+                              img.dataset.retried = '1';
+                              const sep = img.src.includes('?') ? '&' : '?';
+                              img.src = `${img.src}${sep}retry=${Date.now()}`;
+                            }
+                          }}
                         />
                       ) : (
                         // Render authentic site inspection photo view

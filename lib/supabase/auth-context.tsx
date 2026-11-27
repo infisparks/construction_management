@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from './client';
 import { UserRole } from './types';
@@ -19,10 +20,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const redirectToLogin = () => {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      router.replace('/login');
+    }
+  };
 
   // Fetch role from public.user_roles
   const fetchUserRole = async (userId: string, userEmail?: string | null) => {
@@ -130,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(null);
             setUserRole(null);
             setIsLoading(false);
+            redirectToLogin();
             return;
           }
           currentSession = data.session;
@@ -138,6 +148,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setUserRole(null);
           setIsLoading(false);
+          redirectToLogin();
+          return;
+        }
+      } else {
+        // Verify token is still valid on Supabase server
+        const { error: userErr } = await supabase.auth.getUser();
+        if (userErr && (userErr.status === 401 || userErr.status === 403 || /jwt|token|session|expired/i.test(userErr.message))) {
+          console.warn('Session invalid on server, signing out:', userErr.message);
+          await supabase.auth.signOut();
+          setUser(null);
+          setSession(null);
+          setUserRole(null);
+          setIsLoading(false);
+          redirectToLogin();
           return;
         }
       }
@@ -171,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         setUserRole(null);
         setIsLoading(false);
+        redirectToLogin();
         return;
       }
 
@@ -215,6 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(null);
             setSession(null);
             setUserRole(null);
+            redirectToLogin();
           } else {
             setSession(refreshData.session);
             setUser(refreshData.session.user);

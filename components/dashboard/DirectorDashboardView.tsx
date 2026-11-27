@@ -20,6 +20,8 @@ import {
   FileText,
   Users,
   Download,
+  Wallet,
+  Briefcase,
 } from 'lucide-react';
 import {
   fetchDirectorDashboardData,
@@ -314,6 +316,41 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
       paidPct,
     };
   }, [filteredExpenses, data?.expenses, selectedSiteId, todayStr, rpcPeriodStats, rpcSiteTodayMonthStats]);
+
+  // 1b. Petty Cash + Other Expenses (Salaries, Rent, Admin)
+  const operatingStats = useMemo(() => {
+    const rows = (data?.operatingExpenses || []).filter((o) => {
+      if (selectedSiteId !== 'all' && o.project_id !== selectedSiteId) return false;
+      if (!matchesPeriod(o.expense_date, period, todayStr)) return false;
+      return true;
+    });
+
+    let pettyCashTotal = 0;
+    let pettyCashCount = 0;
+    let otherExpenseTotal = 0;
+    let otherExpenseCount = 0;
+
+    for (const r of rows) {
+      const amt = Number(r.amount) || 0;
+      if (r.expense_type === 'petty_cash') {
+        pettyCashTotal += amt;
+        pettyCashCount += 1;
+      } else {
+        otherExpenseTotal += amt;
+        otherExpenseCount += 1;
+      }
+    }
+
+    const grandTotal = expenseStats.total + pettyCashTotal + otherExpenseTotal;
+
+    return {
+      pettyCashTotal,
+      pettyCashCount,
+      otherExpenseTotal,
+      otherExpenseCount,
+      grandTotal,
+    };
+  }, [data?.operatingExpenses, selectedSiteId, period, todayStr, expenseStats.total]);
 
   // 2. Store & Inventory Summary (Central Store)
   const storeStats = useMemo(() => {
@@ -699,43 +736,98 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Top Executive KPI Cards (Bills Total, Today, This Month, Store, Docs, Progress) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {/* KPI 1: Total Bills & Expenses */}
-        <div
-          onClick={() => onNavigateView('expenses')}
-          className="bg-white rounded-2xl border border-[#E5E7EB] hover:border-[#653ef1]/50 p-4 shadow-2xs hover:shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
-        >
-          <div className="flex items-start justify-between gap-2">
+      {/* 2. Top Executive KPI Section: Full-Width Total Expense Hero + 4-Col Secondary KPIs */}
+      <div className="space-y-3">
+        {/* Full-Width Total Expense Card (Bills + Petty Cash + Other Expenses) */}
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
-                Total Bills & Expenses
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+                Total Expense (Consolidated)
               </span>
-              <div className="text-2xl font-bold text-[#111827] mt-1 tracking-tight">
-                ₹{formatINR(expenseStats.total)}
+              <div className="text-3xl sm:text-4xl font-bold text-[#111827] mt-1 tracking-tight">
+                ₹{formatINR(operatingStats.grandTotal)}
               </div>
+              <p className="text-xs text-[#6B7280] mt-1">
+                Combined total of Site Bills + Petty Cash + Other Expenses &amp; Salaries
+              </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 group-hover:bg-[#653ef1] transition-colors">
-              <Receipt className="w-5 h-5 text-[#653ef1] group-hover:text-white transition-colors" />
+            <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0 self-start sm:self-center">
+              <Receipt className="w-6 h-6 text-[#653ef1]" />
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-emerald-600">
-                Paid: {formatCompactINR(expenseStats.paid)}
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="font-semibold text-amber-600">
-                Pending: {formatCompactINR(expenseStats.unpaidTotal)}
-              </span>
-            </div>
-            <span className="inline-flex items-center gap-0.5 font-semibold text-[#653ef1]">
-              {expenseStats.count} bills
-              <ArrowUpRight className="w-3 h-3" />
-            </span>
+          {/* 3 Big Clear Subcards: Site Bills, Petty Cash, Other Expenses */}
+          <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => onNavigateView('expenses')}
+              className="text-left p-4 rounded-xl bg-[#F5F6F8] hover:bg-purple-50 border border-[#E5E7EB] hover:border-purple-300 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+                  Site Bills
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#653ef1]">
+                  View <ArrowUpRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-[#111827] mt-1.5">
+                ₹{formatINR(expenseStats.total)}
+              </div>
+              <div className="text-xs text-[#6B7280] mt-1">
+                {expenseStats.count} {expenseStats.count === 1 ? 'bill' : 'bills'} recorded
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigateView('petty-cash')}
+              className="text-left p-4 rounded-xl bg-[#F5F6F8] hover:bg-purple-50 border border-[#E5E7EB] hover:border-purple-300 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5 text-[#653ef1]" />
+                  Petty Cash
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#653ef1]">
+                  View <ArrowUpRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-[#111827] mt-1.5">
+                ₹{formatINR(operatingStats.pettyCashTotal)}
+              </div>
+              <div className="text-xs text-[#6B7280] mt-1">
+                {operatingStats.pettyCashCount} {operatingStats.pettyCashCount === 1 ? 'entry' : 'entries'} recorded
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigateView('other-expenses')}
+              className="text-left p-4 rounded-xl bg-[#F5F6F8] hover:bg-purple-50 border border-[#E5E7EB] hover:border-purple-300 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5 text-[#653ef1]" />
+                  Other Expenses
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#653ef1]">
+                  View <ArrowUpRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-[#111827] mt-1.5">
+                ₹{formatINR(operatingStats.otherExpenseTotal)}
+              </div>
+              <div className="text-xs text-[#6B7280] mt-1">
+                {operatingStats.otherExpenseCount} {operatingStats.otherExpenseCount === 1 ? 'entry' : 'entries'} recorded
+              </div>
+            </button>
           </div>
         </div>
+
+        {/* Secondary KPI Row (4 Balanced Columns) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
 
         {/* KPI 2: Today's Bill Expense */}
         <div
@@ -871,6 +963,7 @@ export const DirectorDashboardView: React.FC<DirectorDashboardViewProps> = ({
               <ArrowUpRight className="w-3 h-3" />
             </span>
           </div>
+        </div>
         </div>
       </div>
 

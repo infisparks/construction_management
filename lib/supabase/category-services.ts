@@ -99,6 +99,88 @@ export async function fetchDropdownCategory(
   }
 }
 
+export interface CategoryFieldTemplate {
+  category: string;
+  fields: string[];
+}
+
+const OPERATING_FIELDS_KEY = 'operating_category_fields';
+
+export async function fetchCategoryFieldTemplates(): Promise<Record<string, string[]>> {
+  const map: Record<string, string[]> = {};
+  try {
+    if (typeof window !== 'undefined') {
+      const localRaw = localStorage.getItem(`infibuild_category_${OPERATING_FIELDS_KEY}`);
+      if (localRaw) {
+        const parsed = JSON.parse(localRaw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: CategoryFieldTemplate) => {
+            if (item?.category && Array.isArray(item.fields)) {
+              map[item.category] = item.fields;
+            }
+          });
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('category')
+      .select('value')
+      .eq('name', OPERATING_FIELDS_KEY)
+      .maybeSingle();
+
+    if (!error && data && Array.isArray(data.value)) {
+      (data.value as CategoryFieldTemplate[]).forEach((item) => {
+        if (item?.category && Array.isArray(item.fields)) {
+          map[item.category] = item.fields;
+        }
+      });
+      if (typeof window !== 'undefined') {
+        const arr = Object.entries(map).map(([category, fields]) => ({ category, fields }));
+        localStorage.setItem(`infibuild_category_${OPERATING_FIELDS_KEY}`, JSON.stringify(arr));
+      }
+    }
+  } catch (err) {
+    console.warn('[category-services] Failed to fetch category field templates:', err);
+  }
+  return map;
+}
+
+export async function saveCategoryFieldTemplate(
+  categoryLabel: string,
+  fields: string[],
+  currentMap: Record<string, string[]>
+): Promise<Record<string, string[]>> {
+  const cleanCategory = categoryLabel.trim();
+  const cleanFields = Array.from(
+    new Set(fields.map((f) => f.trim()).filter(Boolean))
+  );
+  if (!cleanCategory) return currentMap;
+
+  const nextMap: Record<string, string[]> = {
+    ...currentMap,
+    [cleanCategory]: cleanFields,
+  };
+
+  const payloadArray: CategoryFieldTemplate[] = Object.entries(nextMap).map(
+    ([category, flds]) => ({ category, fields: flds })
+  );
+
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`infibuild_category_${OPERATING_FIELDS_KEY}`, JSON.stringify(payloadArray));
+    }
+    await supabase.from('category').upsert({
+      name: OPERATING_FIELDS_KEY,
+      value: payloadArray,
+    });
+  } catch (err) {
+    console.warn('[category-services] Failed to save category field template:', err);
+  }
+
+  return nextMap;
+}
+
 /**
  * Add a custom category entry to Supabase and localStorage.
  */

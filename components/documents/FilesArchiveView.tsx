@@ -1320,7 +1320,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                           alt={file.title} 
                           className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
                           onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
+                            const img = e.currentTarget;
+                            if (!img.dataset.retried) {
+                              img.dataset.retried = '1';
+                              const sep = img.src.includes('?') ? '&' : '?';
+                              img.src = `${img.src}${sep}retry=${Date.now()}`;
+                              return;
+                            }
+                            img.style.display = 'none';
                           }}
                         />
                       ) : (
@@ -1717,7 +1724,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                                   alt=""
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                   onError={(e) => {
-                                    (e.target as HTMLElement).style.display = 'none';
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.retried) {
+                                      img.dataset.retried = '1';
+                                      const sep = img.src.includes('?') ? '&' : '?';
+                                      img.src = `${img.src}${sep}retry=${Date.now()}`;
+                                      return;
+                                    }
+                                    img.style.display = 'none';
                                   }}
                                 />
                               ) : (
@@ -1737,7 +1751,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                                   alt=""
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
-                                    (e.target as HTMLElement).style.display = 'none';
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.retried) {
+                                      img.dataset.retried = '1';
+                                      const sep = img.src.includes('?') ? '&' : '?';
+                                      img.src = `${img.src}${sep}retry=${Date.now()}`;
+                                      return;
+                                    }
+                                    img.style.display = 'none';
                                   }}
                                 />
                               </div>
@@ -1982,7 +2003,14 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                                   alt={file.title}
                                   className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                                   onError={(e) => {
-                                    (e.target as HTMLElement).style.display = 'none';
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.retried) {
+                                      img.dataset.retried = '1';
+                                      const sep = img.src.includes('?') ? '&' : '?';
+                                      img.src = `${img.src}${sep}retry=${Date.now()}`;
+                                      return;
+                                    }
+                                    img.style.display = 'none';
                                   }}
                                 />
                               ) : (

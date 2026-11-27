@@ -1,13 +1,13 @@
 export type TaskType = 'work_package' | 'task' | 'milestone' | 'inspection';
 
-export type ScheduleStatus = 
-  | 'not_started' 
-  | 'ready_to_start' 
-  | 'in_progress' 
-  | 'at_risk' 
-  | 'delayed' 
-  | 'blocked' 
-  | 'completed' 
+export type ScheduleStatus =
+  | 'not_started'
+  | 'ready_to_start'
+  | 'in_progress'
+  | 'at_risk'
+  | 'delayed'
+  | 'blocked'
+  | 'completed'
   | 'on_hold';
 
 export type DependencyType = 'FS' | 'SS' | 'FF' | 'SF';
@@ -33,27 +33,27 @@ export interface ConstructionTask {
   responsible: string;
   isCritical: boolean;
   totalFloatDays: number;
-  
+
   // Baseline & Planned Schedule
   plannedStartDate: string; // YYYY-MM-DD
   plannedEndDate: string; // YYYY-MM-DD
   plannedDurationDays: number;
-  
+
   // Actual Site Execution
   actualStartDate: string | null;
   actualEndDate: string | null;
   actualDurationDays?: number;
-  
+
   // Schedule Forecasting
   forecastStartDate: string;
   forecastEndDate: string;
   varianceDays: number; // Positive = delayed, Negative/0 = on track
-  
+
   // Quantity tracking (optional)
   plannedQuantity?: number;
   completedQuantity?: number;
   quantityUnit?: string;
-  
+
   notes?: string;
   blockerReason?: string;
   sortOrder: number;
@@ -129,18 +129,20 @@ export interface RecoveryScenario {
   risks: string[];
 }
 
-export type ViewMode = 
+export type ViewMode =
   | 'dashboard'
-  | 'list' 
-  | 'gantt' 
-  | 'critical' 
-  | 'progress' 
-  | 'milestones' 
-  | 'materials' 
-  | 'billing' 
-  | 'subcontractor-bills' 
+  | 'list'
+  | 'gantt'
+  | 'critical'
+  | 'progress'
+  | 'milestones'
+  | 'materials'
+  | 'billing'
+  | 'subcontractor-bills'
   | 'files-archive'
   | 'expenses'
+  | 'petty-cash'
+  | 'other-expenses'
   | 'contractor-work-orders'
   | 'customer-purchases'
   | 'purchase-outflow'

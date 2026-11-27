@@ -2,16 +2,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Building2, 
-  Calendar, 
-  Clock, 
-  Plus, 
-  ClipboardList, 
-  Route, 
-  RotateCcw, 
-  Settings, 
-  TrendingUp, 
+import {
+  Building2,
+  Calendar,
+  Clock,
+  Plus,
+  ClipboardList,
+  Route,
+  RotateCcw,
+  Settings,
+  TrendingUp,
   Layers,
   ChevronDown,
   Menu,
@@ -49,6 +49,8 @@ const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementT
   'subcontractor-bills': { title: 'Sub-Contractor RA Bills', icon: FileSpreadsheet },
   'files-archive': { title: 'Files & Documents Archive', icon: FolderKanban },
   expenses: { title: 'Commercial Bills & Expenses', icon: Receipt },
+  'petty-cash': { title: 'Petty Cash Register', icon: Receipt },
+  'other-expenses': { title: 'Other Expenses & Salaries', icon: Receipt },
   'contractor-work-orders': { title: 'Contractor Work Orders', icon: Wrench },
   'customer-purchases': { title: 'Client Purchases & Inflow', icon: ArrowDownLeft },
   'purchase-outflow': { title: 'Purchase Outflow', icon: Receipt },
@@ -176,7 +178,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
       <div className="w-full px-4 sm:px-6 lg:px-8 py-3">
         {/* Row 1: Unified Clean Header Bar with Global Site Switcher */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          
+
           {/* Left: Mobile Toggle, Title & Interactive Active Site Switcher */}
           <div className="flex items-center gap-3 min-w-0">
             {onToggleMobileMenu && (
@@ -198,104 +200,101 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
 
               {/* Interactive Site Switcher Dropdown - ONLY shown on Timeline views */}
               {isTimelineView && (
-              <div className="relative shrink-0" ref={siteSwitcherRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsSiteSwitcherOpen(!isSiteSwitcherOpen)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shadow-2xs ${
-                    isSiteSwitcherOpen
+                <div className="relative shrink-0" ref={siteSwitcherRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsSiteSwitcherOpen(!isSiteSwitcherOpen)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shadow-2xs ${isSiteSwitcherOpen
                       ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-100 text-[#653ef1] shadow-xs'
                       : 'bg-white hover:bg-purple-50/50 border-slate-200/90 text-slate-800 hover:border-purple-200'
-                  }`}
-                  title="Click to switch construction site / workspace"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-soft-pulse shrink-0" />
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Site:</span>
-                  <span className="font-bold text-slate-900 max-w-[150px] sm:max-w-[220px] truncate">
-                    {project.name}
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isSiteSwitcherOpen ? 'rotate-180 text-[#653ef1]' : ''}`} />
-                </button>
+                      }`}
+                    title="Click to switch construction site / workspace"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-soft-pulse shrink-0" />
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Site:</span>
+                    <span className="font-bold text-slate-900 max-w-[150px] sm:max-w-[220px] truncate">
+                      {project.name}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isSiteSwitcherOpen ? 'rotate-180 text-[#653ef1]' : ''}`} />
+                  </button>
 
-                {/* Site Switcher Popup Menu */}
-                {isSiteSwitcherOpen && (
-                  <div className="absolute left-0 mt-2 w-72 sm:w-84 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#653ef1]">
-                        Switch Construction Site
-                      </span>
-                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
-                        {allProjects.length} {allProjects.length === 1 ? 'Site' : 'Sites'}
-                      </span>
-                    </div>
+                  {/* Site Switcher Popup Menu */}
+                  {isSiteSwitcherOpen && (
+                    <div className="absolute left-0 mt-2 w-72 sm:w-84 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#653ef1]">
+                          Switch Construction Site
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                          {allProjects.length} {allProjects.length === 1 ? 'Site' : 'Sites'}
+                        </span>
+                      </div>
 
-                    <div className="max-h-64 overflow-y-auto p-1.5 space-y-1">
-                      {allProjects.length > 0 ? (
-                        allProjects.map((p) => {
-                          const isCurrent = p.id === (activeProjectId || project.id);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => {
-                                onSelectProject?.(p);
-                                setIsSiteSwitcherOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
-                                isCurrent
+                      <div className="max-h-64 overflow-y-auto p-1.5 space-y-1">
+                        {allProjects.length > 0 ? (
+                          allProjects.map((p) => {
+                            const isCurrent = p.id === (activeProjectId || project.id);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  onSelectProject?.(p);
+                                  setIsSiteSwitcherOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${isCurrent
                                   ? 'bg-purple-50 text-[#653ef1] font-bold border border-purple-200 shadow-2xs'
                                   : 'hover:bg-purple-50/50 text-slate-700 border border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                                  isCurrent ? 'bg-[#653ef1] text-white shadow-2xs' : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                  <Building2 className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-xs font-bold truncate">
-                                    {p.name}
+                                  }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isCurrent ? 'bg-[#653ef1] text-white shadow-2xs' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                    <Building2 className="w-3.5 h-3.5" />
                                   </div>
-                                  {(p.location || p.address) && (
-                                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                      {p.location || p.address}
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold truncate">
+                                      {p.name}
                                     </div>
-                                  )}
+                                    {(p.location || p.address) && (
+                                      <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                                        {p.location || p.address}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              {isCurrent && (
-                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-soft-pulse" />
-                                  Active
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <div className="px-3 py-3 text-center text-xs text-slate-500">
-                          {project.name} (Current Active Site)
-                        </div>
-                      )}
-                    </div>
+                                {isCurrent && (
+                                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-soft-pulse" />
+                                    Active
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="px-3 py-3 text-center text-xs text-slate-500">
+                            {project.name} (Current Active Site)
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="pt-2 mt-1 border-t border-slate-100 px-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSiteSwitcherOpen(false);
-                          onOpenSitesManager?.();
-                        }}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-[#653ef1] hover:bg-purple-50 rounded-xl transition-colors cursor-pointer border border-purple-200"
-                      >
-                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Manage / Add New Construction Site</span>
-                      </button>
+                      <div className="pt-2 mt-1 border-t border-slate-100 px-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSiteSwitcherOpen(false);
+                            onOpenSitesManager?.();
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-[#653ef1] hover:bg-purple-50 rounded-xl transition-colors cursor-pointer border border-purple-200"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Manage / Add New Construction Site</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -304,7 +303,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap md:flex-nowrap justify-between md:justify-end">
 
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              
+
               {/* Timeline Actions: Log Progress, Add Task, Tools - ONLY rendered on Timeline views */}
               {isTimelineView && (
                 <>
@@ -354,11 +353,10 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsToolsOpen(!isToolsOpen)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-xl border transition-all cursor-pointer ${
-                          isToolsOpen 
-                            ? 'bg-purple-50 text-[#653ef1] border-purple-200 ring-2 ring-purple-100' 
-                            : 'bg-white hover:bg-purple-50/50 text-slate-700 border-slate-200 hover:border-purple-200'
-                        }`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-xl border transition-all cursor-pointer ${isToolsOpen
+                          ? 'bg-purple-50 text-[#653ef1] border-purple-200 ring-2 ring-purple-100'
+                          : 'bg-white hover:bg-purple-50/50 text-slate-700 border-slate-200 hover:border-purple-200'
+                          }`}
                         title="Quick Tools & Special Views"
                       >
                         <Sliders className="w-3.5 h-3.5 text-slate-500" />
@@ -376,7 +374,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                           <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                             Quick Tools & Modules
                           </div>
-                          
+
                           {/* 1. Restore Activities (On Top) */}
                           {onOpenRestoreActivities && (
                             <button
@@ -509,11 +507,10 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                    className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-                      isProfileMenuOpen
-                        ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-100 text-slate-900 shadow-xs'
-                        : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300'
-                    }`}
+                    className={`flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-2xs group ${isProfileMenuOpen
+                      ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-100 text-slate-900 shadow-xs'
+                      : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 hover:border-slate-300'
+                      }`}
                     title="User Account & Session"
                   >
                     {/* Avatar with gradient & online dot */}
@@ -540,7 +537,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
                   {/* Profile Dropdown Menu Card */}
                   {isProfileMenuOpen && (
                     <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 z-50 text-left animate-in fade-in zoom-in-95 duration-100">
-                      
+
                       {/* User Header Info Card */}
                       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60">
                         <div className="flex items-center gap-3">
@@ -618,13 +615,13 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
         {/* Row 2: Clean Executive KPI Ribbon (Rendered on Planning Schedule Views) */}
         {isPlanningView && (
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-            
+
             {/* Metric 1: Duration */}
             {(() => {
               const dur = calculateDurationDetails(project.plannedStartDate, project.plannedCompletionDate);
               return (
-                <div 
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-800 shadow-2xs transition-all hover:bg-slate-100/70" 
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-800 shadow-2xs transition-all hover:bg-slate-100/70"
                   title={`Timeline: ${project.plannedStartDate} to ${project.plannedCompletionDate} (${dur.days} calendar days / ${dur.decimalMonths} months)`}
                 >
                   <div className="w-5 h-5 rounded-lg bg-purple-50 text-[#653ef1] flex items-center justify-center shrink-0">
@@ -689,8 +686,8 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
               <span className="text-slate-500 text-[11px] font-medium">Progress:</span>
               <span className="font-extrabold text-[#653ef1] font-numeric">{project.overallProgress}%</span>
               <div className="w-20 h-2 bg-slate-200/80 rounded-full overflow-hidden shrink-0">
-                <div 
-                  className="h-full bg-gradient-to-r from-[#653ef1] to-[#8b5cf6] rounded-full transition-all duration-500" 
+                <div
+                  className="h-full bg-gradient-to-r from-[#653ef1] to-[#8b5cf6] rounded-full transition-all duration-500"
                   style={{ width: `${project.overallProgress}%` }}
                 />
               </div>

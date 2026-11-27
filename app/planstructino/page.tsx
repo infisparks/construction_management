@@ -1,37 +1,37 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  ProjectInfo, 
-  ConstructionTask, 
-  TaskDependency, 
-  DailyProgressEntry, 
-  TaskIssue, 
-  TaskActivityLog, 
+import {
+  ProjectInfo,
+  ConstructionTask,
+  TaskDependency,
+  DailyProgressEntry,
+  TaskIssue,
+  TaskActivityLog,
   RecoveryScenario,
-  ViewMode, 
-  ScheduleStatus, 
-  TaskType, 
+  ViewMode,
+  ScheduleStatus,
+  TaskType,
   DependencyType,
   Party,
   SubcontractorBill,
   FileCategory
 } from '@/lib/construction-planning/types';
-import { 
-  buildTaskTree, 
-  flattenTaskTree, 
-  recalculateParentRollups, 
+import {
+  buildTaskTree,
+  flattenTaskTree,
+  recalculateParentRollups,
   deduplicateTaskList,
-  getTaskMetrics, 
+  getTaskMetrics,
   calculateProjectRollup,
-  TaskNode 
+  TaskNode
 } from '@/lib/construction-planning/task-utils';
 import { fetchProfileVendors } from '@/lib/supabase/profile-services';
-import { 
-  fetchSubcontractorBills, 
-  createSubcontractorBill, 
-  updateSubcontractorBill, 
-  deleteSubcontractorBill 
+import {
+  fetchSubcontractorBills,
+  createSubcontractorBill,
+  updateSubcontractorBill,
+  deleteSubcontractorBill
 } from '@/lib/supabase/subcontractor-bill-services';
 
 import { Sidebar } from '@/components/construction-planning/Sidebar';
@@ -60,6 +60,7 @@ import { QuotationsListView } from '@/components/quotations/QuotationsListView';
 import { SiteInventoryManagement } from '@/components/inventory/SiteInventoryManagement';
 import { SiteExpensesView } from '@/components/expenses/SiteExpensesView';
 import { CommercialBillsAndExpensesView } from '@/components/expenses/CommercialBillsAndExpensesView';
+import { OperatingExpensesView } from '@/components/expenses/OperatingExpensesView';
 import { DirectorDashboardView } from '@/components/dashboard/DirectorDashboardView';
 import { PurchaseOutflowView } from '@/components/purchase/PurchaseOutflowView';
 import { useAuth } from '@/lib/supabase/auth-context';
@@ -68,19 +69,19 @@ import { LoginPage } from '@/components/auth/LoginPage';
 import { SitesManagerModal } from '@/components/projects/SitesManagerModal';
 import { DbProject } from '@/lib/supabase/types';
 import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
-import { 
-  resolveActiveSite, 
-  setStoredActiveSite, 
+import {
+  resolveActiveSite,
+  setStoredActiveSite,
   getStoredActiveSiteId,
-  fetchAllActiveSites 
+  fetchAllActiveSites
 } from '@/lib/supabase/site-storage';
 import { CheckCircle2, AlertTriangle, X, Building2, ShieldAlert, Menu } from 'lucide-react';
 import { isViewAllowed, isRestrictedRole, isAccountRole, isPurchaseRole, getFirstAllowedView } from '@/lib/auth/role-access';
-import { 
-  DateFilterState, 
-  DEFAULT_DATE_FILTER, 
-  matchesDateFilter, 
-  isDateFilterActive 
+import {
+  DateFilterState,
+  DEFAULT_DATE_FILTER,
+  matchesDateFilter,
+  isDateFilterActive
 } from '@/components/common/DateFilterControl';
 import { ConfirmDeleteModal } from '@/components/common/ConfirmDeleteModal';
 import { RestoreTasksModal } from '@/components/construction-planning/RestoreTasksModal';
@@ -223,7 +224,7 @@ export default function ConstructionPlanningPage() {
         const url = new URL(window.location.href);
         url.searchParams.set('site', dbProj.id);
         window.history.pushState({}, '', url.toString());
-      } catch {}
+      } catch { }
     }
 
     showToast(`Switched active workspace to "${dbProj.name}"`, 'success');
@@ -331,7 +332,7 @@ export default function ConstructionPlanningPage() {
             .then((deleted) => {
               if (isMounted) setDeletedTasksCount(deleted?.length || 0);
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       } catch (err) {
         console.error('Failed to synchronize Supabase planning data:', err);
@@ -422,6 +423,8 @@ export default function ConstructionPlanningPage() {
         'subcontractor-bills',
         'files-archive',
         'expenses',
+        'petty-cash',
+        'other-expenses',
         'contractor-work-orders',
         'customer-purchases',
         'purchase-outflow',
@@ -869,8 +872,8 @@ export default function ConstructionPlanningPage() {
   const handleConfirmStartTask = async (taskId: string, isOverride: boolean, overrideReason?: string) => {
     const today = new Date().toISOString().split('T')[0] || '2026-08-29';
     const task = tasks.find((t) => t.id === taskId);
-    const updatedNotes = isOverride 
-      ? `${task?.notes || ''} [AUTHORIZED OVERRIDE: Started despite predecessor constraints: ${overrideReason}]` 
+    const updatedNotes = isOverride
+      ? `${task?.notes || ''} [AUTHORIZED OVERRIDE: Started despite predecessor constraints: ${overrideReason}]`
       : task?.notes;
     const newProgress = task?.progress ?? 0;
 
@@ -899,8 +902,8 @@ export default function ConstructionPlanningPage() {
     }
 
     const actionText = isOverride ? 'Task Started (Authorized Override)' : 'Task Started on Site';
-    const detailsText = isOverride 
-      ? `Actual start stamped as ${today}. Overrode dependencies: ${overrideReason}` 
+    const detailsText = isOverride
+      ? `Actual start stamped as ${today}. Overrode dependencies: ${overrideReason}`
       : `Actual start stamped as ${today}. Dependencies satisfied.`;
     const performedBy = user?.email?.split('@')[0] || 'Site Engineer';
 
@@ -940,9 +943,9 @@ export default function ConstructionPlanningPage() {
   };
 
   const handleExecuteCompleteTask = async (
-    taskId: string, 
-    setProgressTo100: boolean, 
-    completionDate?: string, 
+    taskId: string,
+    setProgressTo100: boolean,
+    completionDate?: string,
     notes?: string
   ) => {
     const today = completionDate || new Date().toISOString().split('T')[0] || '2026-10-12';
@@ -950,12 +953,12 @@ export default function ConstructionPlanningPage() {
     if (!task) return;
 
     const finalProgress = setProgressTo100 ? 100 : (task.progress || 0);
-    const completedQty = setProgressTo100 
-      ? (task.plannedQuantity || task.completedQuantity) 
+    const completedQty = setProgressTo100
+      ? (task.plannedQuantity || task.completedQuantity)
       : (task.completedQuantity || 0);
 
-    const updatedNotes = notes 
-      ? (task.notes ? `${task.notes}\n[COMPLETED: ${notes}]` : `[COMPLETED: ${notes}]`) 
+    const updatedNotes = notes
+      ? (task.notes ? `${task.notes}\n[COMPLETED: ${notes}]` : `[COMPLETED: ${notes}]`)
       : task.notes;
 
     const updated = tasks.map((t) => {
@@ -1031,13 +1034,13 @@ export default function ConstructionPlanningPage() {
     let detailsText = '';
 
     if (targetStatus === 'in_progress') {
-      const prevProgress = task.progress === 100 
-        ? (task.plannedQuantity && task.completedQuantity 
-            ? Math.round((task.completedQuantity / task.plannedQuantity) * 100) 
-            : 0)
+      const prevProgress = task.progress === 100
+        ? (task.plannedQuantity && task.completedQuantity
+          ? Math.round((task.completedQuantity / task.plannedQuantity) * 100)
+          : 0)
         : task.progress;
-      const newQty = task.plannedQuantity 
-        ? Math.floor(task.plannedQuantity * (prevProgress / 100)) 
+      const newQty = task.plannedQuantity
+        ? Math.floor(task.plannedQuantity * (prevProgress / 100))
         : (task.completedQuantity || 0);
 
       updatedTask = {
@@ -1174,10 +1177,10 @@ export default function ConstructionPlanningPage() {
       completedQuantity: newCompletedQty,
     }, activeProjectId);
     await logPlanActivity(
-      entry.taskId, 
-      'Daily Progress Logged', 
-      `Progress increased from ${entry.previousProgress}% to ${entry.newProgress}%. Reported by ${entry.supervisorName}.`, 
-      entry.supervisorName, 
+      entry.taskId,
+      'Daily Progress Logged',
+      `Progress increased from ${entry.previousProgress}% to ${entry.newProgress}%. Reported by ${entry.supervisorName}.`,
+      entry.supervisorName,
       activeProjectId
     );
   };
@@ -1344,7 +1347,7 @@ export default function ConstructionPlanningPage() {
     // Update deleted tasks count
     fetchDeletedPlanTasks(activeProjectId)
       .then((deleted) => setDeletedTasksCount(deleted?.length || 0))
-      .catch(() => {});
+      .catch(() => { });
   };
 
   // Dependencies Management
@@ -1354,9 +1357,9 @@ export default function ConstructionPlanningPage() {
   };
 
   const handleAddDependency = async (
-    predecessorId: string, 
-    successorId: string, 
-    type: DependencyType, 
+    predecessorId: string,
+    successorId: string,
+    type: DependencyType,
     lagDays: number
   ) => {
     const tempId = `dep-${Date.now()}`;
@@ -1418,9 +1421,9 @@ export default function ConstructionPlanningPage() {
 
   // Issue Add Handler
   const handleAddIssue = async (
-    taskId: string, 
-    title: string, 
-    description: string, 
+    taskId: string,
+    title: string,
+    description: string,
     severity: TaskIssue['severity']
   ) => {
     const tempId = `iss-${Date.now()}`;
@@ -1485,16 +1488,16 @@ export default function ConstructionPlanningPage() {
   }
 
   // Determine whether current view is one of the Planning Schedule views
-  const isPlanningView = 
-    currentView === 'list' || 
-    currentView === 'gantt' || 
-    currentView === 'critical' || 
-    currentView === 'milestones' || 
+  const isPlanningView =
+    currentView === 'list' ||
+    currentView === 'gantt' ||
+    currentView === 'critical' ||
+    currentView === 'milestones' ||
     currentView === 'progress';
 
   return (
     <div className="min-h-screen bg-[#f2f2f8] text-slate-900 font-sans antialiased selection:bg-purple-100 selection:text-purple-900 flex">
-      
+
       {/* 1. Left Fixed & Collapsible Sidebar */}
       <Sidebar
         currentView={currentView}
@@ -1538,7 +1541,7 @@ export default function ConstructionPlanningPage() {
       />
 
       {/* 2. Main Content Area (Spans Full Chrome Width & Adapts to Sidebar) */}
-      <div 
+      <div
         className="flex-1 flex flex-col min-w-0 overflow-x-hidden transition-all duration-300 md:pl-[76px] lg:pl-[80px]"
       >
         {/* Global Page Top Header with Interactive Site Switcher */}
@@ -1571,7 +1574,7 @@ export default function ConstructionPlanningPage() {
 
         {/* Full-width Responsive Dashboard Body */}
         <main className="w-full px-3.5 sm:px-6 lg:px-8 py-5 space-y-4 sm:space-y-5 flex-1">
-          
+
           {/* Toast Notification */}
           {toastMessage && (
             <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -1727,10 +1730,10 @@ export default function ConstructionPlanningPage() {
                       currentView === 'contractor-work-orders'
                         ? 'contractor-work-orders'
                         : currentView === 'subcontractor-bills'
-                        ? 'subcontractor-bills'
-                        : currentView === 'customer-purchases'
-                        ? 'customer-purchases'
-                        : 'expenses'
+                          ? 'subcontractor-bills'
+                          : currentView === 'customer-purchases'
+                            ? 'customer-purchases'
+                            : 'expenses'
                     }
                     project={project}
                     projectId={activeProjectId}
@@ -1746,6 +1749,26 @@ export default function ConstructionPlanningPage() {
                     onDeleteSubcontractorBill={handleDeleteSubcontractorBill}
                     onTabChange={(tab) => setCurrentView(tab)}
                     onSelectProject={handleSelectDbProject}
+                  />
+                )}
+
+                {currentView === 'petty-cash' && (
+                  <OperatingExpensesView
+                    expenseType="petty_cash"
+                    projectId={activeProjectId}
+                    allProjects={allDbProjects}
+                    userEmail={user.email || undefined}
+                    showToast={showToast}
+                  />
+                )}
+
+                {currentView === 'other-expenses' && (
+                  <OperatingExpensesView
+                    expenseType="other_expense"
+                    projectId={activeProjectId}
+                    allProjects={allDbProjects}
+                    userEmail={user.email || undefined}
+                    showToast={showToast}
                   />
                 )}
 
@@ -1798,7 +1821,7 @@ export default function ConstructionPlanningPage() {
       </div>
 
       {/* Drawers & Modals */}
-      
+
       {/* Detailed Task Side Drawer */}
       <TaskDetailsDrawer
         task={selectedTaskForDrawer}
@@ -1935,8 +1958,8 @@ export default function ConstructionPlanningPage() {
           deleteConfirmTask?.type === 'milestone'
             ? 'Delete Milestone'
             : deleteConfirmTask?.type === 'work_package'
-            ? 'Delete Work Package'
-            : 'Delete Activity Task'
+              ? 'Delete Work Package'
+              : 'Delete Activity Task'
         }
         itemName={deleteConfirmTask ? `${deleteConfirmTask.code} - ${deleteConfirmTask.name}` : undefined}
         warningMessage={

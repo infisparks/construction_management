@@ -2,23 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Building2, 
-  Calendar, 
-  Receipt, 
-  Package, 
-  FolderKanban, 
+import {
+  Building2,
+  Calendar,
+  Receipt,
+  Package,
+  FolderKanban,
   FileText,
   LayoutDashboard,
   ShoppingBag,
-  LogOut, 
+  Wallet,
+  Briefcase,
+  LogOut,
   X,
   Sparkles
 } from 'lucide-react';
 import { ViewMode, ProjectInfo, FileCategory } from '@/lib/construction-planning/types';
 import { isModuleAllowed, isAccountRole, isPurchaseRole } from '@/lib/auth/role-access';
 
-export type NavModuleId = 'dashboard' | 'planning' | 'execution' | 'commercial' | 'materials' | 'archive' | 'purchase' | 'sites' | 'quotations';
+export type NavModuleId = 'dashboard' | 'planning' | 'execution' | 'commercial' | 'petty-cash' | 'other-expenses' | 'materials' | 'archive' | 'purchase' | 'sites' | 'quotations';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -83,6 +85,24 @@ const MODULES: NavModuleDef[] = [
     badge: 'Live',
     badgeColor: 'bg-purple-100 text-[#653ef1]',
     description: 'Site expenses, work orders & Khata',
+  },
+  {
+    id: 'petty-cash',
+    label: 'Petty Cash Register',
+    shortLabel: 'Petty Cash',
+    icon: Wallet,
+    badge: 'Cash',
+    badgeColor: 'bg-purple-100 text-[#653ef1]',
+    description: 'Daily site petty cash vouchers & sundries',
+  },
+  {
+    id: 'other-expenses',
+    label: 'Other Expenses & Salaries',
+    shortLabel: 'Other Exp',
+    icon: Briefcase,
+    badge: 'Staff',
+    badgeColor: 'bg-purple-100 text-[#653ef1]',
+    description: 'Salaries, office rent, utilities & admin',
   },
   {
     id: 'materials',
@@ -151,6 +171,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (currentView === 'quotations') return 'quotations';
     if (currentView === 'files-archive') return 'archive';
     if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
+    if (currentView === 'petty-cash') return 'petty-cash';
+    if (currentView === 'other-expenses') return 'other-expenses';
     if (currentView === 'materials') return 'materials';
     if (isAccountRole(userRole)) return 'commercial';
     if (isPurchaseRole(userRole)) return 'purchase';
@@ -169,6 +191,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setActiveModule('archive');
     } else if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') {
       setActiveModule('commercial');
+    } else if (currentView === 'petty-cash') {
+      setActiveModule('petty-cash');
+    } else if (currentView === 'other-expenses') {
+      setActiveModule('other-expenses');
     } else if (currentView === 'materials') {
       setActiveModule('materials');
     } else if (currentView === 'list' || currentView === 'gantt' || currentView === 'critical' || currentView === 'milestones' || currentView === 'progress') {
@@ -196,6 +222,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       onViewChange('list');
     } else if (modId === 'commercial') {
       onViewChange('expenses');
+    } else if (modId === 'petty-cash') {
+      onViewChange('petty-cash');
+    } else if (modId === 'other-expenses') {
+      onViewChange('other-expenses');
     } else if (modId === 'materials') {
       onViewChange('materials');
     } else if (modId === 'archive') {
@@ -214,7 +244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Mobile Backdrop */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 lg:hidden transition-opacity"
           onClick={onCloseMobile}
         />
@@ -222,17 +252,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Single Rail Sidebar (Fixed width w-[72px], WebKitX Electric Violet theme) */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-[72px] bg-gradient-to-b from-[#6e46f2] via-[#653ef1] to-[#592be8] border-r border-[#542be3] shadow-lg shadow-[#653ef1]/20 flex flex-col justify-between items-center py-3.5 select-none transition-transform duration-300 ${
-          isMobileOpen 
-            ? 'translate-x-0' 
-            : '-translate-x-full md:translate-x-0'
-        }`}
+        className={`fixed top-0 bottom-0 left-0 z-40 w-[72px] bg-gradient-to-b from-[#6e46f2] via-[#653ef1] to-[#592be8] border-r border-[#542be3] shadow-lg shadow-[#653ef1]/20 flex flex-col justify-between items-center py-3.5 select-none transition-transform duration-300 ${isMobileOpen
+          ? 'translate-x-0'
+          : '-translate-x-full md:translate-x-0'
+          }`}
       >
         {/* ======================================================== */}
         {/* TOP SECTION: Brand Logo & Navigation Icons */}
         {/* ======================================================== */}
         <div className="flex flex-col items-center gap-3.5 w-full">
-          
+
           {/* Brand Logo Button */}
           <button
             type="button"
@@ -241,7 +270,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Armee Enterprises PMS"
           >
             <Building2 className="w-5 h-5 group-hover:rotate-3 transition-transform text-white" />
-            
+
             {/* Live Indicator Dot */}
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#653ef1] animate-soft-pulse" />
 
@@ -269,23 +298,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={mod.id}
                   type="button"
                   onClick={() => handleModuleClick(mod.id)}
-                  className={`w-13 h-13 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative group cursor-pointer ${
-                    isCurrent
-                      ? 'bg-white text-[#653ef1] shadow-lg shadow-black/15 font-bold scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95'
-                  }`}
+                  className={`w-13 h-13 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative group cursor-pointer ${isCurrent
+                    ? 'bg-white text-[#653ef1] shadow-lg shadow-black/15 font-bold scale-105'
+                    : 'text-white/80 hover:text-white hover:bg-white/15 hover:scale-105 active:scale-95'
+                    }`}
                   title={mod.label}
                 >
-                  <Icon 
-                    className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${
-                      isCurrent 
-                        ? 'text-[#653ef1] stroke-[2.4]' 
-                        : 'text-white/85 group-hover:text-white'
-                    }`} 
+                  <Icon
+                    className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${isCurrent
+                      ? 'text-[#653ef1] stroke-[2.4]'
+                      : 'text-white/85 group-hover:text-white'
+                      }`}
                   />
-                  <span className={`text-[10px] tracking-tight leading-none block truncate max-w-[54px] ${
-                    isCurrent ? 'font-bold text-[#653ef1]' : 'font-medium text-white/85 group-hover:text-white'
-                  }`}>
+                  <span className={`text-[10px] tracking-tight leading-none block truncate max-w-[54px] ${isCurrent ? 'font-bold text-[#653ef1]' : 'font-medium text-white/85 group-hover:text-white'
+                    }`}>
                     {mod.shortLabel}
                   </span>
 
@@ -319,7 +345,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* BOTTOM SECTION: Sites Switcher, User Avatar & Sign Out */}
         {/* ======================================================== */}
         <div className="flex flex-col items-center gap-2.5 w-full px-2">
-          
+
           {/* Sites Multi-Project Switcher Button */}
           <button
             type="button"
@@ -351,13 +377,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="w-8 h-px bg-white/20" />
 
           {/* User Avatar Circle */}
-          <div 
+          <div
             className="w-10 h-10 rounded-2xl bg-white/20 hover:bg-white/30 text-white border border-white/25 flex items-center justify-center font-bold text-xs shadow-xs group relative cursor-pointer hover:scale-105 transition-transform"
             title={userEmail || 'admin@gmail.com'}
           >
             {userEmail ? userEmail.charAt(0).toUpperCase() : 'A'}
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#653ef1] animate-soft-pulse" />
-            
+
             {/* Tooltip */}
             <div className="absolute left-[80px] top-1/2 -translate-y-1/2 px-3.5 py-2 bg-[#281760] text-white text-xs rounded-xl shadow-2xl border border-purple-400/20 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 text-left">
               <div className="font-semibold text-[11px] truncate max-w-[180px] text-white">{userEmail || 'admin@gmail.com'}</div>
