@@ -2296,7 +2296,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             title="Open certified GRN PDF voucher in new browser tab via Blob URL"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span>View Bill (PDF)</span>
+                            <span>View GRN</span>
                           </button>
                           <button
                             type="button"
@@ -2455,7 +2455,7 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                             title="Open certified MIN voucher in new browser tab via Blob URL"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span>View Bill (PDF)</span>
+                            <span>Issue Slip</span>
                           </button>
                           <button
                             type="button"
