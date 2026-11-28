@@ -245,14 +245,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 md:hidden transition-opacity"
           onClick={onCloseMobile}
         />
       )}
 
       {/* Main Single Rail Sidebar (Fixed width w-[72px], WebKitX Electric Violet theme) */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-[72px] bg-gradient-to-b from-[#6e46f2] via-[#653ef1] to-[#592be8] border-r border-[#542be3] shadow-lg shadow-[#653ef1]/20 flex flex-col justify-between items-center py-3.5 select-none transition-transform duration-300 ${isMobileOpen
+        className={`fixed top-0 bottom-0 left-0 z-40 w-[72px] bg-gradient-to-b from-[#6e46f2] via-[#653ef1] to-[#592be8] border-r border-[#542be3] shadow-lg shadow-[#653ef1]/20 flex flex-col justify-between items-center py-3.5 select-none overflow-y-auto overflow-x-hidden transition-transform duration-300 ${isMobileOpen
           ? 'translate-x-0'
           : '-translate-x-full md:translate-x-0'
           }`}
@@ -410,7 +410,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 mt-1 cursor-pointer"
+            className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 mt-1 cursor-pointer"
             title="Close Menu"
           >
             <X className="w-4 h-4" />

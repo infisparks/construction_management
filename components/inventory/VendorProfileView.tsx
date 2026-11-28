@@ -500,10 +500,12 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-4 text-slate-700">
-                      {v.city || v.location ? (
+                      {v.city || v.location || v.state ? (
                         <div className="flex items-center gap-1 text-xs font-medium">
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{v.city || v.location}</span>
+                          <span>
+                            {[v.city || v.location, v.state].filter(Boolean).join(', ')}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-slate-400 italic">—</span>

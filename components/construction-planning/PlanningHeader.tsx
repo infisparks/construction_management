@@ -156,23 +156,47 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
     currentView === 'progress'
   );
 
-  // Hide top PlanningHeader completely on Store & Bills views (they have their own dedicated headers)
+  // Hide desktop PlanningHeader on Store & Bills views (they have their own dedicated headers),
+  // but keep a compact mobile navigation bar so the Sidebar drawer is always accessible on mobile.
   const isStoreOrBillsView =
     currentView === 'materials' ||
     currentView === 'expenses' ||
     currentView === 'billing' ||
     currentView === 'subcontractor-bills' ||
     currentView === 'customer-purchases' ||
-    currentView === 'contractor-work-orders';
-
-  if (isStoreOrBillsView) {
-    return null;
-  }
+    currentView === 'contractor-work-orders' ||
+    currentView === 'vendors';
 
   const headerMeta = currentView && VIEW_HEADER_CONFIG[currentView]
     ? VIEW_HEADER_CONFIG[currentView]
     : { title: 'Armee Enterprises', icon: Building2 };
   const HeaderIcon = headerMeta.icon;
+
+  if (isStoreOrBillsView) {
+    return (
+      <header className="md:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-slate-200 px-3 py-2.5 flex items-center justify-between gap-2 w-full shadow-2xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {onToggleMobileMenu && (
+            <button
+              type="button"
+              onClick={onToggleMobileMenu}
+              className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:text-[#653ef1] hover:border-purple-300 transition-colors shrink-0 cursor-pointer"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+          )}
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-slate-900 truncate flex items-center gap-1.5">
+              <HeaderIcon className="w-4 h-4 text-[#653ef1] shrink-0" />
+              <span className="truncate">{headerMeta.title}</span>
+            </div>
+            <div className="text-[11px] text-slate-500 truncate">{project.name}</div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs w-full">
@@ -186,7 +210,7 @@ export const PlanningHeader: React.FC<PlanningHeaderProps> = ({
               <button
                 type="button"
                 onClick={onToggleMobileMenu}
-                className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+                className="md:hidden p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
                 title="Toggle Navigation"
               >
                 <Menu className="w-4 h-4" />

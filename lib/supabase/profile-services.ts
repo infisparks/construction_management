@@ -40,6 +40,7 @@ export interface ProfileVendor {
   bank_details?: string;
   address?: string;
   city?: string;
+  state?: string;
   location?: string;
   notes?: string;
   is_active?: boolean;
@@ -274,6 +275,7 @@ export async function createProfileVendor(
           ),
           address: vendor.address || null,
           city: vendor.city || null,
+          state: vendor.state || null,
           location: vendor.location || null,
           notes: vendor.notes || null,
           is_active: vendor.is_active ?? true,

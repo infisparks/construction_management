@@ -66,6 +66,7 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
   const [gstin, setGstin] = useState('');
   const [pan, setPan] = useState('');
   const [city, setCity] = useState('');
+  const [stateName, setStateName] = useState('');
   const [location, setLocation] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
@@ -95,6 +96,7 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
       setGstin(editingVendor.gstin || '');
       setPan(editingVendor.pan || '');
       setCity(editingVendor.city || '');
+      setStateName(editingVendor.state || '');
       setLocation(editingVendor.location || '');
       setAddress(editingVendor.address || '');
       setNotes(editingVendor.notes || '');
@@ -108,6 +110,7 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
       setGstin('');
       setPan('');
       setCity('');
+      setStateName('');
       setLocation('');
       setAddress('');
       setNotes('');
@@ -165,6 +168,7 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
       gstin: gstin.trim() || undefined,
       pan: pan.trim().toUpperCase() || undefined,
       city: city.trim() || undefined,
+      state: stateName.trim() || undefined,
       location: location.trim() || undefined,
       address: address.trim() || undefined,
       notes: notes.trim() || undefined,
@@ -201,11 +205,11 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]"
+        className="w-full max-w-xl bg-white rounded-none sm:rounded-2xl shadow-2xl border-0 sm:border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -373,8 +377,8 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
             </div>
           </div>
 
-          {/* GSTIN, PAN & City / Location */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* GSTIN & PAN */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 GSTIN / Tax ID
@@ -401,7 +405,10 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
                 className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-mono font-bold uppercase text-slate-900 focus:outline-hidden focus:border-purple-600"
               />
             </div>
+          </div>
 
+          {/* City & State */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 City / Operating Region
@@ -414,6 +421,19 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
                   setCity(e.target.value);
                   setLocation(e.target.value);
                 }}
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                State
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Maharashtra"
+                value={stateName}
+                onChange={(e) => setStateName(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
               />
             </div>
@@ -455,18 +475,18 @@ export const VendorProfileModal: React.FC<VendorProfileModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-5 py-2.5 sm:py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {isSaving ? (
                 <>

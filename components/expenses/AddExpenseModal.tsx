@@ -669,7 +669,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         </div>
 
         {/* Drawer Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 text-xs">
           {errorMessage && (
             <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold animate-in fade-in flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
@@ -1418,12 +1418,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         </form>
 
         {/* Sticky Drawer Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/90 backdrop-blur-xs flex items-center justify-end gap-3 shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-slate-200 bg-slate-50/90 backdrop-blur-xs flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting || isUploading}
-            className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 text-center"
           >
             Cancel
           </button>
@@ -1431,7 +1431,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || isUploading}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-[#653ef1]/25 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6e46f2] via-[#653ef1] to-[#592be8] hover:from-[#764ff5] hover:to-[#5022e3] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-[#653ef1]/25 flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
           >
             {isSubmitting || isUploading ? (
               <>
