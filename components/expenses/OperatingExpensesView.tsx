@@ -53,7 +53,7 @@ import {
 } from '@/components/common/DateFilterControl';
 
 interface OperatingExpensesViewProps {
-  expenseType: OperatingExpenseType;
+  expenseType?: OperatingExpenseType | 'all';
   projectId?: string;
   allProjects?: DbProject[];
   userEmail?: string;
@@ -97,16 +97,34 @@ function formatINR(val: number): string {
 }
 
 export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
-  expenseType,
+  expenseType = 'all',
   projectId = '',
   allProjects = [],
   userEmail,
   showToast,
 }) => {
-  const isPettyCash = expenseType === 'petty_cash';
-  const defaultCategories = isPettyCash ? PETTY_CASH_CATEGORIES : OTHER_EXPENSE_CATEGORIES;
-  const categoryKey = isPettyCash ? 'petty_cash_category' : 'other_expense_category';
+  const [selectedScope, setSelectedScope] = useState<OperatingExpenseType | 'all'>(expenseType);
 
+  useEffect(() => {
+    setSelectedScope(expenseType);
+  }, [expenseType]);
+
+  const isMix = selectedScope === 'all';
+  const isPettyCash = selectedScope === 'petty_cash';
+  const defaultCategories = useMemo(
+    () =>
+      selectedScope === 'all'
+        ? Array.from(new Set([...PETTY_CASH_CATEGORIES, ...OTHER_EXPENSE_CATEGORIES]))
+        : selectedScope === 'petty_cash'
+          ? PETTY_CASH_CATEGORIES
+          : OTHER_EXPENSE_CATEGORIES,
+    [selectedScope]
+  );
+  const categoryKey =
+    selectedScope === 'other_expense' ? 'other_expense_category' : 'petty_cash_category';
+
+  const [pettyCategories, setPettyCategories] = useState<string[]>(PETTY_CASH_CATEGORIES);
+  const [otherCategories, setOtherCategories] = useState<string[]>(OTHER_EXPENSE_CATEGORIES);
   const [categories, setCategories] = useState<string[]>(defaultCategories);
   const [categoryFieldTemplates, setCategoryFieldTemplates] = useState<Record<string, string[]>>({});
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -137,12 +155,15 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
   const currentMonthStr = todayStr.slice(0, 7);
   const [formProjectId, setFormProjectId] = useState<string>(projectId || '');
+  const [formExpenseType, setFormExpenseType] = useState<OperatingExpenseType>(
+    expenseType === 'other_expense' ? 'other_expense' : 'petty_cash'
+  );
   const [formTitle, setFormTitle] = useState('');
   const [formCategory, setFormCategory] = useState(defaultCategories[0]);
   const [formCustomFields, setFormCustomFields] = useState<OperatingCustomField[]>([]);
   const [formAmount, setFormAmount] = useState('');
   const [formPaymentMethod, setFormPaymentMethod] = useState<OperatingPaymentMethod>(
-    isPettyCash ? 'cash' : 'bank_transfer'
+    selectedScope === 'other_expense' ? 'bank_transfer' : 'cash'
   );
   const [formDate, setFormDate] = useState(todayStr);
   const [formReferenceNo, setFormReferenceNo] = useState('');
@@ -153,8 +174,8 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
     setIsLoading(true);
     setLoadError(null);
     const [activeRes, deletedList] = await Promise.all([
-      fetchOperatingExpenses(expenseType, siteFilter === 'all' ? undefined : siteFilter),
-      fetchDeletedOperatingExpenses(expenseType),
+      fetchOperatingExpenses(selectedScope, siteFilter === 'all' ? undefined : siteFilter),
+      fetchDeletedOperatingExpenses(selectedScope),
     ]);
     setRows(activeRes.data);
     setDeletedRows(deletedList);
@@ -166,20 +187,30 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [expenseType, siteFilter]);
+  }, [selectedScope, siteFilter]);
 
   // Load dynamic categories & column templates from public.category
   useEffect(() => {
-    setCategories(defaultCategories);
     setCategoryFilter('all');
     setSearchQuery('');
-    fetchDropdownCategory(categoryKey, defaultCategories).then((cats) => {
-      if (cats && cats.length > 0) {
-        setCategories(cats);
+    Promise.all([
+      fetchDropdownCategory('petty_cash_category', PETTY_CASH_CATEGORIES),
+      fetchDropdownCategory('other_expense_category', OTHER_EXPENSE_CATEGORIES),
+    ]).then(([pettyCats, otherCats]) => {
+      const pList = pettyCats && pettyCats.length > 0 ? pettyCats : PETTY_CASH_CATEGORIES;
+      const oList = otherCats && otherCats.length > 0 ? otherCats : OTHER_EXPENSE_CATEGORIES;
+      setPettyCategories(pList);
+      setOtherCategories(oList);
+      if (selectedScope === 'petty_cash') {
+        setCategories(pList);
+      } else if (selectedScope === 'other_expense') {
+        setCategories(oList);
+      } else {
+        setCategories(Array.from(new Set([...pList, ...oList])));
       }
     });
     fetchCategoryFieldTemplates().then(setCategoryFieldTemplates);
-  }, [expenseType]);
+  }, [selectedScope]);
 
   const filteredRows = useMemo(() => {
     const source = activeTab === 'register' ? rows : deletedRows;
@@ -233,10 +264,21 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
     let cashTotal = 0;
     let salaryTotal = 0;
     let monthTotal = 0;
+    let pettyCashTotal = 0;
+    let pettyCashCount = 0;
+    let otherExpenseTotal = 0;
+    let otherExpenseCount = 0;
 
     for (const r of activeFilteredRows) {
       const amt = Number(r.amount || 0);
       total += amt;
+      if (r.expense_type === 'petty_cash') {
+        pettyCashTotal += amt;
+        pettyCashCount += 1;
+      } else {
+        otherExpenseTotal += amt;
+        otherExpenseCount += 1;
+      }
       if (r.payment_method === 'cash') {
         cashTotal += amt;
       }
@@ -253,6 +295,10 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
       cashTotal,
       salaryTotal,
       monthTotal,
+      pettyCashTotal,
+      pettyCashCount,
+      otherExpenseTotal,
+      otherExpenseCount,
       count: activeFilteredRows.length,
     };
   }, [activeFilteredRows, currentMonthStr]);
@@ -280,12 +326,34 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
     setFormCustomFields((prev) => buildFieldsForCategory(nextCat, prev));
   };
 
+  const activeFormCategories =
+    formExpenseType === 'petty_cash' ? pettyCategories : otherCategories;
+
   const handleAddNewCategory = async () => {
     const trimmed = newCategoryName.trim();
     if (!trimmed) return;
-    const res = await addCustomCategory(categoryKey, trimmed, categories);
+    const targetKey =
+      formExpenseType === 'petty_cash' ? 'petty_cash_category' : 'other_expense_category';
+    const currentList = formExpenseType === 'petty_cash' ? pettyCategories : otherCategories;
+    const res = await addCustomCategory(targetKey, trimmed, currentList);
     if (res.success) {
-      setCategories(res.categories);
+      if (formExpenseType === 'petty_cash') {
+        setPettyCategories(res.categories);
+      } else {
+        setOtherCategories(res.categories);
+      }
+      if (selectedScope === 'all') {
+        setCategories(
+          Array.from(
+            new Set([
+              ...(formExpenseType === 'petty_cash' ? res.categories : pettyCategories),
+              ...(formExpenseType === 'other_expense' ? res.categories : otherCategories),
+            ])
+          )
+        );
+      } else {
+        setCategories(res.categories);
+      }
       setFormCategory(trimmed);
       setFormCustomFields((prev) => buildFieldsForCategory(trimmed, prev));
       setNewCategoryName('');
@@ -294,17 +362,22 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
     }
   };
 
-  const openAddModal = () => {
-    const initialCat = categories[0] || defaultCategories[0];
+  const openAddModal = (explicitType?: OperatingExpenseType) => {
+    const targetType: OperatingExpenseType =
+      explicitType || (selectedScope === 'other_expense' ? 'other_expense' : 'petty_cash');
+    const initialCat =
+      (targetType === 'petty_cash' ? pettyCategories[0] : otherCategories[0]) ||
+      defaultCategories[0];
     setEditingRow(null);
     setIsAddingCategory(false);
     setNewCategoryName('');
+    setFormExpenseType(targetType);
     setFormProjectId(siteFilter !== 'all' ? siteFilter : projectId || allProjects[0]?.id || '');
     setFormTitle('');
     setFormCategory(initialCat);
     setFormCustomFields(buildFieldsForCategory(initialCat));
     setFormAmount('');
-    setFormPaymentMethod(isPettyCash ? 'cash' : 'bank_transfer');
+    setFormPaymentMethod(targetType === 'petty_cash' ? 'cash' : 'bank_transfer');
     setFormDate(todayStr);
     setFormReferenceNo('');
     setFormNotes('');
@@ -316,6 +389,7 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
     setEditingRow(row);
     setIsAddingCategory(false);
     setNewCategoryName('');
+    setFormExpenseType(row.expense_type);
     setFormProjectId(row.project_id || '');
     setFormTitle(row.title);
     setFormCategory(row.category);
@@ -339,7 +413,7 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
     try {
       const uploaded: OperatingExpenseAttachment[] = [];
       for (const f of files) {
-        const att = await uploadOperatingAttachmentToStorage(f, expenseType);
+        const att = await uploadOperatingAttachmentToStorage(f, formExpenseType);
         uploaded.push(att);
       }
       setFormAttachments((prev) => [...prev, ...uploaded]);
@@ -370,7 +444,7 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
 
     setIsSaving(true);
     const payload = {
-      expense_type: expenseType,
+      expense_type: formExpenseType,
       project_id: formProjectId || null,
       title: formTitle.trim(),
       category: formCategory,
@@ -500,16 +574,22 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-bold text-[#111827]">
-                {isPettyCash ? 'Petty Cash Register' : 'Other Expenses & Salaries'}
+                {isMix
+                  ? 'Expenses (Petty Cash & Other)'
+                  : isPettyCash
+                    ? 'Petty Cash Register'
+                    : 'Other Expenses & Salaries'}
               </h1>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-[#653ef1] border border-purple-200">
                 {kpis.count} {kpis.count === 1 ? 'Entry' : 'Entries'}
               </span>
             </div>
             <p className="text-xs text-[#6B7280] mt-0.5">
-              {isPettyCash
-                ? 'Track daily site petty cash vouchers, refreshments, conveyance, and small cash purchases.'
-                : 'Manage staff & engineer salaries, office rent, electricity, fuel, and general operating expenses.'}
+              {isMix
+                ? 'Combined view of daily site petty cash vouchers, staff salaries, rent, and operating expenses.'
+                : isPettyCash
+                  ? 'Track daily site petty cash vouchers, refreshments, conveyance, and small cash purchases.'
+                  : 'Manage staff & engineer salaries, office rent, electricity, fuel, and general operating expenses.'}
             </p>
           </div>
         </div>
@@ -531,22 +611,89 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span className="hidden sm:inline">Export CSV</span>
           </button>
-          <button
-            type="button"
-            onClick={openAddModal}
-            className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#592be8] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{isPettyCash ? 'Add Petty Cash' : 'Add Expense / Salary'}</span>
-          </button>
+          {isMix ? (
+            <>
+              <button
+                type="button"
+                onClick={() => openAddModal('petty_cash')}
+                className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Petty Cash</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openAddModal('other_expense')}
+                className="h-9 px-3.5 rounded-xl bg-[#653ef1] hover:bg-[#592be8] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Expense</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openAddModal()}
+              className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#592be8] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{isPettyCash ? 'Add Petty Cash' : 'Add Expense / Salary'}</span>
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* 1B. Expense Module Sub-Tabs: All / Mix | Petty Cash | Other Expenses */}
+      <div className="bg-white rounded-2xl border border-[#E5E7EB] p-2 shadow-2xs flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setSelectedScope('all')}
+          className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            selectedScope === 'all'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Wallet className="w-3.5 h-3.5" />
+          <span>All / Mix</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSelectedScope('petty_cash')}
+          className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            selectedScope === 'petty_cash'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Wallet className="w-3.5 h-3.5" />
+          <span>Petty Cash</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSelectedScope('other_expense')}
+          className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            selectedScope === 'other_expense'
+              ? 'bg-[#653ef1] text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Briefcase className="w-3.5 h-3.5" />
+          <span>Other Expenses</span>
+        </button>
       </div>
 
       {/* 2. KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 shadow-2xs">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
-            {isPettyCash ? 'Total Petty Cash (Paid)' : 'Total Other Expenses (Paid)'}
+            {isMix
+              ? 'Total Expenses (Paid)'
+              : isPettyCash
+                ? 'Total Petty Cash (Paid)'
+                : 'Total Other Expenses (Paid)'}
           </span>
           <div className="text-xl font-bold text-[#111827] mt-1">₹{formatINR(kpis.total)}</div>
           <div className="text-[11px] text-[#6B7280] mt-1">{kpis.count} recorded entries</div>
@@ -554,21 +701,39 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
 
         <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 shadow-2xs">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
-            Cash Payments
+            {isMix ? 'Petty Cash Amount' : 'Cash Payments'}
           </span>
-          <div className="text-xl font-bold text-emerald-700 mt-1">₹{formatINR(kpis.cashTotal)}</div>
-          <div className="text-[11px] text-[#6B7280] mt-1">Paid in cash</div>
+          <div className="text-xl font-bold text-emerald-700 mt-1">
+            ₹{formatINR(isMix ? kpis.pettyCashTotal : kpis.cashTotal)}
+          </div>
+          <div className="text-[11px] text-[#6B7280] mt-1">
+            {isMix ? `${kpis.pettyCashCount} petty cash entries` : 'Paid in cash'}
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 shadow-2xs">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
-            {isPettyCash ? 'This Month Spend' : 'Salaries Disbursed'}
+            {isMix
+              ? 'Other Expenses Amount'
+              : selectedScope === 'other_expense'
+                ? 'Salaries Disbursed'
+                : 'This Month Spend'}
           </span>
           <div className="text-xl font-bold text-[#653ef1] mt-1">
-            ₹{formatINR(isPettyCash ? kpis.monthTotal : kpis.salaryTotal)}
+            ₹{formatINR(
+              isMix
+                ? kpis.otherExpenseTotal
+                : selectedScope === 'other_expense'
+                  ? kpis.salaryTotal
+                  : kpis.monthTotal
+            )}
           </div>
           <div className="text-[11px] text-[#6B7280] mt-1">
-            {isPettyCash ? `Month ${currentMonthStr}` : 'Staff & Engineer Salaries'}
+            {isMix
+              ? `${kpis.otherExpenseCount} other expense entries`
+              : selectedScope === 'other_expense'
+                ? 'Staff & Engineer Salaries'
+                : `Month ${currentMonthStr}`}
           </div>
         </div>
       </div>
@@ -728,6 +893,17 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
                           {row.title}
                         </div>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {isMix && (
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                row.expense_type === 'petty_cash'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}
+                            >
+                              {row.expense_type === 'petty_cash' ? 'Petty Cash' : 'Other Expense'}
+                            </span>
+                          )}
                           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-50 text-[#653ef1] border border-purple-100">
                             {row.category}
                           </span>
@@ -838,6 +1014,17 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {isMix && (
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        row.expense_type === 'petty_cash'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      }`}
+                    >
+                      {row.expense_type === 'petty_cash' ? 'Petty Cash' : 'Other Expense'}
+                    </span>
+                  )}
                   <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-50 text-[#653ef1]">
                     {row.category}
                   </span>
@@ -897,12 +1084,12 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
                 <h2 className="text-base font-bold text-[#111827]">
                   {editingRow
                     ? 'Edit Entry'
-                    : isPettyCash
+                    : formExpenseType === 'petty_cash'
                       ? 'Add Petty Cash Voucher'
                       : 'Add Other Expense / Salary'}
                 </h2>
                 <p className="text-xs text-[#6B7280]">
-                  {isPettyCash
+                  {formExpenseType === 'petty_cash'
                     ? 'Log daily site petty cash expenditure'
                     : 'Log staff salary, office rent, utilities, or admin expense'}
                 </p>
@@ -917,6 +1104,51 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
             </div>
 
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Expense Head Selector: Petty Cash vs Other Expense */}
+              <div>
+                <label className="block text-xs font-semibold text-[#111827] mb-1.5">
+                  Expense Head <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormExpenseType('petty_cash');
+                      const nextCat = pettyCategories[0] || PETTY_CASH_CATEGORIES[0];
+                      setFormCategory(nextCat);
+                      setFormCustomFields(buildFieldsForCategory(nextCat));
+                      setFormPaymentMethod('cash');
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      formExpenseType === 'petty_cash'
+                        ? 'bg-[#653ef1] text-white border-[#653ef1] shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span>Petty Cash</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormExpenseType('other_expense');
+                      const nextCat = otherCategories[0] || OTHER_EXPENSE_CATEGORIES[0];
+                      setFormCategory(nextCat);
+                      setFormCustomFields(buildFieldsForCategory(nextCat));
+                      setFormPaymentMethod('bank_transfer');
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      formExpenseType === 'other_expense'
+                        ? 'bg-[#653ef1] text-white border-[#653ef1] shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Briefcase className="w-3.5 h-3.5" />
+                    <span>Other Expense / Salary</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Section 1: Basic Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
@@ -973,7 +1205,7 @@ export const OperatingExpensesView: React.FC<OperatingExpensesViewProps> = ({
                       onChange={(e) => handleCategoryChangeInForm(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-lg border border-[#E5E7EB] text-sm text-[#111827] bg-white focus:outline-none focus:border-[#653ef1]"
                     >
-                      {categories.map((c) => (
+                      {activeFormCategories.map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>

@@ -82,17 +82,20 @@ function normalizeRow(row: any): OperatingExpenseRow {
 }
 
 export async function fetchOperatingExpenses(
-  expenseType: OperatingExpenseType,
+  expenseType: OperatingExpenseType | 'all',
   projectId?: string
 ): Promise<{ data: OperatingExpenseRow[]; error: string | null }> {
   try {
     let query = supabase
       .from('operating_expenses')
       .select('*, project:projects(id, name, code)')
-      .eq('expense_type', expenseType)
       .eq('is_deleted', false)
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false });
+
+    if (expenseType !== 'all') {
+      query = query.eq('expense_type', expenseType);
+    }
 
     if (projectId && projectId !== 'all') {
       query = query.eq('project_id', projectId);
@@ -112,15 +115,20 @@ export async function fetchOperatingExpenses(
 }
 
 export async function fetchDeletedOperatingExpenses(
-  expenseType: OperatingExpenseType
+  expenseType: OperatingExpenseType | 'all'
 ): Promise<OperatingExpenseRow[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('operating_expenses')
       .select('*, project:projects(id, name, code)')
-      .eq('expense_type', expenseType)
       .eq('is_deleted', true)
       .order('updated_at', { ascending: false });
+
+    if (expenseType !== 'all') {
+      query = query.eq('expense_type', expenseType);
+    }
+
+    const { data, error } = await query;
 
     if (error) return [];
     return (data || []).map(normalizeRow);

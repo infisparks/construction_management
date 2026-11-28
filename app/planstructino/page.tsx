@@ -1755,19 +1755,9 @@ export default function ConstructionPlanningPage() {
                   />
                 )}
 
-                {currentView === 'petty-cash' && (
+                {(currentView === 'petty-cash' || currentView === 'other-expenses') && (
                   <OperatingExpensesView
-                    expenseType="petty_cash"
-                    projectId={activeProjectId}
-                    allProjects={allDbProjects}
-                    userEmail={user.email || undefined}
-                    showToast={showToast}
-                  />
-                )}
-
-                {currentView === 'other-expenses' && (
-                  <OperatingExpensesView
-                    expenseType="other_expense"
+                    expenseType={currentView === 'other-expenses' ? 'other_expense' : 'all'}
                     projectId={activeProjectId}
                     allProjects={allDbProjects}
                     userEmail={user.email || undefined}

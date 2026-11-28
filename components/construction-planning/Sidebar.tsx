@@ -88,21 +88,12 @@ const MODULES: NavModuleDef[] = [
   },
   {
     id: 'petty-cash',
-    label: 'Petty Cash Register',
-    shortLabel: 'Petty Cash',
+    label: 'Expenses (Petty & Other)',
+    shortLabel: 'Expenses',
     icon: Wallet,
-    badge: 'Cash',
+    badge: 'Live',
     badgeColor: 'bg-purple-100 text-[#653ef1]',
-    description: 'Daily site petty cash vouchers & sundries',
-  },
-  {
-    id: 'other-expenses',
-    label: 'Other Expenses & Salaries',
-    shortLabel: 'Other Exp',
-    icon: Briefcase,
-    badge: 'Staff',
-    badgeColor: 'bg-purple-100 text-[#653ef1]',
-    description: 'Salaries, office rent, utilities & admin',
+    description: 'Petty cash vouchers, salaries & operating expenses',
   },
   {
     id: 'materials',
@@ -171,8 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (currentView === 'quotations') return 'quotations';
     if (currentView === 'files-archive') return 'archive';
     if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') return 'commercial';
-    if (currentView === 'petty-cash') return 'petty-cash';
-    if (currentView === 'other-expenses') return 'other-expenses';
+    if (currentView === 'petty-cash' || currentView === 'other-expenses') return 'petty-cash';
     if (currentView === 'materials') return 'materials';
     if (isAccountRole(userRole)) return 'commercial';
     if (isPurchaseRole(userRole)) return 'purchase';
@@ -191,10 +181,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setActiveModule('archive');
     } else if (currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'billing' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') {
       setActiveModule('commercial');
-    } else if (currentView === 'petty-cash') {
+    } else if (currentView === 'petty-cash' || currentView === 'other-expenses') {
       setActiveModule('petty-cash');
-    } else if (currentView === 'other-expenses') {
-      setActiveModule('other-expenses');
     } else if (currentView === 'materials') {
       setActiveModule('materials');
     } else if (currentView === 'list' || currentView === 'gantt' || currentView === 'critical' || currentView === 'milestones' || currentView === 'progress') {
