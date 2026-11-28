@@ -291,8 +291,6 @@ export function generateInventoryVoucherPdf(
       transaction.brand ? `${transaction.materialName}\nBrand: ${transaction.brand}` : transaction.materialName,
       transaction.category || 'General',
       `${isCheckIn ? '+' : '-'}${transaction.quantity} ${transaction.unit}`,
-      transaction.unitRate ? formatINR(transaction.unitRate) : '—',
-      transaction.totalAmount ? formatINR(transaction.totalAmount) : '—',
     ]
   ];
 
@@ -305,19 +303,15 @@ export function generateInventoryVoucherPdf(
       'Material Description',
       'Category',
       { content: 'Quantity', styles: { halign: 'right' } },
-      { content: 'Unit Rate', styles: { halign: 'right' } },
-      { content: 'Total Value', styles: { halign: 'right' } },
     ]],
     body: tableData,
     theme: 'grid',
     columnStyles: {
-      0: { cellWidth: 11, halign: 'center', fontStyle: 'bold' },
-      1: { cellWidth: 23, fontStyle: 'bold', textColor: accentRGB },
-      2: { cellWidth: 44, fontStyle: 'bold' },
-      3: { cellWidth: 26 },
-      4: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
-      5: { cellWidth: 24, halign: 'right' },
-      6: { cellWidth: 30, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 28, fontStyle: 'bold', textColor: accentRGB },
+      2: { cellWidth: 68, fontStyle: 'bold' },
+      3: { cellWidth: 40 },
+      4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' },
     },
     styles: {
       fontSize: 8,
@@ -343,30 +337,12 @@ export function generateInventoryVoucherPdf(
 
   currentY += 6;
 
-  // --- 6. Financial Summary & Running Store Balance (Side-by-Side) ---
+  // --- 6. Remarks & Running Store Balance (Side-by-Side, without rate/value) ---
   const summaryRightW = 76;
   const summaryLeftW = pageWidth - margin * 2 - summaryRightW - 5;
 
-  // Left: Amount in Words + Remarks
-  let leftBlockY = currentY;
-  const totalAmtNum = Number(transaction.totalAmount || 0);
-  if (totalAmtNum > 0) {
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(margin, leftBlockY, summaryLeftW, 14, 1.5, 1.5, 'FD');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    doc.text('AMOUNT IN WORDS:', margin + 3.5, leftBlockY + 4.8);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(amountToWords(totalAmtNum), margin + 3.5, leftBlockY + 9.5, { maxWidth: summaryLeftW - 7 });
-    leftBlockY += 17;
-  }
-
+  // Left: Remarks & Purpose
+  const leftBlockY = currentY;
   if (transaction.purpose || transaction.notes) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
@@ -384,63 +360,33 @@ export function generateInventoryVoucherPdf(
     });
   }
 
-  // Right: Valuation & Remaining Stock Box
+  // Right: Remaining Stock Box
   const rightBoxX = pageWidth - margin - summaryRightW;
-  const rightBoxH = totalAmtNum > 0 ? 27 : 16;
+  const rightBoxH = 16;
 
   doc.setFillColor(badgeBgRGB[0], badgeBgRGB[1], badgeBgRGB[2]);
   doc.setDrawColor(accentRGB[0], accentRGB[1], accentRGB[2]);
   doc.roundedRect(rightBoxX, currentY, summaryRightW, rightBoxH, 2, 2, 'FD');
 
-  if (totalAmtNum > 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
-    doc.setTextColor(71, 85, 105);
-    doc.text('Total Voucher Value:', rightBoxX + 4, currentY + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text('Updated Store Balance:', rightBoxX + 4, currentY + 7);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(15, 23, 42);
-    doc.text(formatINR(totalAmtNum), rightBoxX + summaryRightW - 4, currentY + 6, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
+  doc.text(
+    `${transaction.runningStockBalance} ${transaction.unit}`,
+    rightBoxX + summaryRightW - 4,
+    currentY + 7.5,
+    { align: 'right' }
+  );
 
-    doc.setDrawColor(203, 213, 225);
-    doc.line(rightBoxX + 4, currentY + 9.5, rightBoxX + summaryRightW - 4, currentY + 9.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
-    doc.setTextColor(71, 85, 105);
-    doc.text('Updated Store Balance:', rightBoxX + 4, currentY + 16);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
-    doc.text(`${transaction.runningStockBalance} ${transaction.unit}`, rightBoxX + summaryRightW - 4, currentY + 16, { align: 'right' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Live Ledger-Verified Balance', rightBoxX + 4, currentY + 22.5);
-  } else {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105);
-    doc.text('Updated Store Balance:', rightBoxX + 4, currentY + 7);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(accentRGB[0], accentRGB[1], accentRGB[2]);
-    doc.text(
-      `${transaction.runningStockBalance} ${transaction.unit}`,
-      rightBoxX + summaryRightW - 4,
-      currentY + 7.5,
-      { align: 'right' }
-    );
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Live Ledger-Verified Balance', rightBoxX + 4, currentY + 12.5);
-  }
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Live Ledger-Verified Balance', rightBoxX + 4, currentY + 12.5);
 
   currentY += Math.max(rightBoxH + 8, 30);
 

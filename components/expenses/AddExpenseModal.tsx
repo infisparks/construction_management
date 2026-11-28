@@ -36,6 +36,7 @@ import {
 import { fetchAllActiveSites } from '@/lib/supabase/site-storage';
 import { ExpenseBillUploader } from './ExpenseBillUploader';
 import { SearchableSelect, SearchableOption } from '@/components/common/SearchableSelect';
+import { VendorProfileModal } from '@/components/inventory/VendorProfileModal';
 import { useAuth } from '@/lib/supabase/auth-context';
 
 interface ProjectOption {
@@ -88,6 +89,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [isLoadingVendors, setIsLoadingVendors] = useState(false);
   const [vendorLoadError, setVendorLoadError] = useState<string | null>(null);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [newVendorInitialName, setNewVendorInitialName] = useState('');
   const [customPayeeName, setCustomPayeeName] = useState('');
   const [customPayeeType, setCustomPayeeType] = useState<'vendor' | 'contractor'>('vendor');
   const [isCustomPayee, setIsCustomPayee] = useState(false);
@@ -109,6 +112,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   // Form Fields
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<string>('');
+  const [gstMode, setGstMode] = useState<'percent' | 'amount'>('percent');
+  const [gstPercent, setGstPercent] = useState<string>('0');
+  const [gstAmount, setGstAmount] = useState<string>('0');
+  const [tdsPercent, setTdsPercent] = useState<string>('0');
+  const [hsnSacCode, setHsnSacCode] = useState<string>('');
   const todayStr = new Date().toISOString().split('T')[0];
   const [expenseDate, setExpenseDate] = useState<string>(todayStr);
   const [paymentMethod, setPaymentMethod] = useState<ExpensePaymentMethod>('cash');
@@ -173,6 +181,17 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setSelectedProjectId(expenseToEdit.project_id || projectId || '');
       setTitle(expenseToEdit.title || '');
       setAmount(expenseToEdit.amount ? String(expenseToEdit.amount) : '');
+      setGstMode('amount');
+      setGstPercent('0');
+      setGstAmount(expenseToEdit.gst_amount ? String(expenseToEdit.gst_amount) : '0');
+      const editAmt = Number(expenseToEdit.amount || 0);
+      const editGst = Number(expenseToEdit.gst_amount || 0);
+      const editBase = Math.max(editAmt - editGst, 0);
+      const editTds = Number(expenseToEdit.tds_amount || 0);
+      setTdsPercent(
+        editTds > 0 && editBase > 0 ? String(Number(((editTds / editBase) * 100).toFixed(2))) : '0'
+      );
+      setHsnSacCode(expenseToEdit.hsn_sac_code || '');
       setExpenseDate(expenseToEdit.expense_date || new Date().toISOString().split('T')[0]);
       setSelectedCategory(expenseToEdit.category || DEFAULT_EXPENSE_CATEGORIES[0]);
       setPaymentMethod(expenseToEdit.payment_method || 'cash');
@@ -207,6 +226,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setExpenseDate(new Date().toISOString().split('T')[0]);
       setTitle('');
       setAmount('');
+      setGstMode('percent');
+      setGstPercent('0');
+      setGstAmount('0');
+      setTdsPercent('0');
+      setHsnSacCode('');
       setSelectedCategory(DEFAULT_EXPENSE_CATEGORIES[0]);
       setPaymentMethod('cash');
       setPaymentStatus('paid');
@@ -264,6 +288,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
             : 'bg-purple-50 text-purple-700 border border-purple-200',
       })),
+      {
+        value: '__create_vendor__',
+        label: '+ Create New Vendor / Party Profile...',
+        isAction: true,
+      },
     ];
   }, [vendors]);
 
@@ -499,12 +528,22 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           : `Ref: ${trimmedRef}`
         : baseNotes || null;
 
+    const computedGst =
+      gstMode === 'percent'
+        ? Math.max(((numAmount * (parseFloat(gstPercent) || 0)) / 100), 0)
+        : Math.max(parseFloat(gstAmount) || 0, 0);
+    const baseAfterGst = Math.max(numAmount - computedGst, 0);
+    const computedTds = Math.max((baseAfterGst * (parseFloat(tdsPercent) || 0)) / 100, 0);
+
     if (expenseToEdit) {
       const payload: Partial<CreateExpensePayload> = {
         project_id: finalProjectId,
         title: title.trim(),
         category: selectedCategory,
         amount: numAmount,
+        gst_amount: Number(computedGst.toFixed(2)),
+        tds_amount: Number(computedTds.toFixed(2)),
+        hsn_sac_code: hsnSacCode.trim() || null,
         expense_date: expenseDate,
         payment_method: paymentMethod,
         payment_status: resolvedStatus,
@@ -548,6 +587,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         title: title.trim(),
         category: selectedCategory,
         amount: numAmount,
+        gst_amount: Number(computedGst.toFixed(2)),
+        tds_amount: Number(computedTds.toFixed(2)),
+        hsn_sac_code: hsnSacCode.trim() || null,
         expense_date: expenseDate,
         payment_method: paymentMethod,
         payment_status: resolvedStatus,
@@ -739,6 +781,160 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </div>
             </div>
 
+            {/* GST (% or ₹) & TDS (% only) + Live Breakdown */}
+            {(() => {
+              const totNum = parseFloat(amount) || 0;
+              const gstVal =
+                gstMode === 'percent'
+                  ? Math.max((totNum * (parseFloat(gstPercent) || 0)) / 100, 0)
+                  : Math.max(parseFloat(gstAmount) || 0, 0);
+              const baseVal = Math.max(totNum - gstVal, 0);
+              const tdsPct = Math.max(parseFloat(tdsPercent) || 0, 0);
+              const tdsVal = Math.max((baseVal * tdsPct) / 100, 0);
+              const netPayable = Math.max(totNum - tdsVal, 0);
+
+              return (
+                <div className="space-y-2.5 p-3 rounded-xl bg-slate-50/80 border border-slate-200/80">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-slate-700">
+                          GST (Default 0)
+                        </label>
+                        <div className="inline-flex rounded-md border border-slate-200 bg-white overflow-hidden text-[10px] font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setGstMode('percent')}
+                            className={`px-2 py-0.5 cursor-pointer ${gstMode === 'percent' ? 'bg-[#653ef1] text-white' : 'text-slate-600'}`}
+                          >
+                            %
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGstMode('amount')}
+                            className={`px-2 py-0.5 cursor-pointer ${gstMode === 'amount' ? 'bg-[#653ef1] text-white' : 'text-slate-600'}`}
+                          >
+                            ₹
+                          </button>
+                        </div>
+                      </div>
+                      {gstMode === 'percent' ? (
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={['0', '5', '12', '18', '28'].includes(gstPercent) ? gstPercent : 'custom'}
+                            onChange={(e) => {
+                              if (e.target.value !== 'custom') setGstPercent(e.target.value);
+                            }}
+                            className="h-9 px-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 font-medium"
+                          >
+                            <option value="0">0%</option>
+                            <option value="5">5%</option>
+                            <option value="12">12%</option>
+                            <option value="18">18%</option>
+                            <option value="28">28%</option>
+                            <option value="custom">Custom %</option>
+                          </select>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={gstPercent}
+                            onChange={(e) => setGstPercent(e.target.value)}
+                            placeholder="0"
+                            className="w-20 h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 font-semibold"
+                          />
+                          <span className="text-[11px] font-bold text-[#653ef1] ml-auto whitespace-nowrap">
+                            = ₹{gstVal.toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={gstAmount}
+                          onChange={(e) => setGstAmount(e.target.value)}
+                          placeholder="Enter GST amount (₹)"
+                          className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 font-semibold"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-slate-700">
+                          TDS % (Default 0%)
+                        </label>
+                        <span className="text-[10px] font-semibold text-amber-700">
+                          Percentage only
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={['0', '1', '2', '5', '10'].includes(tdsPercent) ? tdsPercent : 'custom'}
+                          onChange={(e) => {
+                            if (e.target.value !== 'custom') setTdsPercent(e.target.value);
+                          }}
+                          className="h-9 px-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 font-medium"
+                        >
+                          <option value="0">0%</option>
+                          <option value="1">1%</option>
+                          <option value="2">2%</option>
+                          <option value="5">5%</option>
+                          <option value="10">10%</option>
+                          <option value="custom">Custom %</option>
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={tdsPercent}
+                          onChange={(e) => setTdsPercent(e.target.value)}
+                          placeholder="0"
+                          className="w-20 h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 font-semibold"
+                        />
+                        <span className="text-[11px] font-bold text-amber-700 ml-auto whitespace-nowrap">
+                          = ₹{tdsVal.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      HSN / SAC Code (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={hsnSacCode}
+                      onChange={(e) => setHsnSacCode(e.target.value)}
+                      placeholder="e.g. 995411 (Construction Service) or 2523 (Cement)"
+                      className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {totNum > 0 && (
+                    <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px] bg-white px-3 py-2 rounded-lg border border-slate-200">
+                      <span className="font-semibold text-slate-700">
+                        Base: <strong className="text-slate-900">₹{baseVal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                        {' + '}
+                        GST: <strong className="text-[#653ef1]">₹{gstVal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                        {' = '}
+                        Total Bill: <strong className="text-slate-900">₹{totNum.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                      </span>
+                      {tdsVal > 0 && (
+                        <span className="font-semibold text-amber-800">
+                          TDS ({tdsPct}%): <strong>-₹{tdsVal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                          {' • '}
+                          Net Payable: <strong className="text-emerald-700">₹{netPayable.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Category */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -872,23 +1068,40 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
           {/* Section 2: Payee / Vendor Information */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3 shadow-2xs">
-            <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider flex items-center justify-between">
+            <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5" />
                 <span>2. Payee / Vendor Information</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-normal lowercase">
-                (picks from Supabase vendors)
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewVendorInitialName('');
+                  setIsVendorModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-[#653ef1] border border-purple-200 text-[10px] font-bold normal-case tracking-normal transition-colors cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Create Vendor / Party</span>
+              </button>
             </div>
 
             <SearchableSelect
               options={payeeOptions}
               value={selectedVendorId}
               onChange={(val) => {
+                if (val === '__create_vendor__') {
+                  setNewVendorInitialName('');
+                  setIsVendorModalOpen(true);
+                  return;
+                }
                 setIsCustomPayee(false);
                 setCustomPayeeName('');
                 setSelectedVendorId(val);
+              }}
+              onCreateOption={(newLabel) => {
+                setNewVendorInitialName(newLabel);
+                setIsVendorModalOpen(true);
               }}
               placeholder="Select Payee / Vendor..."
               searchPlaceholder="Search vendor or contractor..."
@@ -898,7 +1111,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               onRetry={() => loadVendors(true)}
             />
             <p className="text-[10px] text-slate-400">
-              Select from existing Store vendors/contractors (new vendor profiles are created from Store).
+              Select an existing vendor/party or type a name &amp; click Create to open the profile popup.
             </p>
           </div>
 
@@ -1300,6 +1513,18 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           </div>
         </div>
       )}
+      {/* Create Vendor / Party Profile Popup */}
+      <VendorProfileModal
+        isOpen={isVendorModalOpen}
+        onClose={() => setIsVendorModalOpen(false)}
+        initialName={newVendorInitialName}
+        onSaved={(createdVendor) => {
+          setVendors((prev) => [createdVendor, ...prev]);
+          setSelectedVendorId(createdVendor.id);
+          setIsCustomPayee(false);
+          setCustomPayeeName(createdVendor.name);
+        }}
+      />
     </div>
   );
 };

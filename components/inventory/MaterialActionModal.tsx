@@ -794,14 +794,15 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Purchase Unit Rate (Rs. per {currentMat?.unit || 'unit'}) (Optional)
+                    Purchase Unit Rate (Rs. per {currentMat?.unit || 'unit'}) <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-[11px] text-slate-400 font-semibold">Rs.</span>
                     <input
                       type="number"
-                      min="0"
+                      min="0.01"
                       step="any"
+                      required={actionType === 'check_in'}
                       value={unitRate}
                       onChange={(e) => setUnitRate(e.target.value === '' ? '' : Number(e.target.value))}
                       onWheel={(e) => e.currentTarget.blur()}
@@ -812,7 +813,7 @@ export const MaterialActionModal: React.FC<MaterialActionModalProps> = ({
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
                     {currentMat?.averageUnitRate && currentMat.averageUnitRate > 0
                       ? `Current avg rate: Rs. ${currentMat.averageUnitRate.toLocaleString('en-IN')}`
-                      : 'Enter unit purchase rate for incoming delivery (optional)'}
+                      : 'Required: Enter unit purchase rate for incoming delivery'}
                   </span>
                 </div>
 

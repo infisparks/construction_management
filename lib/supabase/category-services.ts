@@ -8,6 +8,7 @@ export const DEFAULT_DOCUMENT_CATEGORIES: string[] = [
   'BOQs and cost estimates',
   'Contracts and agreements',
   'Legal and statutory documents',
+  'Quotations and purchase orders',
   'Meeting minutes and correspondence',
   'Quality, safety and handover documents',
   'Project information',
@@ -208,16 +209,29 @@ export async function addCustomCategory(
   try {
     const { error } = await supabase
       .from('category')
-      .upsert({
-        name: categoryName,
-        value: updatedCategories,
-      });
+      .upsert(
+        {
+          name: categoryName,
+          value: updatedCategories,
+        },
+        { onConflict: 'name' }
+      );
 
     if (error) {
-      console.warn(`[category-services] Supabase upsert note for "${categoryName}":`, error.message);
+      console.warn(`[category-services] Supabase upsert error for "${categoryName}":`, error.message);
+      return {
+        success: false,
+        categories: currentList,
+        error: error.message || 'Failed to save category to Supabase',
+      };
     }
   } catch (err: any) {
     console.warn(`[category-services] Exception syncing to Supabase:`, err);
+    return {
+      success: false,
+      categories: currentList,
+      error: err?.message || 'Failed to save category to Supabase',
+    };
   }
 
   return { success: true, categories: updatedCategories };

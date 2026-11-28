@@ -259,14 +259,15 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               {/* Unit Rate */}
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                  Purchase Unit Rate (Rs. per {currentMat?.unit || 'unit'}) (Optional)
+                  Purchase Unit Rate (Rs. per {currentMat?.unit || 'unit'}) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-[11px] text-slate-400 font-medium">Rs.</span>
                   <input
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="any"
+                    required
                     value={unitRate}
                     onChange={(e) => setUnitRate(e.target.value === '' ? '' : Number(e.target.value))}
                     onWheel={(e) => e.currentTarget.blur()}

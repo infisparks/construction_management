@@ -145,6 +145,7 @@ export type ViewMode =
   | 'other-expenses'
   | 'contractor-work-orders'
   | 'customer-purchases'
+  | 'vendors'
   | 'purchase-outflow'
   | 'quotations';
 
@@ -167,6 +168,16 @@ export type FileCategory =
 export type FileType = 'pdf' | 'image' | 'spreadsheet' | 'document' | 'dwg' | 'other';
 export type FileStatus = 'approved' | 'under_review' | 'draft' | 'superseded';
 
+export type DocumentApprovalDecision = 'approved' | 'rejected' | 'not_required';
+
+export interface DocumentApprovalEntry {
+  user_id: string;
+  user_name: string;
+  user_email?: string;
+  decision: DocumentApprovalDecision;
+  updated_at: string;
+}
+
 export interface ProjectFile {
   id: string;
   project_id: string;
@@ -188,6 +199,7 @@ export interface ProjectFile {
   uploaded_by?: string;
   version: string;
   status: FileStatus;
+  approvals?: DocumentApprovalEntry[];
   tags: string[];
   building_floor?: string;
   contractor_name?: string;

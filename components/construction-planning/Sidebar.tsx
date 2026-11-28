@@ -41,8 +41,8 @@ interface SidebarProps {
   onSignOut?: () => void;
   activeArchiveCategory?: FileCategory | 'all';
   onSelectArchiveCategory?: (category: FileCategory | 'all') => void;
-  activeInventoryTab?: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'vendors';
-  onSelectInventoryTab?: (tab: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'vendors') => void;
+  activeInventoryTab?: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock';
+  onSelectInventoryTab?: (tab: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock') => void;
   onOpenMaterialAction?: (action: 'check_in' | 'check_out' | 'return' | 'damage') => void;
   onOpenExpenseAction?: (action: string) => void;
   onAddTask?: () => void;

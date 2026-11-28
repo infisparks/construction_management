@@ -44,7 +44,7 @@ export type ApprovalStage =
 
 export interface ApprovalHistoryEntry {
   stage: 'purchase' | 'director' | 'accounts';
-  decision: 'approved' | 'rejected';
+  decision: 'approved' | 'rejected' | 'reverted' | 'undo_reject';
   by_email: string;
   by_role: string;
   at: string;
@@ -308,21 +308,92 @@ export async function createPurchaseRequisition(payload: {
   }
 }
 
+export async function updatePurchaseRequisition(
+  id: string,
+  payload: {
+    project_id?: string | null;
+    title: string;
+    description?: string | null;
+    form_data: Record<string, any>;
+  }
+): Promise<{ data: PurchaseRequisition | null; error: string | null }> {
+  try {
+    const { data, error } = await supabase
+      .from('purchase_requisitions')
+      .update({
+        project_id: payload.project_id && payload.project_id !== 'all' ? payload.project_id : null,
+        title: payload.title.trim(),
+        description: payload.description?.trim() || null,
+        form_data: payload.form_data || {},
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return { data: null, error: error.message };
+    return { data: data as PurchaseRequisition, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Failed to update purchase requisition.' };
+  }
+}
+
 export async function processRequisitionApproval(
   req: PurchaseRequisition,
-  decision: 'approved' | 'rejected',
+  decision: 'approved' | 'rejected' | 'reverted' | 'undo_reject',
   approverEmail: string,
   approverRole: string,
   remarks?: string
 ): Promise<{ data: PurchaseRequisition | null; error: string | null }> {
   const stageMap: Record<
     'pending_purchase' | 'pending_director' | 'pending_accounts',
-    { step: 'purchase' | 'director' | 'accounts'; next: ApprovalStage }
+    { step: 'purchase' | 'director' | 'accounts'; next: ApprovalStage; prev: ApprovalStage }
   > = {
-    pending_purchase: { step: 'purchase', next: 'pending_director' },
-    pending_director: { step: 'director', next: 'pending_accounts' },
-    pending_accounts: { step: 'accounts', next: 'approved' },
+    pending_purchase: { step: 'purchase', next: 'pending_director', prev: 'pending_purchase' },
+    pending_director: { step: 'director', next: 'pending_accounts', prev: 'pending_purchase' },
+    pending_accounts: { step: 'accounts', next: 'approved', prev: 'pending_director' },
   };
+
+  if (req.approval_stage === 'rejected' && (decision === 'reverted' || decision === 'undo_reject')) {
+    const historyList = Array.isArray(req.approval_history) ? req.approval_history : [];
+    const lastRejected = [...historyList].reverse().find((h) => h.decision === 'rejected');
+    const restoredStage: ApprovalStage =
+      decision === 'reverted'
+        ? 'pending_purchase'
+        : lastRejected?.stage === 'purchase'
+          ? 'pending_purchase'
+          : lastRejected?.stage === 'accounts'
+            ? 'pending_accounts'
+            : 'pending_director';
+
+    const nextHistory: ApprovalHistoryEntry[] = [
+      ...historyList,
+      {
+        stage: lastRejected?.stage || 'director',
+        decision,
+        by_email: approverEmail,
+        by_role: approverRole,
+        at: new Date().toISOString(),
+        remarks: remarks?.trim() || undefined,
+      },
+    ];
+    try {
+      const { data, error } = await supabase
+        .from('purchase_requisitions')
+        .update({
+          approval_stage: restoredStage,
+          approval_history: nextHistory,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', req.id)
+        .select()
+        .single();
+      if (error) return { data: null, error: error.message };
+      return { data: data as PurchaseRequisition, error: null };
+    } catch (err: any) {
+      return { data: null, error: err?.message || 'Failed to restore requisition.' };
+    }
+  }
 
   if (
     req.approval_stage !== 'pending_purchase' &&
@@ -333,7 +404,12 @@ export async function processRequisitionApproval(
   }
 
   const currentMeta = stageMap[req.approval_stage];
-  const nextStage: ApprovalStage = decision === 'rejected' ? 'rejected' : currentMeta.next;
+  const nextStage: ApprovalStage =
+    decision === 'rejected'
+      ? 'rejected'
+      : decision === 'reverted'
+        ? currentMeta.prev
+        : currentMeta.next;
 
   const nextHistory: ApprovalHistoryEntry[] = [
     ...(Array.isArray(req.approval_history) ? req.approval_history : []),
@@ -370,6 +446,28 @@ export async function softDeletePurchaseRequisition(id: string): Promise<boolean
   const { error } = await supabase
     .from('purchase_requisitions')
     .update({ is_deleted: true, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  return !error;
+}
+
+export async function fetchDeletedPurchaseRequisitions(): Promise<PurchaseRequisition[]> {
+  try {
+    const { data, error } = await supabase
+      .from('purchase_requisitions')
+      .select('*')
+      .eq('is_deleted', true)
+      .order('updated_at', { ascending: false });
+    if (error) return [];
+    return (data || []) as PurchaseRequisition[];
+  } catch {
+    return [];
+  }
+}
+
+export async function restorePurchaseRequisition(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('purchase_requisitions')
+    .update({ is_deleted: false, updated_at: new Date().toISOString() })
     .eq('id', id);
   return !error;
 }

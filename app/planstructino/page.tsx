@@ -196,7 +196,7 @@ export default function ConstructionPlanningPage() {
     };
   }, [user, isAuthLoading, router]);
 
-  const handleSelectDbProject = (dbProj: DbProject) => {
+  const handleSelectDbProject = (dbProj: DbProject, skipBroadcast = false) => {
     // Immediately clear previous site's state so tasks never mix or linger
     setTasks([]);
     setDependencies([]);
@@ -206,7 +206,7 @@ export default function ConstructionPlanningPage() {
     setSubcontractorBills([]);
 
     setActiveDbProject(dbProj);
-    setStoredActiveSite(dbProj);
+    setStoredActiveSite(dbProj, { silent: skipBroadcast });
     setProject((prev) => ({
       ...prev,
       id: dbProj.id,
@@ -401,7 +401,7 @@ export default function ConstructionPlanningPage() {
   // Material Store & Billing Drawer State (Onsite / Powerplay)
   const [isMaterialBillingDrawerOpen, setIsMaterialBillingDrawerOpen] = useState(false);
   const [materialBillingTab, setMaterialBillingTab] = useState<'materials' | 'parties' | 'billing'>('materials');
-  const [inventorySubTab, setInventorySubTab] = useState<'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'vendors'>('catalog');
+  const [inventorySubTab, setInventorySubTab] = useState<'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock'>('catalog');
   const [triggerMaterialAction, setTriggerMaterialAction] = useState<{ action: 'check_in' | 'check_out' | 'return' | 'damage'; timestamp: number } | null>(null);
   const [triggerExpenseAction, setTriggerExpenseAction] = useState<{ action: string; timestamp: number } | null>(null);
 
@@ -427,6 +427,7 @@ export default function ConstructionPlanningPage() {
         'other-expenses',
         'contractor-work-orders',
         'customer-purchases',
+        'vendors',
         'purchase-outflow',
         'quotations',
       ];
@@ -434,7 +435,7 @@ export default function ConstructionPlanningPage() {
         setCurrentView(urlView as ViewMode);
       }
       const urlTab = params.get('tab');
-      const validTabs = ['products', 'catalog', 'inward', 'outward', 'returns_damages', 'ledger', 'low_stock', 'vendors'];
+      const validTabs = ['products', 'catalog', 'inward', 'outward', 'returns_damages', 'ledger', 'low_stock'];
       if (urlTab && validTabs.includes(urlTab)) {
         setInventorySubTab(urlTab as any);
       }
@@ -483,7 +484,7 @@ export default function ConstructionPlanningPage() {
     const handleActiveSiteChanged = (e: Event) => {
       const customEvent = e as CustomEvent<{ project: DbProject }>;
       if (customEvent.detail?.project && customEvent.detail.project.id !== activeDbProject?.id) {
-        handleSelectDbProject(customEvent.detail.project);
+        handleSelectDbProject(customEvent.detail.project, true);
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -1724,7 +1725,7 @@ export default function ConstructionPlanningPage() {
                   />
                 )}
 
-                {(currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases') && (
+                {(currentView === 'expenses' || currentView === 'subcontractor-bills' || currentView === 'contractor-work-orders' || currentView === 'customer-purchases' || currentView === 'vendors') && (
                   <CommercialBillsAndExpensesView
                     initialTab={
                       currentView === 'contractor-work-orders'
@@ -1733,7 +1734,9 @@ export default function ConstructionPlanningPage() {
                           ? 'subcontractor-bills'
                           : currentView === 'customer-purchases'
                             ? 'customer-purchases'
-                            : 'expenses'
+                            : currentView === 'vendors'
+                              ? 'vendors'
+                              : 'expenses'
                     }
                     project={project}
                     projectId={activeProjectId}

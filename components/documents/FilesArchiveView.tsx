@@ -47,7 +47,7 @@ import {
   Paperclip,
   Phone
 } from 'lucide-react';
-import { ProjectInfo, ProjectFile, FileCategory, FileType } from '@/lib/construction-planning/types';
+import { ProjectInfo, ProjectFile, FileCategory, FileType, DocumentApprovalDecision, DocumentApprovalEntry } from '@/lib/construction-planning/types';
 import { formatMumbaiDate } from '@/lib/common/date-format';
 import { 
   fetchProjectFiles, 
@@ -62,9 +62,12 @@ import {
   resolveFileUrl,
   extractStoragePath,
   STORAGE_BUCKET,
-  downloadProjectFile
+  downloadProjectFile,
+  updateProjectFileApproval,
+  updateProjectFileDate
 } from '@/lib/supabase/project-files';
 import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/supabase/auth-context';
 import { fetchSubDocumentsCounts } from '@/lib/supabase/project-sub-documents';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -98,6 +101,7 @@ const BASE_CATEGORIES: { label: string; value: FileCategory | 'all' }[] = [
   { label: 'Contracts & Agreements', value: 'Contracts and agreements' },
   { label: 'Legal & Statutory', value: 'Legal and statutory documents' },
   { label: 'BOQs & Estimates', value: 'BOQs and cost estimates' },
+  { label: 'Quotations & Purchase Orders', value: 'Quotations and purchase orders' },
   { label: 'Site Photographs', value: 'Site photographs and reports' },
   { label: 'Meeting Minutes (MoM)', value: 'Meeting minutes and correspondence' },
   { label: 'Quality & Handover', value: 'Quality, safety and handover documents' },
@@ -113,8 +117,124 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
   onCategoryChange,
   onOpenQuotationBuilder,
 }) => {
+  const { session, user } = useAuth();
   // Main tab: Active Vault vs Recycle Bin
   const [activeTab, setActiveTab] = useState<'vault' | 'bin'>('vault');
+
+  // Multi-user Document Approval Modal State
+  const [approvalModalFile, setApprovalModalFile] = useState<ProjectFile | null>(null);
+  const [isSavingApproval, setIsSavingApproval] = useState(false);
+
+  // Safe Delete Confirmation Modal State (requires typing "DELETE")
+  const [fileToDelete, setFileToDelete] = useState<ProjectFile | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingFile, setIsDeletingFile] = useState(false);
+
+  // Edit Document Date Modal State
+  const [editingDateFile, setEditingDateFile] = useState<ProjectFile | null>(null);
+  const [editingDateValue, setEditingDateValue] = useState('');
+  const [isSavingDate, setIsSavingDate] = useState(false);
+
+  const handleOpenEditDate = (file: ProjectFile) => {
+    const istDate = file.created_at
+      ? new Date(file.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+      : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    setEditingDateFile(file);
+    setEditingDateValue(istDate);
+  };
+
+  const handleSaveEditedDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDateFile || !editingDateValue) return;
+    setIsSavingDate(true);
+    try {
+      const newIso = new Date(`${editingDateValue}T12:00:00+05:30`).toISOString();
+      const res = await updateProjectFileDate(editingDateFile.id, newIso);
+      if (!res.error) {
+        setActiveFiles((prev) =>
+          prev
+            .map((f) => (f.id === editingDateFile.id ? { ...f, created_at: newIso } : f))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        );
+        setToastMessage({
+          text: `Updated date for "${editingDateFile.title}"`,
+          type: 'success',
+        });
+        setEditingDateFile(null);
+      } else {
+        setToastMessage({ text: res.error, type: 'info' });
+      }
+    } finally {
+      setIsSavingDate(false);
+    }
+  };
+
+  const handleInitiateDelete = (file: ProjectFile) => {
+    setFileToDelete(file);
+    setDeleteConfirmText('');
+  };
+
+  const handleConfirmDeleteFile = async () => {
+    if (!fileToDelete) return;
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') return;
+    setIsDeletingFile(true);
+    try {
+      await handleSoftDelete(fileToDelete);
+      setFileToDelete(null);
+      setDeleteConfirmText('');
+    } finally {
+      setIsDeletingFile(false);
+    }
+  };
+
+  const currentUserId = user?.id || userEmail || 'anonymous';
+  const currentUserEmailResolved = user?.email || userEmail || '';
+  const currentUserDisplayName =
+    (user?.user_metadata?.full_name as string) ||
+    (user?.user_metadata?.name as string) ||
+    (currentUserEmailResolved ? currentUserEmailResolved.split('@')[0] : 'Team Member');
+
+  const handleSaveDocumentApproval = async (
+    file: ProjectFile,
+    decision: DocumentApprovalDecision | null
+  ) => {
+    setIsSavingApproval(true);
+    try {
+      const entry: DocumentApprovalEntry | null = decision
+        ? {
+            user_id: currentUserId,
+            user_name: currentUserDisplayName,
+            user_email: currentUserEmailResolved || undefined,
+            decision,
+            updated_at: new Date().toISOString(),
+          }
+        : null;
+
+      const res = await updateProjectFileApproval(
+        file.id,
+        entry,
+        currentUserId,
+        currentUserEmailResolved
+      );
+
+      if (!res.error && res.data) {
+        const updatedApprovals = res.data;
+        const updatedStatus = (res.status || file.status) as any;
+        setActiveFiles((prev) =>
+          prev.map((f) =>
+            f.id === file.id ? { ...f, approvals: updatedApprovals, status: updatedStatus } : f
+          )
+        );
+        setApprovalModalFile((prev) =>
+          prev && prev.id === file.id
+            ? { ...prev, approvals: updatedApprovals, status: updatedStatus }
+            : prev
+        );
+      }
+    } finally {
+      setIsSavingApproval(false);
+    }
+  };
 
   const [activeFiles, setActiveFiles] = useState<ProjectFile[]>([]);
   const [deletedFiles, setDeletedFiles] = useState<ProjectFile[]>([]);
@@ -149,18 +269,15 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
       }
     });
 
-    const isHiddenDocCategory = (cat: string) =>
-      /quotation|purchase order|invoice|bill/i.test(cat);
-
     dynamicCategories.forEach(cat => {
-      if (!seen.has(cat) && !isHiddenDocCategory(cat)) {
+      if (!seen.has(cat)) {
         list.push({ label: cat, value: cat as FileCategory });
         seen.add(cat);
       }
     });
 
     activeFiles.forEach(f => {
-      if (f.category && !seen.has(f.category) && !isHiddenDocCategory(f.category)) {
+      if (f.category && !seen.has(f.category)) {
         list.push({ label: f.category, value: f.category as FileCategory });
         seen.add(f.category);
       }
@@ -259,7 +376,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
   useEffect(() => {
     loadAllFiles();
-  }, [projectFilter]);
+  }, [projectFilter, session?.access_token]);
 
   // Auto-dismiss toast after 4s
   useEffect(() => {
@@ -1230,7 +1347,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               <div className="my-1 border-t border-slate-100" />
                               <button
                                 type="button"
-                                onClick={() => handleSoftDelete(file)}
+                                onClick={() => handleInitiateDelete(file)}
                                 className="w-full px-3 py-1.5 text-xs text-left text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-rose-500" />
@@ -1378,7 +1495,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleSoftDelete(file)}
+                          onClick={() => handleInitiateDelete(file)}
                           className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                           title="Move to Recycle Bin"
                         >
@@ -1463,7 +1580,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                     <th className="py-2.5 px-2">Document Title & File</th>
                     <th className="py-2.5 px-2">Category</th>
                     <th className="py-2.5 px-2 hidden lg:table-cell">Size</th>
-                    <th className="py-2.5 px-2 hidden md:table-cell">Status</th>
+                    <th className="py-2.5 px-2 hidden md:table-cell">Approvals</th>
                     <th className="py-2.5 pl-2 pr-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1482,12 +1599,20 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         {idx + 1}
                       </td>
 
-                      {/* Upload Date Only */}
-                      <td className="py-2.5 px-2.5 whitespace-nowrap">
-                        <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5" title="Upload Date">
+                      {/* Upload Date (Click to edit) */}
+                      <td
+                        className="py-2.5 px-2.5 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditDate(file)}
+                          className="text-xs font-semibold text-slate-800 hover:text-[#653ef1] flex items-center gap-1.5 px-1.5 py-1 -mx-1.5 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer group/date"
+                          title="Click to change document date"
+                        >
                           <Calendar className="w-3.5 h-3.5 text-[#653ef1] shrink-0" />
                           <span>{formatMumbaiDate(file.created_at)}</span>
-                        </div>
+                        </button>
                       </td>
 
                       {/* Project / Construction Site Tag */}
@@ -1545,16 +1670,60 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                         {formatFileSize(file.file_size)}
                       </td>
 
-                      {/* Status */}
-                      <td className="py-2.5 px-2.5 hidden md:table-cell">
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
-                          file.status === 'approved' 
-                            ? 'bg-[#e6f9ed] text-[#16a34a] border border-[#b8f0ca]' 
-                            : 'bg-amber-50 text-amber-800 border border-amber-200'
-                        }`}>
-                          {file.status === 'approved' && <CheckCircle2 className="w-3 h-3 stroke-[2.2]" />}
-                          <span>{file.status || 'Approved'}</span>
-                        </span>
+                      {/* Approvals (Multi-User Review & Sign-off) */}
+                      <td
+                        className="py-2.5 px-2.5 hidden md:table-cell"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {(() => {
+                          const list = Array.isArray(file.approvals) ? file.approvals : [];
+                          const approvedList = list.filter((a) => a.decision === 'approved');
+                          const rejectedList = list.filter((a) => a.decision === 'rejected');
+                          const notReqList = list.filter((a) => a.decision === 'not_required');
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setApprovalModalFile(file)}
+                              className="text-left group/app cursor-pointer flex flex-col gap-1"
+                              title="Click to mark Approved / Rejected / Approval Not Required or view all user marks"
+                            >
+                              {list.length === 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 group-hover/app:border-purple-300 group-hover/app:bg-purple-50 group-hover/app:text-purple-700 transition-colors">
+                                  <Clock className="w-3 h-3" />
+                                  <span>Mark Approval</span>
+                                </span>
+                              ) : (
+                                <>
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    {approvedList.length > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e6f9ed] text-[#16a34a] border border-[#b8f0ca]">
+                                        <CheckCircle2 className="w-2.5 h-2.5 stroke-[2.3]" />
+                                        <span>Approved ({approvedList.length})</span>
+                                      </span>
+                                    )}
+                                    {rejectedList.length > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                                        <X className="w-2.5 h-2.5 stroke-[2.5]" />
+                                        <span>Rejected ({rejectedList.length})</span>
+                                      </span>
+                                    )}
+                                    {notReqList.length > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        <ShieldCheck className="w-2.5 h-2.5" />
+                                        <span>Not Req. ({notReqList.length})</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 truncate max-w-[170px] group-hover/app:text-[#653ef1]">
+                                    By {list.slice(0, 2).map((a) => a.user_name).join(', ')}
+                                    {list.length > 2 ? ` +${list.length - 2}` : ''}
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          );
+                        })()}
                       </td>
 
                       {/* Actions */}
@@ -1601,7 +1770,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
 
                             <button
                               type="button"
-                              onClick={() => handleSoftDelete(file)}
+                              onClick={() => handleInitiateDelete(file)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                               title="Move to Recycle Bin"
                             >
@@ -2144,7 +2313,7 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
                               {activeTab === 'vault' ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleSoftDelete(file)}
+                                  onClick={() => handleInitiateDelete(file)}
                                   className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                   title="Move to Recycle Bin"
                                 >
@@ -2187,6 +2356,9 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
           setActiveFiles(prev => [newFile, ...prev]);
           fetchDropdownCategory('document_category', DEFAULT_DOCUMENT_CATEGORIES).then(setDynamicCategories);
         }}
+        onCategoryCreated={(cats) => {
+          setDynamicCategories(cats);
+        }}
         onSiteCreated={async (newProj) => {
           const projs = await fetchAvailableProjects();
           setAvailableProjects(projs);
@@ -2208,14 +2380,330 @@ export const FilesArchiveView: React.FC<FilesArchiveViewProps> = ({
         onSubDocsCountChange={loadSubDocsCounts}
         onToggleStar={handleToggleStar}
         onDeleteFile={(f) => {
-          handleSoftDelete(f);
           setIsPreviewOpen(false);
+          handleInitiateDelete(f);
         }}
         onRestoreFile={(f) => {
           handleRestoreFile(f);
           setIsPreviewOpen(false);
         }}
       />
+
+      {/* Document Multi-User Approvals Modal */}
+      {approvalModalFile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in"
+          onClick={() => !isSavingApproval && setApprovalModalFile(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
+              <div className="min-w-0 pr-2">
+                <h3 className="text-sm font-bold text-slate-900 truncate">
+                  Document Approvals
+                </h3>
+                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                  {approvalModalFile.title} ({approvalModalFile.file_name})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApprovalModalFile(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              {/* Current User's Action */}
+              {(() => {
+                const list = Array.isArray(approvalModalFile.approvals) ? approvalModalFile.approvals : [];
+                const myMark = list.find(
+                  (a) =>
+                    (currentUserId && a.user_id === currentUserId) ||
+                    (currentUserEmailResolved &&
+                      a.user_email?.toLowerCase() === currentUserEmailResolved.toLowerCase())
+                );
+
+                return (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          Your Decision ({currentUserDisplayName})
+                        </span>
+                        {myMark && (
+                          <button
+                            type="button"
+                            disabled={isSavingApproval}
+                            onClick={() => handleSaveDocumentApproval(approvalModalFile, null)}
+                            className="text-[10px] font-semibold text-slate-400 hover:text-rose-600 cursor-pointer"
+                          >
+                            Clear my mark
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          disabled={isSavingApproval}
+                          onClick={() => handleSaveDocumentApproval(approvalModalFile, 'approved')}
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            myMark?.decision === 'approved'
+                              ? 'bg-[#16a34a] text-white border-[#16a34a] shadow-xs'
+                              : 'bg-emerald-50/70 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>Approved</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isSavingApproval}
+                          onClick={() => handleSaveDocumentApproval(approvalModalFile, 'rejected')}
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            myMark?.decision === 'rejected'
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                              : 'bg-rose-50/70 text-rose-700 border-rose-200 hover:bg-rose-100'
+                          }`}
+                        >
+                          <X className="w-3.5 h-3.5 shrink-0" />
+                          <span>Rejected</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isSavingApproval}
+                          onClick={() => handleSaveDocumentApproval(approvalModalFile, 'not_required')}
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            myMark?.decision === 'not_required'
+                              ? 'bg-[#653ef1] text-white border-[#653ef1] shadow-xs'
+                              : 'bg-indigo-50/70 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                          }`}
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                          <span>Not Req.</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* All Users' Marks */}
+                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                      <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        Team Review History ({list.length})
+                      </div>
+
+                      {list.length === 0 ? (
+                        <div className="py-5 text-center rounded-xl bg-slate-50 border border-slate-100 text-slate-400 text-xs">
+                          No team members have marked this document yet.
+                        </div>
+                      ) : (
+                        <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                          {list.map((item, i) => (
+                            <div
+                              key={`${item.user_id}-${i}`}
+                              className="p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-800 truncate flex items-center gap-1.5">
+                                  <User className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                  <span className="truncate">{item.user_name}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                  {item.user_email ? `${item.user_email} • ` : ''}
+                                  {formatMumbaiDate(item.updated_at)}
+                                </div>
+                              </div>
+                              <span
+                                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                  item.decision === 'approved'
+                                    ? 'bg-[#e6f9ed] text-[#16a34a] border-[#b8f0ca]'
+                                    : item.decision === 'rejected'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                }`}
+                              >
+                                {item.decision === 'approved'
+                                  ? 'Approved'
+                                  : item.decision === 'rejected'
+                                  ? 'Rejected'
+                                  : 'Approval Not Required'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Safe Delete Confirmation Modal (Requires typing "DELETE") */}
+      {fileToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            if (!isDeletingFile) {
+              setFileToDelete(null);
+              setDeleteConfirmText('');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-700">
+                  <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-rose-950">Confirm Document Delete</h3>
+                  <p className="text-[11px] text-rose-700">Moves document to Recycle Bin</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isDeletingFile}
+                onClick={() => {
+                  setFileToDelete(null);
+                  setDeleteConfirmText('');
+                }}
+                className="p-1.5 rounded-lg text-rose-400 hover:text-rose-700 hover:bg-rose-100/70 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <p className="text-slate-600 leading-relaxed">
+                Are you sure you want to delete{' '}
+                <span className="font-bold text-slate-900">&ldquo;{fileToDelete.title}&rdquo;</span>?
+                You can restore it anytime from the Recycle Bin.
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                  Type <span className="font-mono text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">DELETE</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type DELETE"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && deleteConfirmText.trim().toUpperCase() === 'DELETE') {
+                      e.preventDefault();
+                      handleConfirmDeleteFile();
+                    }
+                  }}
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isDeletingFile}
+                  onClick={() => {
+                    setFileToDelete(null);
+                    setDeleteConfirmText('');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteConfirmText.trim().toUpperCase() !== 'DELETE' || isDeletingFile}
+                  onClick={handleConfirmDeleteFile}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeletingFile ? 'Deleting...' : 'Move to Recycle Bin'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Document Date Modal */}
+      {editingDateFile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => !isSavingDate && setEditingDateFile(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <Calendar className="w-4 h-4 text-[#653ef1] shrink-0" />
+                <h3 className="text-sm font-bold text-slate-900 truncate">Edit Document Date</h3>
+              </div>
+              <button
+                type="button"
+                disabled={isSavingDate}
+                onClick={() => setEditingDateFile(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedDate} className="p-5 space-y-4 text-xs">
+              <p className="text-slate-600 truncate">
+                Document: <span className="font-bold text-slate-900">{editingDateFile.title}</span>
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Document / Upload Date <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  autoFocus
+                  value={editingDateValue}
+                  onChange={(e) => setEditingDateValue(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-hidden focus:border-[#653ef1] focus:ring-1 focus:ring-[#653ef1]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isSavingDate}
+                  onClick={() => setEditingDateFile(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDate || !editingDateValue}
+                  className="px-4 py-2 rounded-xl bg-[#653ef1] hover:bg-[#5530d9] disabled:opacity-50 text-white text-xs font-bold cursor-pointer"
+                >
+                  {isSavingDate ? 'Saving...' : 'Save Date'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -329,10 +329,8 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                 }`}>
                   <tr>
                     <th className="px-4 py-3">Item Description & Code</th>
-                    <th className="px-4 py-3 text-right">Unit Rate</th>
                     <th className="px-4 py-3 text-right">Movement Qty</th>
                     <th className="px-4 py-3 text-right">Store Balance</th>
-                    <th className="px-4 py-3 text-right">Total Value</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -345,9 +343,6 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                           <span className="text-slate-600 font-sans font-medium">• Brand: <strong className="text-purple-700">{transaction.brand}</strong></span>
                         )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-mono text-slate-600">
-                      {transaction.unitRate ? `Rs. ${transaction.unitRate.toLocaleString('en-IN')}` : '—'}
                     </td>
                     <td className={`px-4 py-3.5 text-right font-extrabold text-sm tabular-nums ${
                       isCheckIn 
@@ -364,9 +359,6 @@ export const VoucherSlipModal: React.FC<VoucherSlipModalProps> = ({
                       <span className="px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
                         {transaction.runningStockBalance} {transaction.unit}
                       </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right font-extrabold font-mono text-slate-900 tabular-nums">
-                      {transaction.totalAmount ? `Rs. ${transaction.totalAmount.toLocaleString('en-IN')}` : '—'}
                     </td>
                   </tr>
                 </tbody>

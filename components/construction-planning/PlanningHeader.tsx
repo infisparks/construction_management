@@ -52,7 +52,8 @@ const VIEW_HEADER_CONFIG: Record<ViewMode, { title: string; icon: React.ElementT
   'petty-cash': { title: 'Petty Cash Register', icon: Receipt },
   'other-expenses': { title: 'Other Expenses & Salaries', icon: Receipt },
   'contractor-work-orders': { title: 'Contractor Work Orders', icon: Wrench },
-  'customer-purchases': { title: 'Client Purchases & Inflow', icon: ArrowDownLeft },
+  'customer-purchases': { title: 'Client Sales & Inflow', icon: ArrowDownLeft },
+  vendors: { title: 'Vendors & Parties Directory', icon: Building2 },
   'purchase-outflow': { title: 'Purchase Outflow', icon: Receipt },
   quotations: { title: 'Quotation Builder', icon: FileText },
 };

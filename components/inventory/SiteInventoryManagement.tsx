@@ -77,7 +77,6 @@ import {
 import { WhatsAppShareModal, WhatsAppSharePayload } from '@/components/whatsapp/WhatsAppShareModal';
 
 import { ProductProfileView } from './ProductProfileView';
-import { VendorProfileView } from './VendorProfileView';
 import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
 
 import {
@@ -115,7 +114,7 @@ import {
 interface SiteInventoryManagementProps {
   allTasks?: ConstructionTask[];
   project?: ProjectInfo;
-  initialTab?: 'products' | 'vendors' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin';
+  initialTab?: 'products' | 'catalog' | 'inward' | 'outward' | 'returns_damages' | 'ledger' | 'low_stock' | 'bin';
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
   externalActionTrigger?: { action: InventoryTransactionType; timestamp: number } | null;
 }
@@ -1693,19 +1692,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           <span>Products Master ({materials.length})</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('vendors')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-            activeTab === 'vendors'
-              ? 'bg-gradient-to-r from-[#6e46f2] to-[#592be8] text-white shadow-md shadow-purple-500/25'
-              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/90'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Vendors & Parties ({vendorProfiles.length})</span>
-        </button>
-
         <div className="h-5 w-[1px] bg-slate-200 mx-1 shrink-0" />
 
         <button
@@ -1859,19 +1845,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
                 <span>Preview PDF</span>
               </button>
             </>
-          )}
-
-          {activeTab === 'vendors' && (
-            <select
-              value={vendorTypeFilter}
-              onChange={(e) => setVendorTypeFilter(e.target.value as any)}
-              className="h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-purple-600 font-semibold"
-            >
-              <option value="all">All Party Types</option>
-              <option value="vendor">Material Vendors (Suppliers)</option>
-              <option value="contractor">Subcontractors (Agencies)</option>
-              <option value="other">Other Parties (Logistics/Rental)</option>
-            </select>
           )}
 
           {activeTab === 'ledger' && (
@@ -2977,11 +2950,6 @@ export const SiteInventoryManagement: React.FC<SiteInventoryManagementProps> = (
           liveStockMap={liveStockMap}
           onProductsChanged={loadDataFromSupabase}
         />
-      )}
-
-      {/* TAB 7: VENDORS & PARTIES DIRECTORY (profile_vendor) */}
-      {activeTab === 'vendors' && (
-        <VendorProfileView showToast={showToast} />
       )}
 
       {/* TAB 8: RECYCLE BIN (is_deleted = true in profile_product) */}

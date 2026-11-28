@@ -135,15 +135,24 @@ export function getStoredActiveSite(): DbProject | null {
   }
 }
 
+let isDispatchingSiteChange = false;
+
 /**
  * Store active site in localStorage
  */
-export function setStoredActiveSite(project: DbProject): void {
+export function setStoredActiveSite(project: DbProject, options?: { silent?: boolean }): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(ACTIVE_SITE_ID_KEY, project.id);
     localStorage.setItem(ACTIVE_SITE_DATA_KEY, JSON.stringify(project));
-    window.dispatchEvent(new CustomEvent('active-site-changed', { detail: { project } }));
+    if (!options?.silent && !isDispatchingSiteChange) {
+      isDispatchingSiteChange = true;
+      try {
+        window.dispatchEvent(new CustomEvent('active-site-changed', { detail: { project } }));
+      } finally {
+        isDispatchingSiteChange = false;
+      }
+    }
   } catch (err) {
     console.warn('Failed to save active site to localStorage:', err);
   }

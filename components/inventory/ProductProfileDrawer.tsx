@@ -86,6 +86,7 @@ export const ProductProfileDrawer: React.FC<ProductProfileDrawerProps> = ({
   const [customStorageLocation, setCustomStorageLocation] = useState('');
   const [isCustomStorage, setIsCustomStorage] = useState(false);
   const [brand, setBrand] = useState('');
+  const [hsnCode, setHsnCode] = useState('');
   const [gstRate, setGstRate] = useState<0 | 5 | 12 | 18 | 28>(0); // Default GST is 0%
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dbCategories, setDbCategories] = useState<string[]>(DEFAULT_CATEGORIES);
@@ -144,6 +145,7 @@ export const ProductProfileDrawer: React.FC<ProductProfileDrawerProps> = ({
       gstRate,
       storageLocation: finalStorage,
       brand: brand.trim() || undefined,
+      hsnCode: hsnCode.trim() || undefined,
       lastUpdated: new Date().toISOString().split('T')[0],
     };
 
@@ -162,6 +164,7 @@ export const ProductProfileDrawer: React.FC<ProductProfileDrawerProps> = ({
     setCustomStorageLocation('');
     setIsCustomStorage(false);
     setBrand('');
+    setHsnCode('');
     setGstRate(0);
     onClose();
   };
@@ -408,6 +411,19 @@ export const ProductProfileDrawer: React.FC<ProductProfileDrawerProps> = ({
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
                   placeholder="e.g. UltraTech / Tata Tiscon"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  HSN / SAC Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={hsnCode}
+                  onChange={(e) => setHsnCode(e.target.value)}
+                  placeholder="e.g. 2523 (Cement), 7214 (Steel), 9954 (Service)"
                   className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
                 />
               </div>

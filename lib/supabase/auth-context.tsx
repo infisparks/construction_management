@@ -306,6 +306,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, pass: string) => {
     setIsLoading(true);
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('infibuild_demo_auth');
+      }
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password: pass,
@@ -353,12 +356,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      localStorage.removeItem('infibuild_demo_auth');
+      await supabase.auth.signOut({ scope: 'local' });
     } catch {
       // ignore
     }
     try {
-      await supabase.auth.signOut();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('infibuild_demo_auth');
+        // Force-clear any stale Supabase auth tokens in localStorage
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
     } catch {
       // ignore
     }

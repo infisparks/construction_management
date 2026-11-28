@@ -262,7 +262,7 @@ export const CustomerPurchasesView: React.FC<CustomerPurchasesViewProps> = ({
                 Client Sales & Commercial Inward
               </span>
               <h1 className="text-xl sm:text-2xl font-extrabold text-[#6338eb] tracking-tight leading-none mt-0.5">
-                Client Purchases & Inflow
+                Client Sales & Inflow
               </h1>
               <p className="text-xs text-slate-500 mt-1 max-w-md leading-snug">
                 Manage room & unit bookings, track customer collections, print scannable barcode slips & commercial statements.

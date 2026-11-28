@@ -83,8 +83,8 @@ interface SiteExpensesViewProps {
   userEmail?: string;
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
   externalActionTrigger?: { action: string; timestamp: number } | null;
-  activeCommercialTab?: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases';
-  onSelectCommercialTab?: (tab: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases') => void;
+  activeCommercialTab?: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases' | 'vendors';
+  onSelectCommercialTab?: (tab: 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases' | 'vendors') => void;
 }
 
 export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
@@ -348,8 +348,12 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
         return false;
       }
 
-      // 5. Payment Status Filter
-      if (statusFilter !== 'all' && exp.payment_status !== statusFilter) {
+      // 5. Payment Status Filter (Paid includes Partial Paid; Pending includes Partial Pending)
+      if (statusFilter === 'paid') {
+        if (exp.payment_status !== 'paid' && exp.payment_status !== 'partial') return false;
+      } else if (statusFilter === 'pending') {
+        if (exp.payment_status !== 'pending' && exp.payment_status !== 'partial') return false;
+      } else if (statusFilter !== 'all' && exp.payment_status !== statusFilter) {
         return false;
       }
 
@@ -643,7 +647,21 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               }`}
             >
               <ArrowDownLeft className="w-3.5 h-3.5 text-slate-500" />
-              <span>Purchases & Inflow</span>
+              <span>Sales & Inflow</span>
+            </button>
+
+            {/* Tab 4: Vendors & Parties Directory */}
+            <button
+              type="button"
+              onClick={() => onSelectCommercialTab?.('vendors')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeCommercialTab === 'vendors'
+                  ? 'bg-[#f0ecff] text-[#6338eb] border border-[#ddd4ff] shadow-2xs'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>Vendors & Parties</span>
             </button>
           </div>
 
@@ -831,19 +849,19 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 {/* Metric Info Column */}
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
-                    {isDateFilterActive(dateFilter) ? 'Filtered Date Total' : "This Month's Total"}
+                    {isDateFilterActive(dateFilter) ? 'Filtered Date Total' : 'Total Bills (All Data)'}
                   </span>
 
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
-                      {formatINR(isDateFilterActive(dateFilter) ? stats.allTimeTotal : stats.monthTotal)}
+                      {formatINR(stats.allTimeTotal)}
                     </span>
                     <span className="text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap bg-blue-100 text-blue-800 border border-blue-200/90">
                       {isDateFilterActive(dateFilter)
                         ? dateFilter.mode === 'exact'
                           ? 'Selected Date'
                           : 'Selected Range'
-                        : 'Month to Date'}
+                        : 'All Data'}
                     </span>
                   </div>
                 </div>
@@ -853,14 +871,14 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               <div className="mt-2 pt-1.5 relative z-10 flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200">
-                    Paid: {formatINR(isDateFilterActive(dateFilter) ? stats.paidTotal : stats.monthPaid)}
+                    Paid: {formatINR(stats.paidTotal)}
                   </span>
                   <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100/90 text-amber-800 border border-amber-200">
-                    Due: {formatINR(isDateFilterActive(dateFilter) ? stats.pendingTotal : stats.monthDue)}
+                    Due: {formatINR(stats.pendingTotal)}
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-600 font-semibold">
-                  {isDateFilterActive(dateFilter) ? stats.allTimeCount : stats.monthCount} Bills
+                  {stats.allTimeCount} Bills
                 </span>
               </div>
 
@@ -872,120 +890,105 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
               </div>
             </div>
 
-            {/* Card 3: Total Pending / Due Bills */}
-            <div
-              onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
-              className={`rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] border-[#baf2cf] hover:border-emerald-300 hover:shadow-md hover:-translate-y-1 cursor-pointer ${
-                statusFilter === 'pending' ? 'ring-2 ring-emerald-500/40 border-emerald-500' : ''
-              }`}
-              title="Click to filter pending/due bills"
-            >
-              {/* Card Body: Left 3D Icon, Right Metric Info */}
-              <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
-                {/* 3D Glossy Icon */}
-                <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/bill/Receipt with Green Checkmark.png"
-                    alt="Total Due Bills"
-                    className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
-                  />
-                </div>
+            {/* Card 3: Total Bills Count & Date Span (Start Date -> End Date) */}
+            {(() => {
+              const datedRows = filteredExpenses
+                .map((e) => e.expense_date)
+                .filter(Boolean)
+                .sort();
+              const startDate = datedRows[0] || '';
+              const endDate = datedRows[datedRows.length - 1] || '';
+              return (
+                <div className="rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#f0fdf5] via-[#e6f9ee] to-[#d2f7e2] border-[#baf2cf] hover:border-emerald-300 hover:shadow-md">
+                  <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
+                      <img
+                        src="/bill/Receipt with Green Checkmark.png"
+                        alt="Total Bills Count"
+                        className="w-full h-full object-contain drop-shadow-md select-none pointer-events-none"
+                      />
+                    </div>
 
-                {/* Metric Info Column */}
-                <div className="flex-1 min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
-                    Total Due / Pending
-                  </span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
+                        Total Bills
+                      </span>
 
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
-                      {formatINR(stats.pendingTotal)}
-                    </span>
-                    <span className={`text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap ${
-                      stats.pendingTotal > 0
-                        ? 'bg-amber-100 text-amber-800 border border-amber-200/90'
-                        : 'bg-emerald-100 text-emerald-800 border border-emerald-200/90'
-                    }`}>
-                      {stats.pendingTotal > 0 ? 'Due Balance' : 'All Cleared'}
-                    </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-numeric">
+                          {filteredExpenses.length} {filteredExpenses.length === 1 ? 'Bill' : 'Bills'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-1.5 relative z-10">
+                    <p className="text-[11px] sm:text-xs text-slate-700 font-semibold leading-tight truncate">
+                      {startDate && endDate
+                        ? `${formatMumbaiDate(startDate)} → ${formatMumbaiDate(endDate)}`
+                        : 'No bills in selected range'}
+                    </p>
+                  </div>
+
+                  <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
+                    <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
+                      <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#86efac" />
+                    </svg>
                   </div>
                 </div>
-              </div>
+              );
+            })()}
 
-              {/* Bottom Row: Subtext */}
-              <div className="mt-2 pt-1.5 relative z-10">
-                <p className="text-[11px] sm:text-xs text-slate-700 font-semibold leading-tight truncate">
-                  Paid: {formatINR(stats.paidTotal)} • Total: {formatINR(stats.allTimeTotal)}
-                </p>
-              </div>
+            {/* Card 4: GST & TDS Summary */}
+            {(() => {
+              const totalGst = filteredExpenses.reduce((sum, e) => sum + Math.max(Number(e.gst_amount || 0), 0), 0);
+              const totalTds = filteredExpenses.reduce((sum, e) => sum + Math.max(Number(e.tds_amount || 0), 0), 0);
+              return (
+                <div className="rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#fffdf5] via-[#fff5ea] to-[#ffe5d0] border-[#fed7aa] hover:border-amber-300 hover:shadow-md">
+                  <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
+                      <img
+                        src="/bill/Glossy Calendar Checkmark Icon.png"
+                        alt="GST & TDS Summary"
+                        className="w-full h-full object-contain drop-shadow-md select-none pointer-events-none"
+                      />
+                    </div>
 
-              {/* Organic Bottom-Right Corner Wave Accent */}
-              <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
-                <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
-                  <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#86efac" />
-                </svg>
-              </div>
-            </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
+                        GST &amp; TDS Collected
+                      </span>
+                      <div className="mt-1 space-y-0.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[10px] font-semibold text-slate-600">Total GST:</span>
+                          <span className="text-sm sm:text-base font-black text-slate-900">
+                            ₹{formatINR(totalGst)}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[10px] font-semibold text-slate-600">Total TDS:</span>
+                          <span className="text-sm sm:text-base font-black text-amber-800">
+                            ₹{formatINR(totalTds)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Card 4: Filter Quick Mode */}
-            <div 
-              onClick={() => {
-                if (dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr) {
-                  setDateFilter(DEFAULT_DATE_FILTER);
-                } else {
-                  setDateFilter({ mode: 'exact', exactDate: todayStr, startDate: '', endDate: '' });
-                }
-              }}
-              className={`rounded-2xl p-3 sm:p-3.5 border transition-all duration-300 flex flex-col justify-between relative overflow-hidden group min-h-[114px] sm:min-h-[124px] bg-gradient-to-br from-[#fffdf5] via-[#fff5ea] to-[#ffe5d0] border-[#fed7aa] hover:border-amber-300 hover:shadow-md cursor-pointer hover:-translate-y-1 ${
-                dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'border-amber-600 ring-2 ring-amber-500/30 shadow-md' : ''
-              }`}
-            >
-              {/* Card Body: Left 3D Icon, Right Metric Info */}
-              <div className="flex items-center gap-2 sm:gap-2.5 relative z-10">
-                {/* 3D Glossy Icon */}
-                <div className="w-11 h-11 sm:w-12 sm:h-12 lg:w-13 lg:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/bill/Glossy Calendar Checkmark Icon.png"
-                    alt="Filter Quick Mode"
-                    className="w-full h-full object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105 select-none pointer-events-none"
-                  />
-                </div>
+                  <div className="mt-2 pt-1 relative z-10">
+                    <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
+                      Sum of GST &amp; TDS across {filteredExpenses.length} filtered bill(s)
+                    </p>
+                  </div>
 
-                {/* Metric Info Column */}
-                <div className="flex-1 min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-wider block truncate">
-                    Filter Quick Mode
-                  </span>
-
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
-                      {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Showing Today' : 'Show Today Only'}
-                    </span>
-                    <span className={`text-[8.5px] sm:text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shadow-2xs whitespace-nowrap ${
-                      dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300 font-bold'
-                        : 'bg-amber-100/70 text-amber-800 border border-amber-200'
-                    }`}>
-                      {dateFilter.mode === 'exact' && dateFilter.exactDate === todayStr ? 'Active' : 'Quick Filter'}
-                    </span>
+                  <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
+                    <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
+                      <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#fdba74" />
+                    </svg>
                   </div>
                 </div>
-              </div>
-
-              {/* Bottom Row: Subtext */}
-              <div className="mt-2 pt-1 relative z-10">
-                <p className="text-[10px] sm:text-[10.5px] text-slate-500 font-medium leading-tight truncate">
-                  Click to isolate today's receipts & lunch
-                </p>
-              </div>
-
-              {/* Organic Bottom-Right Corner Wave Accent */}
-              <div className="absolute -bottom-2 -right-2 w-20 sm:w-24 h-10 sm:h-12 pointer-events-none opacity-40 overflow-hidden z-0">
-                <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-full">
-                  <path d="M0,50 Q40,15 70,35 T100,0 L100,50 Z" fill="#fdba74" />
-                </svg>
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
           {/* 3. Filter & Search Toolbar (Modern Pill Inputs & Selects) */}
@@ -1064,9 +1067,9 @@ export const SiteExpensesView: React.FC<SiteExpensesViewProps> = ({
                 className="h-9 px-3 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-hidden focus:border-[#6338eb] font-medium cursor-pointer"
               >
                 <option value="all">All Statuses</option>
-                <option value="paid">Paid</option>
-                <option value="partial">Partial Paid</option>
-                <option value="pending">Pending</option>
+                <option value="paid">Paid (incl. Partial)</option>
+                <option value="pending">Pending (incl. Partial)</option>
+                <option value="partial">Partial Only</option>
               </select>
 
               {/* Clear Filters (if any active) */}

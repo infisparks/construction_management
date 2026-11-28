@@ -17,8 +17,9 @@ import { SiteExpensesView } from './SiteExpensesView';
 import { SubcontractorBillsView } from '@/components/construction-planning/SubcontractorBillsView';
 import { ContractorWorkOrdersView } from '@/components/contractor-work-orders/ContractorWorkOrdersView';
 import { CustomerPurchasesView } from '@/components/customer-purchases/CustomerPurchasesView';
+import { VendorProfileView } from '@/components/inventory/VendorProfileView';
 
-export type CommercialTab = 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases';
+export type CommercialTab = 'expenses' | 'subcontractor-bills' | 'contractor-work-orders' | 'customer-purchases' | 'vendors';
 
 interface CommercialBillsAndExpensesViewProps {
   initialTab?: CommercialTab;
@@ -111,7 +112,21 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
               }`}
             >
               <ArrowDownLeft className={`w-3.5 h-3.5 ${activeTab === 'customer-purchases' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
-              <span>Purchases & Inflow</span>
+              <span>Sales & Inflow</span>
+            </button>
+
+            {/* Tab 4: Vendors & Parties Directory */}
+            <button
+              type="button"
+              onClick={() => handleSelectTab('vendors')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'vendors'
+                  ? 'bg-white text-[#653ef1] shadow-2xs border border-[#653ef1]/30 font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <Building2 className={`w-3.5 h-3.5 ${activeTab === 'vendors' ? 'text-[#653ef1] stroke-[2.3]' : 'text-slate-400'}`} />
+              <span>Vendors & Parties</span>
             </button>
           </div>
 
@@ -152,6 +167,8 @@ export const CommercialBillsAndExpensesView: React.FC<CommercialBillsAndExpenses
           userEmail={userEmail}
           showToast={showToast}
         />
+      ) : activeTab === 'vendors' ? (
+        <VendorProfileView showToast={showToast} />
       ) : (
         <SubcontractorBillsView
           bills={subcontractorBills}

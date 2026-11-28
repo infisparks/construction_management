@@ -53,13 +53,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       if (mode === 'signin') {
         const { error } = await signIn(email.trim(), password.trim());
         if (error) {
-          // If Supabase invalid credentials in demo environment, auto fallback to demo session
-          loginAsDemo();
-          setSuccessMessage('Session Authenticated! Redirecting to Dashboard...');
-          onSuccess?.();
-          setTimeout(() => {
-            router.replace('/planstructino');
-          }, 150);
+          setErrorMessage(error.message || 'Invalid email or password. Please try again.');
         } else {
           setSuccessMessage('Authentication successful! Redirecting to Dashboard...');
           onSuccess?.();

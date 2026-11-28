@@ -33,7 +33,10 @@ import {
   updatePurchaseQuotationItems,
   softDeletePurchaseQuotation,
   fetchPurchaseRequisitions,
+  fetchDeletedPurchaseRequisitions,
+  restorePurchaseRequisition,
   createPurchaseRequisition,
+  updatePurchaseRequisition,
   processRequisitionApproval,
   softDeletePurchaseRequisition,
   uploadPurchaseQuotationFile,
@@ -58,6 +61,13 @@ interface DraftQuoteRow {
   quoted_amount: string;
   notes: string;
   file: File | null;
+}
+
+function formatINR(val: number): string {
+  return Number(val || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }
 
 const STAGE_LABEL: Record<ApprovalStage, string> = {
@@ -87,8 +97,13 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
 
   // Requisitions State
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
+  const [deletedRequisitions, setDeletedRequisitions] = useState<PurchaseRequisition[]>([]);
+  const [reqViewTab, setReqViewTab] = useState<'active' | 'bin'>('active');
   const [isLoadingReqs, setIsLoadingReqs] = useState(true);
   const [reqSetupError, setReqSetupError] = useState<string | null>(null);
+  const [deleteReqTarget, setDeleteReqTarget] = useState<PurchaseRequisition | null>(null);
+  const [deleteReqConfirmText, setDeleteReqConfirmText] = useState('');
+  const [isDeletingReq, setIsDeletingReq] = useState(false);
 
   // Viewer Modal
   const [viewerState, setViewerState] = useState<{
@@ -117,18 +132,29 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
   const [extraFile, setExtraFile] = useState<File | null>(null);
   const [isAddingExtraQuote, setIsAddingExtraQuote] = useState(false);
 
-  // New Requisition Modal (flexible JSONB form_data)
+  // New Requisition Modal (flexible JSONB table inside form_data)
+  const DEFAULT_REQ_COLUMNS = [
+    { key: 'product_name', label: 'Product Name', type: 'text' as const },
+    { key: 'quantity', label: 'Quantity', type: 'number' as const },
+    { key: 'amount', label: 'Amount (₹)', type: 'number' as const },
+    { key: 'gst', label: 'GST (%)', type: 'number' as const },
+  ];
   const [isNewReqOpen, setIsNewReqOpen] = useState(false);
   const [reqSiteId, setReqSiteId] = useState<string>(projectId || '');
   const [reqTitle, setReqTitle] = useState('');
   const [reqDescription, setReqDescription] = useState('');
-  const [reqFile, setReqFile] = useState<File | null>(null);
+  const [reqColumns, setReqColumns] = useState<{ key: string; label: string; type: 'text' | 'number' }[]>(DEFAULT_REQ_COLUMNS);
+  const [reqRows, setReqRows] = useState<Record<string, string>[]>([
+    { product_name: '', quantity: '1', amount: '', gst: '0' },
+  ]);
+  const [viewingReqTable, setViewingReqTable] = useState<PurchaseRequisition | null>(null);
+  const [editingReq, setEditingReq] = useState<PurchaseRequisition | null>(null);
   const [isSavingReq, setIsSavingReq] = useState(false);
 
   // Approval Action Modal
   const [approvalTarget, setApprovalTarget] = useState<{
     req: PurchaseRequisition;
-    decision: 'approved' | 'rejected';
+    decision: 'approved' | 'rejected' | 'reverted' | 'undo_reject';
   } | null>(null);
   const [approvalRemarks, setApprovalRemarks] = useState('');
   const [isProcessingApproval, setIsProcessingApproval] = useState(false);
@@ -153,13 +179,15 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
   const loadAll = async () => {
     setIsLoadingQuotes(true);
     setIsLoadingReqs(true);
-    const [qRes, rRes] = await Promise.all([
+    const [qRes, rRes, deletedReqs] = await Promise.all([
       fetchPurchaseQuotations(siteFilter),
       fetchPurchaseRequisitions(siteFilter),
+      fetchDeletedPurchaseRequisitions(),
     ]);
     setInquiries(qRes.data);
     setQuoteSetupError(qRes.error);
     setRequisitions(rRes.data);
+    setDeletedRequisitions(deletedReqs);
     setReqSetupError(rRes.error);
     setIsLoadingQuotes(false);
     setIsLoadingReqs(false);
@@ -182,16 +210,17 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
   }, [inquiries, searchQuery]);
 
   const filteredRequisitions = useMemo(() => {
-    if (!searchQuery.trim()) return requisitions;
+    const source = reqViewTab === 'active' ? requisitions : deletedRequisitions;
+    if (!searchQuery.trim()) return source;
     const q = searchQuery.toLowerCase();
-    return requisitions.filter(
+    return source.filter(
       (r) =>
         r.title.toLowerCase().includes(q) ||
         r.req_code.toLowerCase().includes(q) ||
         (r.submitted_by_email || '').toLowerCase().includes(q) ||
         JSON.stringify(r.form_data || {}).toLowerCase().includes(q)
     );
-  }, [requisitions, searchQuery]);
+  }, [reqViewTab, requisitions, deletedRequisitions, searchQuery]);
 
   // Create New Quotation Inquiry Profile (Step 1: Heading + Description only)
   const handleCreateInquiry = async (e: React.FormEvent) => {
@@ -310,51 +339,104 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
     }
   };
 
-  // Submit Purchase Requisition (Heading + Uploaded PDF/Image)
+  const calcRowTotals = (row: Record<string, string>) => {
+    const qty = Math.max(Number(row.quantity || 0), 0);
+    const rate = Math.max(Number(row.amount || 0), 0);
+    const gstPct = Math.max(Number(row.gst || 0), 0);
+    const base = qty * rate;
+    const gstAmt = (base * gstPct) / 100;
+    const total = base + gstAmt;
+    return { base, gstAmt, total };
+  };
+
+  const reqSummary = useMemo(() => {
+    return reqRows.reduce(
+      (acc, r) => {
+        const { base, gstAmt, total } = calcRowTotals(r);
+        acc.subtotal += base;
+        acc.gstTotal += gstAmt;
+        acc.grandTotal += total;
+        return acc;
+      },
+      { subtotal: 0, gstTotal: 0, grandTotal: 0 }
+    );
+  }, [reqRows]);
+
+  // Submit Purchase Requisition (Flexible Table JSONB in form_data)
   const handleCreateRequisition = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqTitle.trim()) {
       showToast?.('Please enter a requisition heading.', 'error');
       return;
     }
-    if (!reqFile) {
-      showToast?.('Please upload the requisition PDF or image.', 'error');
+
+    const nonEmptyRows = reqRows.filter((r) =>
+      reqColumns.some((c) => (r[c.key] || '').trim() !== '')
+    );
+    if (nonEmptyRows.length === 0) {
+      showToast?.('Please enter at least one item row in the table.', 'error');
       return;
     }
 
     setIsSavingReq(true);
     try {
-      const uploaded = await uploadPurchaseQuotationFile(reqFile, 'requisitions');
+      const normalizedRows = nonEmptyRows.map((r, idx) => {
+        const { base, gstAmt, total } = calcRowTotals(r);
+        return {
+          sr_no: idx + 1,
+          ...r,
+          line_subtotal: Number(base.toFixed(2)),
+          line_gst: Number(gstAmt.toFixed(2)),
+          total_amount: Number(total.toFixed(2)),
+        };
+      });
+
       const formData = {
         description: reqDescription.trim() || null,
-        file_url: uploaded.publicUrl,
-        file_name: uploaded.fileName,
-        file_type: uploaded.fileType,
+        table: {
+          columns: reqColumns,
+          rows: normalizedRows,
+          subtotal: Number(reqSummary.subtotal.toFixed(2)),
+          gst_total: Number(reqSummary.gstTotal.toFixed(2)),
+          grand_total: Number(reqSummary.grandTotal.toFixed(2)),
+        },
       };
 
-      const res = await createPurchaseRequisition({
-        project_id: reqSiteId || null,
-        title: reqTitle,
-        description: reqDescription.trim() || null,
-        file_url: uploaded.publicUrl,
-        file_name: uploaded.fileName,
-        form_data: formData,
-        submitted_by_email: userEmail || null,
-        submitted_by_role: userRole || 'user',
-      });
+      const res = editingReq
+        ? await updatePurchaseRequisition(editingReq.id, {
+            project_id: reqSiteId || null,
+            title: reqTitle,
+            description: reqDescription.trim() || null,
+            form_data: formData,
+          })
+        : await createPurchaseRequisition({
+            project_id: reqSiteId || null,
+            title: reqTitle,
+            description: reqDescription.trim() || null,
+            form_data: formData,
+            submitted_by_email: userEmail || null,
+            submitted_by_role: userRole || 'user',
+          });
 
       if (res.error) {
         showToast?.(res.error, 'error');
       } else if (res.data) {
-        setRequisitions((prev) => [res.data!, ...prev]);
-        showToast?.('Purchase Requisition PDF submitted for Purchase Approval!', 'success');
+        if (editingReq) {
+          setRequisitions((prev) => prev.map((r) => (r.id === res.data!.id ? res.data! : r)));
+          showToast?.('Requisition updated! Purchase can now approve.', 'success');
+        } else {
+          setRequisitions((prev) => [res.data!, ...prev]);
+          showToast?.('Purchase Requisition submitted for Purchase Approval!', 'success');
+        }
         setIsNewReqOpen(false);
+        setEditingReq(null);
         setReqTitle('');
         setReqDescription('');
-        setReqFile(null);
+        setReqColumns(DEFAULT_REQ_COLUMNS);
+        setReqRows([{ product_name: '', quantity: '1', amount: '', gst: '0' }]);
       }
     } catch (err: any) {
-      showToast?.(err?.message || 'Failed to upload requisition PDF.', 'error');
+      showToast?.(err?.message || 'Failed to submit requisition.', 'error');
     } finally {
       setIsSavingReq(false);
     }
@@ -382,8 +464,12 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         showToast?.(
           approvalTarget.decision === 'approved'
             ? `Approved! Current status: ${STAGE_LABEL[res.data.approval_stage]}`
-            : `Requisition ${res.data.req_code} rejected.`,
-          approvalTarget.decision === 'approved' ? 'success' : 'info'
+            : approvalTarget.decision === 'reverted'
+              ? `Reverted ${res.data.req_code} to ${STAGE_LABEL[res.data.approval_stage]}`
+              : approvalTarget.decision === 'undo_reject'
+                ? `Rejection undone! ${res.data.req_code} restored to ${STAGE_LABEL[res.data.approval_stage]}`
+                : `Requisition ${res.data.req_code} rejected.`,
+          approvalTarget.decision === 'approved' || approvalTarget.decision === 'undo_reject' ? 'success' : 'info'
         );
         setApprovalTarget(null);
         setApprovalRemarks('');
@@ -446,7 +532,18 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
 
           <button
             type="button"
-            onClick={() => (activeTab === 'quotations' ? setIsNewInquiryOpen(true) : setIsNewReqOpen(true))}
+            onClick={() => {
+              if (activeTab === 'quotations') {
+                setIsNewInquiryOpen(true);
+              } else {
+                setEditingReq(null);
+                setReqTitle('');
+                setReqDescription('');
+                setReqColumns(DEFAULT_REQ_COLUMNS);
+                setReqRows([{ product_name: '', quantity: '1', amount: '', gst: '0' }]);
+                setIsNewReqOpen(true);
+              }
+            }}
             className="h-9 px-4 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -781,6 +878,33 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
       {/* 4. TAB 2: PURCHASE REQUISITIONS & 3-STEP APPROVAL TABLE */}
       {activeTab === 'requisitions' && (
         <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-2xs overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/60">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setReqViewTab('active')}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  reqViewTab === 'active'
+                    ? 'bg-white text-[#653ef1] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Active Requisitions ({requisitions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReqViewTab('bin')}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  reqViewTab === 'bin'
+                    ? 'bg-white text-rose-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Recycle Bin ({deletedRequisitions.length})
+              </button>
+            </div>
+          </div>
+
           {isLoadingReqs ? (
             <div className="p-12 text-center text-xs text-slate-500">
               Loading purchase requisitions...
@@ -788,9 +912,13 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
           ) : filteredRequisitions.length === 0 ? (
             <div className="p-12 text-center">
               <ClipboardCheck className="w-9 h-9 text-slate-300 mx-auto mb-2" />
-              <div className="text-sm font-semibold text-slate-800">No Purchase Requisitions Yet</div>
+              <div className="text-sm font-semibold text-slate-800">
+                {reqViewTab === 'bin' ? 'Recycle Bin is Empty' : 'No Purchase Requisitions Yet'}
+              </div>
               <p className="text-xs text-slate-500 mt-1">
-                Upload a requisition PDF with heading. Approvals flow in table: Purchase → Director → Accounts.
+                {reqViewTab === 'bin'
+                  ? 'Soft-deleted requisitions appear here so you can restore them anytime.'
+                  : 'Click "+ New Requisition" to add items. Approvals flow: Purchase → Director → Accounts.'}
               </p>
             </div>
           ) : (
@@ -801,7 +929,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                     <th className="px-3.5 py-3 text-center w-10">Sr.</th>
                     <th className="px-3.5 py-3">Req &amp; Date</th>
                     <th className="px-3.5 py-3">Site</th>
-                    <th className="px-3.5 py-3">Heading &amp; Requisition PDF</th>
+                    <th className="px-3.5 py-3">Heading &amp; Items</th>
                     <th className="px-3.5 py-3">1. Purchase</th>
                     <th className="px-3.5 py-3">2. Director</th>
                     <th className="px-3.5 py-3">3. Accounts</th>
@@ -826,27 +954,55 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                       const isCurrent = req.approval_stage === pendingStage;
                       if (entry?.decision === 'approved') {
                         return (
-                          <div className="text-[11px]">
+                          <div className="text-[11px] max-w-[160px]">
                             <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               Approved
                             </span>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[130px]" title={entry.by_email}>
+                            <div className="text-[10px] text-slate-500 truncate" title={entry.by_email}>
                               {entry.by_email}
                             </div>
+                            {entry.remarks && (
+                              <div className="mt-1 text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 whitespace-normal break-words">
+                                &ldquo;{entry.remarks}&rdquo;
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      if (entry?.decision === 'reverted') {
+                        return (
+                          <div className="text-[11px] max-w-[160px]">
+                            <span className="inline-flex items-center gap-1 font-bold text-amber-700">
+                              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              Reverted
+                            </span>
+                            <div className="text-[10px] text-slate-500 truncate" title={entry.by_email}>
+                              {entry.by_email}
+                            </div>
+                            {entry.remarks && (
+                              <div className="mt-1 text-[10px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 whitespace-normal break-words">
+                                &ldquo;{entry.remarks}&rdquo;
+                              </div>
+                            )}
                           </div>
                         );
                       }
                       if (entry?.decision === 'rejected') {
                         return (
-                          <div className="text-[11px]">
+                          <div className="text-[11px] max-w-[160px]">
                             <span className="inline-flex items-center gap-1 font-bold text-rose-700">
                               <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                               Rejected
                             </span>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[130px]" title={entry.by_email}>
+                            <div className="text-[10px] text-slate-500 truncate" title={entry.by_email}>
                               {entry.by_email}
                             </div>
+                            {entry.remarks && (
+                              <div className="mt-1 text-[10px] text-rose-800 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5 whitespace-normal break-words">
+                                &ldquo;{entry.remarks}&rdquo;
+                              </div>
+                            )}
                           </div>
                         );
                       }
@@ -880,6 +1036,12 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                         </td>
                         <td className="px-3.5 py-3">
                           <div className="font-bold text-[#111827]">{req.title}</div>
+                          {req.form_data?.table?.rows?.length > 0 && (
+                            <div className="text-[11px] font-semibold text-[#653ef1] mt-0.5">
+                              {req.form_data.table.rows.length} item(s) • Grand Total: ₹
+                              {formatINR(req.form_data.table.grand_total || 0)}
+                            </div>
+                          )}
                           {desc && <div className="text-[11px] text-[#6B7280] truncate max-w-[220px]">{desc}</div>}
                           <div className="text-[10px] text-slate-500 mt-0.5">
                             By: {req.submitted_by_email || 'Staff'}
@@ -909,6 +1071,17 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                         </td>
                         <td className="px-3.5 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center justify-end gap-1.5">
+                            {req.form_data?.table?.rows?.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingReqTable(req)}
+                                className="h-7 px-2.5 rounded-lg bg-purple-50 hover:bg-[#653ef1] text-[#653ef1] hover:text-white text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                title="View requisition items table"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View Items</span>
+                              </button>
+                            )}
                             {fileUrl && (
                               <button
                                 type="button"
@@ -927,6 +1100,48 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                                 <span>View PDF</span>
                               </button>
                             )}
+                            {reqViewTab === 'bin' ? (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (await restorePurchaseRequisition(req.id)) {
+                                    setDeletedRequisitions((prev) => prev.filter((r) => r.id !== req.id));
+                                    setRequisitions((prev) => [{ ...req, is_deleted: false }, ...prev]);
+                                    showToast?.(`${req.req_code} restored!`, 'success');
+                                  }
+                                }}
+                                className="h-7 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold cursor-pointer"
+                              >
+                                Restore
+                              </button>
+                            ) : (
+                              <>
+                            {req.approval_stage === 'pending_purchase' && (isPurchase || isAdmin) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingReq(req);
+                                  setReqTitle(req.title);
+                                  setReqSiteId(req.project_id || '');
+                                  setReqDescription(req.description || '');
+                                  setReqColumns(
+                                    req.form_data?.table?.columns?.length > 0
+                                      ? req.form_data.table.columns
+                                      : DEFAULT_REQ_COLUMNS
+                                  );
+                                  setReqRows(
+                                    req.form_data?.table?.rows?.length > 0
+                                      ? req.form_data.table.rows
+                                      : [{ product_name: '', quantity: '1', amount: '', gst: '0' }]
+                                  );
+                                  setIsNewReqOpen(true);
+                                }}
+                                className="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                title="Edit requisition items"
+                              >
+                                <span>Edit</span>
+                              </button>
+                            )}
                             {canAct && (
                               <>
                                 <button
@@ -937,6 +1152,17 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   <span>Approve</span>
                                 </button>
+                                {(req.approval_stage === 'pending_director' ||
+                                  req.approval_stage === 'pending_accounts') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setApprovalTarget({ req, decision: 'reverted' })}
+                                    className="h-7 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                    title="Revert back for changes"
+                                  >
+                                    <span>Revert</span>
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => setApprovalTarget({ req, decision: 'rejected' })}
@@ -947,20 +1173,40 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                                 </button>
                               </>
                             )}
+                            {req.approval_stage === 'rejected' && isAdmin && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setApprovalTarget({ req, decision: 'undo_reject' })}
+                                  className="h-7 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                  title="Undo rejection so you can approve or revert"
+                                >
+                                  <span>Undo Reject</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setApprovalTarget({ req, decision: 'reverted' })}
+                                  className="h-7 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                  title="Revert rejected requisition back to Purchase"
+                                >
+                                  <span>Revert to Purchase</span>
+                                </button>
+                              </>
+                            )}
                             {isAdmin && (
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  if (await softDeletePurchaseRequisition(req.id)) {
-                                    setRequisitions((prev) => prev.filter((r) => r.id !== req.id));
-                                    showToast?.('Requisition deleted.', 'info');
-                                  }
+                                onClick={() => {
+                                  setDeleteReqTarget(req);
+                                  setDeleteReqConfirmText('');
                                 }}
                                 className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer"
                                 title="Delete requisition"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
+                            )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -1138,15 +1384,17 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         </div>
       )}
 
-      {/* MODAL 3: New Purchase Requisition (Heading + Upload PDF/Image) */}
+      {/* MODAL 3: New Purchase Requisition (Flexible Table Builder) */}
       {isNewReqOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center sm:p-4">
+          <div className="bg-white w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
-                <h2 className="text-base font-bold text-[#111827]">Upload Purchase Requisition</h2>
+                <h2 className="text-base font-bold text-[#111827]">
+                  {editingReq ? `Edit Requisition — ${editingReq.req_code}` : 'New Purchase Requisition'}
+                </h2>
                 <p className="text-xs text-[#6B7280]">
-                  Approval Flow: Purchase → Director → Accounts
+                  Approval Flow: Purchase → Director → Accounts • Flexible item table
                 </p>
               </div>
               <button
@@ -1158,66 +1406,218 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateRequisition} className="p-5 space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Requisition Heading <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={reqTitle}
-                  onChange={(e) => setReqTitle(e.target.value)}
-                  placeholder="e.g. Split AC for Site Office"
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
-                />
-              </div>
+            <form onSubmit={handleCreateRequisition} className="flex-1 overflow-y-auto p-5 space-y-4">
+              {editingReq && (() => {
+                const lastRevert = [...(editingReq.approval_history || [])]
+                  .reverse()
+                  .find((h) => h.decision === 'reverted' || h.decision === 'rejected');
+                if (!lastRevert?.remarks) return null;
+                return (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                    <span className="font-bold">Director / Reviewer Remark: </span>
+                    <span>&ldquo;{lastRevert.remarks}&rdquo;</span>
+                  </div>
+                );
+              })()}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Requisition Heading <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={reqTitle}
+                    onChange={(e) => setReqTitle(e.target.value)}
+                    placeholder="e.g. Split AC & Electrical Material"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Site / Project
-                </label>
-                <select
-                  value={reqSiteId}
-                  onChange={(e) => setReqSiteId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#653ef1]"
-                >
-                  <option value="">General / All Sites</option>
-                  {allProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Site / Project
+                  </label>
+                  <select
+                    value={reqSiteId}
+                    onChange={(e) => setReqSiteId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#653ef1]"
+                  >
+                    <option value="">General / All Sites</option>
+                    {allProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Description / Note (Optional)
                 </label>
-                <textarea
-                  rows={2}
+                <input
+                  type="text"
                   value={reqDescription}
                   onChange={(e) => setReqDescription(e.target.value)}
                   placeholder="Any remarks or urgency note..."
-                  className="w-full p-2.5 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Requisition PDF / Document <span className="text-rose-500">*</span>
-                </label>
-                <label className="w-full h-11 px-3 rounded-lg border border-dashed border-[#653ef1] bg-purple-50/30 text-xs font-semibold text-[#653ef1] flex items-center gap-2 cursor-pointer">
-                  <Upload className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{reqFile ? reqFile.name : 'Choose Requisition PDF or Image *'}</span>
-                  <input
-                    type="file"
-                    accept=".pdf,image/*,.heic,.heif"
-                    className="hidden"
-                    onChange={(e) => setReqFile(e.target.files?.[0] || null)}
-                  />
-                </label>
+              {/* Flexible Requisition Items Table */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-[#111827]">
+                      Requisition Items Table
+                    </span>
+                    <p className="text-[11px] text-[#6B7280]">
+                      Click any header to rename it, or add custom columns &amp; rows.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newKey = `col_${Date.now()}`;
+                        setReqColumns((prev) => [
+                          ...prev,
+                          { key: newKey, label: 'Custom Column', type: 'text' },
+                        ]);
+                      }}
+                      className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Column</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setReqRows((prev) => [
+                          ...prev,
+                          { product_name: '', quantity: '1', amount: '', gst: '0' },
+                        ])
+                      }
+                      className="h-8 px-3 rounded-lg bg-purple-50 hover:bg-purple-100 text-[#653ef1] text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Row</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                  <table className="w-full text-left text-xs min-w-[680px]">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600">
+                      <tr>
+                        <th className="px-2.5 py-2.5 w-12 text-center">Sr. No.</th>
+                        {reqColumns.map((col, cIdx) => {
+                          const isCore = ['product_name', 'quantity', 'amount', 'gst'].includes(col.key);
+                          return (
+                            <th key={col.key} className="px-2 py-2 min-w-[110px]">
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={col.label}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setReqColumns((prev) =>
+                                      prev.map((c, i) => (i === cIdx ? { ...c, label: val } : c))
+                                    );
+                                  }}
+                                  className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-[#653ef1] focus:outline-hidden font-bold text-slate-700 py-0.5 text-[11px]"
+                                />
+                                {!isCore && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setReqColumns((prev) => prev.filter((_, i) => i !== cIdx))
+                                    }
+                                    className="text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
+                                    title="Remove column"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </th>
+                          );
+                        })}
+                        <th className="px-2.5 py-2.5 text-right w-28">Total (₹)</th>
+                        <th className="px-2 py-2.5 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {reqRows.map((row, rIdx) => {
+                        const { total } = calcRowTotals(row);
+                        return (
+                          <tr key={rIdx} className="hover:bg-slate-50/50">
+                            <td className="px-2.5 py-2 text-center font-mono text-slate-500">
+                              {rIdx + 1}
+                            </td>
+                            {reqColumns.map((col) => (
+                              <td key={col.key} className="px-2 py-1.5">
+                                <input
+                                  type={col.type === 'number' ? 'number' : 'text'}
+                                  step={col.type === 'number' ? 'any' : undefined}
+                                  min={col.type === 'number' ? '0' : undefined}
+                                  value={row[col.key] ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setReqRows((prev) =>
+                                      prev.map((r, i) =>
+                                        i === rIdx ? { ...r, [col.key]: val } : r
+                                      )
+                                    );
+                                  }}
+                                  placeholder={col.label}
+                                  className="w-full h-8 px-2 rounded-md border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#653ef1]"
+                                />
+                              </td>
+                            ))}
+                            <td className="px-2.5 py-2 text-right font-bold text-[#111827] whitespace-nowrap">
+                              ₹{formatINR(total)}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              {reqRows.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setReqRows((prev) => prev.filter((_, i) => i !== rIdx))
+                                  }
+                                  className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                  title="Remove row"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Live Totals Summary Bar */}
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <span className="text-slate-600 font-medium">
+                    Total Rows: <strong className="text-slate-900">{reqRows.length}</strong>
+                  </span>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className="text-slate-600">
+                      Subtotal: <strong className="text-slate-900">₹{formatINR(reqSummary.subtotal)}</strong>
+                    </span>
+                    <span className="text-slate-600">
+                      GST: <strong className="text-slate-900">₹{formatINR(reqSummary.gstTotal)}</strong>
+                    </span>
+                    <span className="text-sm font-bold text-[#653ef1]">
+                      Grand Total: ₹{formatINR(reqSummary.grandTotal)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1233,7 +1633,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                   disabled={isSavingReq}
                   className="h-9 px-5 rounded-xl bg-[#653ef1] hover:bg-[#542be3] text-white text-xs font-bold cursor-pointer disabled:opacity-60"
                 >
-                  {isSavingReq ? 'Uploading...' : 'Submit for Approval'}
+                  {isSavingReq ? 'Submitting...' : 'Submit for Approval'}
                 </button>
               </div>
             </form>
@@ -1241,14 +1641,136 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         </div>
       )}
 
-      {/* MODAL 4: Approval / Rejection Confirmation */}
+      {/* MODAL 3B: View Requisition Items Table */}
+      {viewingReqTable && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-3xl max-h-[88vh] rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#111827]">
+                  {viewingReqTable.title} — {viewingReqTable.req_code}
+                </h3>
+                <p className="text-xs text-[#6B7280]">
+                  By {viewingReqTable.submitted_by_email || 'Staff'} •{' '}
+                  {(viewingReqTable.project_id && projectMap.get(viewingReqTable.project_id)) || 'General'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingReqTable(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-5 space-y-4">
+              {viewingReqTable.description && (
+                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  {viewingReqTable.description}
+                </p>
+              )}
+
+              <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2.5 text-center">Sr. No.</th>
+                      {(viewingReqTable.form_data?.table?.columns || []).map((col: any) => (
+                        <th key={col.key} className="px-3 py-2.5">
+                          {col.label}
+                        </th>
+                      ))}
+                      <th className="px-3 py-2.5 text-right">Total (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(viewingReqTable.form_data?.table?.rows || []).map((r: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="px-3 py-2 text-center font-mono text-slate-500">
+                          {r.sr_no || idx + 1}
+                        </td>
+                        {(viewingReqTable.form_data?.table?.columns || []).map((col: any) => (
+                          <td key={col.key} className="px-3 py-2 text-slate-800">
+                            {r[col.key] || '—'}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-right font-bold text-[#111827]">
+                          ₹{formatINR(r.total_amount || 0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-purple-50/60 rounded-xl border border-purple-200 p-3.5 flex flex-wrap items-center justify-end gap-5 text-xs">
+                <span>
+                  Subtotal: <strong>₹{formatINR(viewingReqTable.form_data?.table?.subtotal || 0)}</strong>
+                </span>
+                <span>
+                  GST: <strong>₹{formatINR(viewingReqTable.form_data?.table?.gst_total || 0)}</strong>
+                </span>
+                <span className="text-sm font-bold text-[#653ef1]">
+                  Grand Total: ₹{formatINR(viewingReqTable.form_data?.table?.grand_total || 0)}
+                </span>
+              </div>
+
+              {viewingReqTable.approval_history?.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="text-xs font-bold text-[#111827]">Approval History &amp; Remarks</div>
+                  <div className="space-y-1.5">
+                    {viewingReqTable.approval_history.map((h, i) => (
+                      <div
+                        key={i}
+                        className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex flex-col gap-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold capitalize text-[#111827]">
+                            {h.stage} —{' '}
+                            <span
+                              className={
+                                h.decision === 'approved'
+                                  ? 'text-emerald-700'
+                                  : h.decision === 'reverted'
+                                    ? 'text-amber-700'
+                                    : 'text-rose-700'
+                              }
+                            >
+                              {h.decision.toUpperCase()}
+                            </span>
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {h.by_email} • {formatMumbaiDate(h.at)}
+                          </span>
+                        </div>
+                        {h.remarks && (
+                          <div className="text-[11px] text-slate-700 italic">&ldquo;{h.remarks}&rdquo;</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: Approval / Rejection / Revert Confirmation */}
       {approvalTarget && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#111827]">
-                {approvalTarget.decision === 'approved' ? 'Approve Requisition' : 'Reject Requisition'} —{' '}
-                {approvalTarget.req.req_code}
+                {approvalTarget.decision === 'approved'
+                  ? 'Approve Requisition'
+                  : approvalTarget.decision === 'reverted'
+                    ? 'Revert Requisition for Update'
+                    : approvalTarget.decision === 'undo_reject'
+                      ? 'Undo Rejection'
+                      : 'Reject Requisition'}{' '}
+                — {approvalTarget.req.req_code}
               </h3>
               <button
                 type="button"
@@ -1264,13 +1786,18 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Remarks (Optional)
+                  Remarks {approvalTarget.decision === 'reverted' ? '(Explain what to update)' : '(Optional)'}
                 </label>
                 <textarea
                   rows={2}
+                  required={approvalTarget.decision === 'reverted'}
                   value={approvalRemarks}
                   onChange={(e) => setApprovalRemarks(e.target.value)}
-                  placeholder="Enter approval or rejection notes..."
+                  placeholder={
+                    approvalTarget.decision === 'reverted'
+                      ? 'Write reason/comment for Purchase to update...'
+                      : 'Enter approval or rejection notes...'
+                  }
                   className="w-full p-2.5 rounded-lg border border-slate-200 text-xs"
                 />
               </div>
@@ -1286,19 +1813,112 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                   type="submit"
                   disabled={isProcessingApproval}
                   className={`h-9 px-4 rounded-xl text-white text-xs font-bold cursor-pointer disabled:opacity-60 ${
-                    approvalTarget.decision === 'approved'
+                    approvalTarget.decision === 'approved' || approvalTarget.decision === 'undo_reject'
                       ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-rose-600 hover:bg-rose-700'
+                      : approvalTarget.decision === 'reverted'
+                        ? 'bg-amber-600 hover:bg-amber-700'
+                        : 'bg-rose-600 hover:bg-rose-700'
                   }`}
                 >
                   {isProcessingApproval
                     ? 'Saving...'
                     : approvalTarget.decision === 'approved'
-                    ? 'Confirm Approval'
-                    : 'Confirm Rejection'}
+                      ? 'Confirm Approval'
+                      : approvalTarget.decision === 'reverted'
+                        ? 'Confirm Revert'
+                        : approvalTarget.decision === 'undo_reject'
+                          ? 'Confirm Undo Reject'
+                          : 'Confirm Rejection'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: Type DELETE Confirmation for Purchase Requisition */}
+      {deleteReqTarget && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#111827]">Confirm Delete Requisition</h3>
+                  <p className="text-xs text-[#6B7280]">
+                    This will move {deleteReqTarget.req_code} to the Recycle Bin.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteReqTarget(null);
+                  setDeleteReqConfirmText('');
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+              <div className="font-bold text-[#111827]">{deleteReqTarget.title}</div>
+              <div className="text-slate-500 mt-0.5">{deleteReqTarget.req_code}</div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Type <span className="font-mono text-rose-600">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={deleteReqConfirmText}
+                onChange={(e) => setDeleteReqConfirmText(e.target.value)}
+                placeholder="Type DELETE"
+                className="w-full h-10 px-3 rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteReqTarget(null);
+                  setDeleteReqConfirmText('');
+                }}
+                className="h-9 px-4 rounded-xl border border-slate-200 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingReq || deleteReqConfirmText.trim().toUpperCase() !== 'DELETE'}
+                onClick={async () => {
+                  setIsDeletingReq(true);
+                  const ok = await softDeletePurchaseRequisition(deleteReqTarget.id);
+                  setIsDeletingReq(false);
+                  if (ok) {
+                    setRequisitions((prev) => prev.filter((r) => r.id !== deleteReqTarget.id));
+                    setDeletedRequisitions((prev) => [
+                      { ...deleteReqTarget, is_deleted: true },
+                      ...prev,
+                    ]);
+                    showToast?.(`${deleteReqTarget.req_code} moved to Recycle Bin.`, 'info');
+                    setDeleteReqTarget(null);
+                    setDeleteReqConfirmText('');
+                  } else {
+                    showToast?.('Failed to delete requisition.', 'error');
+                  }
+                }}
+                className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
+              >
+                {isDeletingReq ? 'Deleting...' : 'Delete Requisition'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -96,6 +96,9 @@ export interface CreateExpensePayload {
   title: string;
   category: string;
   amount: number;
+  gst_amount?: number | null;
+  tds_amount?: number | null;
+  hsn_sac_code?: string | null;
   paid_amount?: number | null;
   first_payment_date?: string | null;
   settlement_date?: string | null;
@@ -355,6 +358,9 @@ export async function createSiteExpense(
       title: payload.title.trim(),
       category: payload.category || 'Petty Cash',
       amount: Number(payload.amount) || 0,
+      gst_amount: Math.max(Number(payload.gst_amount) || 0, 0),
+      tds_amount: Math.max(Number(payload.tds_amount) || 0, 0),
+      hsn_sac_code: payload.hsn_sac_code?.trim() || null,
       expense_date: payload.expense_date || todayStr,
       payment_method: payload.payment_method || 'cash',
       payment_status: payload.payment_status || 'paid',
@@ -395,8 +401,11 @@ export async function createSiteExpense(
       .select()
       .single();
 
-    if (error && error.message && error.message.includes('attachments')) {
+    if (error && error.message && (error.message.includes('attachments') || error.message.includes('gst_amount') || error.message.includes('tds_amount') || error.message.includes('hsn_sac_code'))) {
       delete recordToInsert.attachments;
+      delete recordToInsert.gst_amount;
+      delete recordToInsert.tds_amount;
+      delete recordToInsert.hsn_sac_code;
       const retry = await supabase
         .from('site_expenses')
         .insert(recordToInsert)
@@ -462,6 +471,9 @@ export async function updateSiteExpense(
     if (payload.title !== undefined) updateRecord.title = payload.title.trim();
     if (payload.category !== undefined) updateRecord.category = payload.category;
     if (payload.amount !== undefined) updateRecord.amount = Number(payload.amount) || 0;
+    if (payload.gst_amount !== undefined) updateRecord.gst_amount = Math.max(Number(payload.gst_amount) || 0, 0);
+    if (payload.tds_amount !== undefined) updateRecord.tds_amount = Math.max(Number(payload.tds_amount) || 0, 0);
+    if (payload.hsn_sac_code !== undefined) updateRecord.hsn_sac_code = payload.hsn_sac_code?.trim() || null;
     if (payload.expense_date !== undefined) updateRecord.expense_date = payload.expense_date;
     if (payload.payment_method !== undefined) updateRecord.payment_method = payload.payment_method;
     if (payload.payment_status !== undefined) updateRecord.payment_status = payload.payment_status;

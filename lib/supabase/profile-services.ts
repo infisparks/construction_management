@@ -12,6 +12,12 @@ export interface ProfileProduct {
   storage_location?: string;
   minimum_alert_stock?: number;
   current_stock?: number;
+  boq_cost_code?: string | null;
+  boq_section?: string | null;
+  boq_planned_qty?: number;
+  boq_planned_rate?: number;
+  boq_planned_amount?: number;
+  boq_meta?: Record<string, any> | null;
   is_active?: boolean;
   is_deleted?: boolean;
   created_at?: string;
@@ -21,7 +27,7 @@ export interface ProfileProduct {
 export interface ProfileVendor {
   id: string;
   name: string;
-  type: 'vendor' | 'contractor' | 'client' | 'other';
+  type: string;
   phone?: string;
   email?: string;
   contact_person?: string;
@@ -82,6 +88,12 @@ export async function createProfileProduct(
           hsn_code: product.hsn_code || null,
           storage_location: product.storage_location || null,
           minimum_alert_stock: product.minimum_alert_stock ?? 0,
+          boq_cost_code: product.boq_cost_code || null,
+          boq_section: product.boq_section || null,
+          boq_planned_qty: Number(product.boq_planned_qty || 0),
+          boq_planned_rate: Number(product.boq_planned_rate || 0),
+          boq_planned_amount: Number(product.boq_planned_amount || 0),
+          boq_meta: product.boq_meta || {},
           is_active: product.is_active ?? true,
           is_deleted: false,
         },

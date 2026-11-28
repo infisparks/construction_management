@@ -34,6 +34,12 @@ import {
   fetchDeletedProfileVendors
 } from '@/lib/supabase/profile-services';
 import { ScrollableTableContainer } from '@/components/common/ScrollableTableContainer';
+import {
+  VendorProfileModal,
+  DEFAULT_PARTY_TYPES,
+  normalizePartyTypeLabel,
+} from './VendorProfileModal';
+import { fetchDropdownCategory } from '@/lib/supabase/category-services';
 
 interface VendorProfileViewProps {
   showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
@@ -47,7 +53,8 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
   const [activeDirectoryTab, setActiveDirectoryTab] = useState<'active' | 'trash'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'vendor' | 'contractor' | 'client' | 'other'>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [partyTypes, setPartyTypes] = useState<string[]>(DEFAULT_PARTY_TYPES);
 
   // Modal State for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -60,7 +67,7 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
 
   // Form State
   const [name, setName] = useState('');
-  const [type, setType] = useState<'vendor' | 'contractor' | 'client' | 'other'>('vendor');
+  const [type, setType] = useState<string>('Material Supplier');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -91,6 +98,12 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
 
   useEffect(() => {
     loadVendors();
+    fetchDropdownCategory('party_type', DEFAULT_PARTY_TYPES).then((list) => {
+      const cleaned = (list && list.length > 0 ? list : DEFAULT_PARTY_TYPES).filter(
+        (t) => t.trim().toLowerCase() !== 'other' && t.trim().toLowerCase() !== 'other service'
+      );
+      setPartyTypes(cleaned.length > 0 ? cleaned : DEFAULT_PARTY_TYPES);
+    });
   }, []);
 
   // Filtered vendors based on active directory tab
@@ -108,7 +121,11 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
         (v.city && v.city.toLowerCase().includes(q)) ||
         (v.location && v.location.toLowerCase().includes(q));
 
-      const matchesType = typeFilter === 'all' || v.type === typeFilter;
+      const normalizedType = normalizePartyTypeLabel(v.type);
+      const matchesType =
+        typeFilter === 'all' ||
+        normalizedType.toLowerCase() === typeFilter.toLowerCase() ||
+        (v.type && v.type.toLowerCase() === typeFilter.toLowerCase());
 
       return matchesSearch && matchesType;
     });
@@ -323,27 +340,19 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
             />
           </div>
 
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
-            {(['all', 'vendor', 'contractor', 'client', 'other'] as const).map((t) => (
+          <div className="flex flex-wrap bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs gap-1">
+            {(['all', ...partyTypes] as string[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTypeFilter(t)}
-                className={`px-2.5 py-1 rounded-lg font-bold capitalize transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                   typeFilter === t
                     ? 'bg-white text-purple-700 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {t === 'all'
-                  ? 'All'
-                  : t === 'vendor'
-                  ? 'Suppliers'
-                  : t === 'contractor'
-                  ? 'Contractors'
-                  : t === 'client'
-                  ? 'Clients'
-                  : 'Other'}
+                {t === 'all' ? 'All' : t}
               </button>
             ))}
           </div>
@@ -441,25 +450,25 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
-                          v.type === 'vendor'
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : v.type === 'contractor'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : v.type === 'client'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {v.type === 'vendor'
-                          ? 'Material Supplier'
-                          : v.type === 'contractor'
-                          ? 'Subcontractor'
-                          : v.type === 'client'
-                          ? 'Client'
-                          : 'Other Agency'}
-                      </span>
+                      {(() => {
+                        const label = normalizePartyTypeLabel(v.type);
+                        const lower = label.toLowerCase();
+                        return (
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                              lower.includes('supplier') || lower === 'vendor'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : lower.includes('contractor')
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : lower.includes('client')
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-purple-50 text-purple-700 border-purple-200'
+                            }`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-4 text-slate-800 font-medium">
                       {v.contact_person || '—'}
@@ -501,7 +510,12 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-4 font-mono text-[11px] text-slate-600">
-                      {v.gstin || '—'}
+                      <div>{v.gstin || '—'}</div>
+                      {v.pan && (
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          PAN: {v.pan}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -546,227 +560,21 @@ export const VendorProfileView: React.FC<VendorProfileViewProps> = ({
       </div>
 
       {/* 3. Add / Edit Vendor Profile Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div
-            className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700">
-                  <Building2 className="w-5 h-5 stroke-[2.2]" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                    {editingVendor ? 'Edit Vendor / Party Profile' : 'New Vendor / Party Profile'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-mono">
-                    Table: profile_vendor (Profile details only, no financial amounts)
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Name & Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Vendor / Party Legal Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Shree Cement & Building Materials Supply"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-900 focus:outline-hidden focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Party Type <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value as any)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  >
-                    <option value="vendor">Material Supplier</option>
-                    <option value="contractor">Subcontractor</option>
-                    <option value="client">Client / Owner</option>
-                    <option value="other">Other Service</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Contact Person & Trade */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Contact Person / Representative
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Rajesh Gupta / Ramprasad Sharma"
-                    value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Trade / Specialization
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Ready Mix Concrete, TMT Rebar, Shuttering Gang"
-                    value={trade}
-                    onChange={(e) => setTrade(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  />
-                </div>
-              </div>
-
-              {/* Phone & Email */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Phone / Mobile Number
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +91 98450 11982"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="e.g. sales@vendorcompany.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  />
-                </div>
-              </div>
-
-              {/* GSTIN & City / Location */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    GSTIN / Tax ID
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 27AAECF5521R1ZW"
-                    value={gstin}
-                    onChange={(e) => setGstin(e.target.value.toUpperCase())}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-mono font-bold uppercase text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    City / Operating Region
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Mumbai / Thane / Navi Mumbai"
-                    value={city}
-                    onChange={(e) => {
-                      setCity(e.target.value);
-                      setLocation(e.target.value);
-                    }}
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                  />
-                </div>
-              </div>
-
-              {/* Office / Site Address */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Registered Office / Godown Address
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Street, Industrial Area, Building, Pincode..."
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full p-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  General Remarks / Profile Notes
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Notes about supply reliability, working capacity, delivery terms..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full p-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
-                />
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center gap-2 text-[11px] text-slate-500">
-                <Info className="w-4 h-4 text-purple-600 shrink-0" />
-                <span>
-                  Notice: Only profile data is stored in <code className="text-purple-700 font-bold">profile_vendor</code>. Financial rates, bill balances, and ledger payments are kept in commercial registers.
-                </span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>{editingVendor ? 'Update Profile' : 'Save Profile'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <VendorProfileModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        editingVendor={editingVendor}
+        onSaved={(savedVendor, isEdit) => {
+          if (isEdit) {
+            setVendors((prev) =>
+              prev.map((item) => (item.id === savedVendor.id ? savedVendor : item))
+            );
+          } else {
+            setVendors((prev) => [savedVendor, ...prev]);
+          }
+        }}
+        showToast={showToast}
+      />
 
       {/* 4. Safe Delete Confirmation Modal (Requires typing "DELETE") */}
       {vendorToDelete && (

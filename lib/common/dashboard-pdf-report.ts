@@ -111,8 +111,8 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
   const PAGE_W = 210;
   const PAGE_H = 297;
-  const MARGIN_TOP = 42;    // Clear of letterhead top logo & gold bar (~37mm)
-  const MARGIN_BOTTOM = 29; // Clear of letterhead bottom navy/gold footer (~275mm)
+  const MARGIN_TOP = 49;    // Clear of letterhead top ARM logo & Noori Horizon (~46mm)
+  const MARGIN_BOTTOM = 30; // Clear of letterhead bottom forest-green/gold footer (~26mm)
   const MARGIN_X = 14;
   const CONTENT_W = PAGE_W - MARGIN_X * 2;
 
@@ -127,14 +127,14 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
   let cursorY = MARGIN_TOP;
 
-  // Report Header Card
-  doc.setFillColor(246, 248, 252);
-  doc.setDrawColor(219, 226, 238);
+  // Report Header Card (Forest Green & Gold letterhead theme)
+  doc.setFillColor(248, 249, 246);
+  doc.setDrawColor(218, 224, 215);
   doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, 20, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.setTextColor(15, 37, 74); // Armee Navy
+  doc.setTextColor(31, 51, 35); // Armee Forest Green
   doc.text('DIRECTOR EXECUTIVE SUMMARY REPORT', MARGIN_X + 4, cursorY + 7.5);
 
   doc.setFont('helvetica', 'normal');
@@ -169,9 +169,9 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     ensureSpace(16);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setTextColor(15, 37, 74);
+    doc.setTextColor(31, 51, 35);
     doc.text(title, MARGIN_X, cursorY);
-    doc.setDrawColor(217, 155, 38); // Armee Gold accent
+    doc.setDrawColor(207, 163, 58); // Armee Gold accent
     doc.setLineWidth(0.5);
     doc.line(MARGIN_X, cursorY + 1.5, MARGIN_X + 38, cursorY + 1.5);
     cursorY += 4.5;
@@ -183,17 +183,17 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
       fontSize: 8,
       cellPadding: 2.2,
       textColor: [31, 41, 55] as [number, number, number],
-      lineColor: [229, 231, 235] as [number, number, number],
+      lineColor: [224, 228, 222] as [number, number, number],
       lineWidth: 0.2,
     },
     headStyles: {
-      fillColor: [15, 37, 74] as [number, number, number],
-      textColor: [255, 255, 255] as [number, number, number],
+      fillColor: [31, 51, 35] as [number, number, number],
+      textColor: [245, 223, 158] as [number, number, number],
       fontStyle: 'bold' as const,
       fontSize: 8,
     },
     alternateRowStyles: {
-      fillColor: [249, 250, 251] as [number, number, number],
+      fillColor: [249, 250, 248] as [number, number, number],
     },
     didDrawPage: (hookData: any) => {
       // Ensure letterhead is placed behind any auto-added pages
@@ -260,18 +260,18 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
   {
     const chartH = 44;
     const chartW = CONTENT_W;
-    doc.setFillColor(250, 251, 253);
-    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(249, 250, 248);
+    doc.setDrawColor(220, 226, 218);
     doc.roundedRect(MARGIN_X, cursorY, chartW, chartH, 2, 2, 'FD');
 
-    // Legend top-right (Armee Letterhead Navy & Gold)
+    // Legend top-right (Armee Letterhead Forest Green & Gold)
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.setFillColor(15, 37, 74);
+    doc.setFillColor(31, 51, 35);
     doc.rect(MARGIN_X + chartW - 44, cursorY + 3.5, 3, 3, 'F');
-    doc.setTextColor(15, 37, 74);
+    doc.setTextColor(31, 51, 35);
     doc.text('Paid', MARGIN_X + chartW - 39.5, cursorY + 6);
-    doc.setFillColor(234, 179, 46);
+    doc.setFillColor(207, 163, 58);
     doc.rect(MARGIN_X + chartW - 26, cursorY + 3.5, 3, 3, 'F');
     doc.text('Pending', MARGIN_X + chartW - 21.5, cursorY + 6);
 
@@ -297,11 +297,11 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
       const pendH = Math.max(totalH - paidH, 0);
 
       if (paidH > 0) {
-        doc.setFillColor(15, 37, 74);
+        doc.setFillColor(31, 51, 35);
         doc.rect(barX, plotBottom - paidH, barW, paidH, 'F');
       }
       if (pendH > 0) {
-        doc.setFillColor(234, 179, 46);
+        doc.setFillColor(207, 163, 58);
         doc.rect(barX, plotBottom - paidH - pendH, barW, pendH, 'F');
       }
       if (m.total === 0) {
@@ -352,8 +352,8 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     const chartBoxH = 18 + input.paymentModes.length * 7;
     ensureSpace(chartBoxH + 8);
 
-    doc.setFillColor(250, 251, 253);
-    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(249, 250, 248);
+    doc.setDrawColor(220, 226, 218);
     doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, chartBoxH, 2, 2, 'FD');
 
     // Overall Paid vs Pending Stacked Bar
@@ -364,29 +364,29 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 37, 74);
+    doc.setTextColor(31, 51, 35);
     doc.text(
       `Settlement Health: ${input.expenseStats.paidPct}% Paid (${fmtRs(input.expenseStats.paid)})   |   Pending: ${fmtRs(input.expenseStats.unpaidTotal)}`,
       barLeft,
       cursorY + 5.5
     );
 
-    doc.setFillColor(234, 179, 46);
+    doc.setFillColor(207, 163, 58);
     doc.roundedRect(barLeft, cursorY + 7.5, fullBarW, 4, 1, 1, 'F');
     if (paidRatio > 0) {
-      doc.setFillColor(15, 37, 74);
+      doc.setFillColor(31, 51, 35);
       doc.roundedRect(barLeft, cursorY + 7.5, Math.max(fullBarW * paidRatio, 2), 4, 1, 1, 'F');
     }
 
-    // Mode Horizontal Bars (Armee Letterhead Navy, Steel Blue & Gold)
+    // Mode Horizontal Bars (Armee Letterhead Forest Green, Olive & Gold)
     const modeBarStart = MARGIN_X + 38;
     const modeBarMaxW = CONTENT_W - 82;
     const modeColors: [number, number, number][] = [
-      [15, 37, 74],
-      [44, 76, 126],
-      [234, 179, 46],
-      [71, 85, 105],
-      [180, 120, 18],
+      [31, 51, 35],
+      [66, 99, 71],
+      [207, 163, 58],
+      [100, 116, 139],
+      [163, 122, 32],
     ];
 
     input.paymentModes.forEach((m, idx) => {
@@ -439,8 +439,8 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
     const siteGraphH = 12 + input.siteComparison.length * 8;
     ensureSpace(siteGraphH + 8);
 
-    doc.setFillColor(250, 251, 253);
-    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(249, 250, 248);
+    doc.setDrawColor(220, 226, 218);
     doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, siteGraphH, 2, 2, 'FD');
 
     const maxSiteSpend = Math.max(...input.siteComparison.map((s) => s.billTotal), 1);
@@ -449,11 +449,11 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.setFillColor(15, 37, 74);
+    doc.setFillColor(31, 51, 35);
     doc.rect(MARGIN_X + 4, cursorY + 3.5, 3, 3, 'F');
-    doc.setTextColor(15, 37, 74);
+    doc.setTextColor(31, 51, 35);
     doc.text('Total Spend', MARGIN_X + 8.5, cursorY + 6);
-    doc.setFillColor(234, 179, 46);
+    doc.setFillColor(207, 163, 58);
     doc.rect(MARGIN_X + 30, cursorY + 3.5, 3, 3, 'F');
     doc.text('Pending Due', MARGIN_X + 34.5, cursorY + 6);
 
@@ -470,12 +470,12 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
       const totalW = Math.max((s.billTotal / maxSiteSpend) * sBarMaxW, s.billTotal > 0 ? 2 : 0);
       if (totalW > 0) {
-        doc.setFillColor(15, 37, 74);
+        doc.setFillColor(31, 51, 35);
         doc.roundedRect(sBarStart, rowY, totalW, 3.6, 1, 1, 'F');
       }
       if (s.billPending > 0 && s.billTotal > 0) {
         const pendW = Math.max((s.billPending / maxSiteSpend) * sBarMaxW, 1.5);
-        doc.setFillColor(234, 179, 46);
+        doc.setFillColor(207, 163, 58);
         doc.roundedRect(sBarStart + Math.max(totalW - pendW, 0), rowY, Math.min(pendW, totalW), 3.6, 1, 1, 'F');
       }
 
@@ -512,8 +512,8 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
   ensureSpace(30);
   {
     const boxH = 26;
-    doc.setFillColor(250, 251, 253);
-    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(249, 250, 248);
+    doc.setDrawColor(220, 226, 218);
     doc.roundedRect(MARGIN_X, cursorY, CONTENT_W, boxH, 2, 2, 'FD');
 
     const totalSkus = Math.max(input.storeStats.totalProducts, 1);
@@ -523,7 +523,7 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 37, 74);
+    doc.setTextColor(31, 51, 35);
     doc.text(
       `Catalog Stock Readiness (${input.storeStats.totalProducts} Items):   In Stock: ${input.storeStats.healthyCount}   |   Low Stock: ${input.storeStats.lowStockCount}   |   Depleted: ${input.storeStats.outOfStockCount}`,
       MARGIN_X + 4,
@@ -532,12 +532,12 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
 
     let sx = MARGIN_X + 4;
     if (okW > 0) {
-      doc.setFillColor(15, 37, 74);
+      doc.setFillColor(31, 51, 35);
       doc.rect(sx, cursorY + 8, okW, 3.8, 'F');
       sx += okW;
     }
     if (lowW > 0) {
-      doc.setFillColor(234, 179, 46);
+      doc.setFillColor(207, 163, 58);
       doc.rect(sx, cursorY + 8, lowW, 3.8, 'F');
       sx += lowW;
     }
@@ -546,11 +546,11 @@ export async function downloadDirectorDashboardPdf(input: DashboardPdfReportInpu
       doc.rect(sx, cursorY + 8, outW, 3.8, 'F');
     }
 
-    // 3 Movement Summary Pill Boxes (Armee Navy, Gold & Slate tints)
+    // 3 Movement Summary Pill Boxes (Armee Forest Green, Gold & Slate tints)
     const cardW = (CONTENT_W - 16) / 3;
     const moves = [
-      { label: 'INWARD VOUCHERS', val: String(input.storeStats.inCount), bg: [239, 244, 251] as [number, number, number], tc: [15, 37, 74] as [number, number, number] },
-      { label: 'OUTWARD ISSUES', val: String(input.storeStats.outCount), bg: [254, 249, 231] as [number, number, number], tc: [146, 98, 10] as [number, number, number] },
+      { label: 'INWARD VOUCHERS', val: String(input.storeStats.inCount), bg: [238, 243, 238] as [number, number, number], tc: [31, 51, 35] as [number, number, number] },
+      { label: 'OUTWARD ISSUES', val: String(input.storeStats.outCount), bg: [253, 248, 232] as [number, number, number], tc: [145, 108, 20] as [number, number, number] },
       { label: 'RETURNS / DAMAGES', val: String(input.storeStats.defectReturnCount), bg: [241, 245, 249] as [number, number, number], tc: [51, 65, 85] as [number, number, number] },
     ];
     moves.forEach((mv, idx) => {

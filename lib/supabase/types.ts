@@ -56,6 +56,9 @@ export interface SiteExpense {
   title: string;
   category: string;
   amount: number;
+  gst_amount?: number | null;
+  tds_amount?: number | null;
+  hsn_sac_code?: string | null;
   paid_amount?: number | null;
   first_payment_date?: string | null;
   settlement_date?: string | null;

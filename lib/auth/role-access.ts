@@ -141,6 +141,13 @@ export function isViewAllowed(
       return true;
     }
 
+    if (
+      (allowed === 'vendors' || allowed === 'expenses' || allowed === 'expense' || allowed === 'commercial' || allowed === 'bills') &&
+      target === 'vendors'
+    ) {
+      return true;
+    }
+
 
 
     if (

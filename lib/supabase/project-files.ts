@@ -1,5 +1,5 @@
 import { supabase } from './client';
-import { ProjectFile } from '@/lib/construction-planning/types';
+import { ProjectFile, DocumentApprovalEntry } from '@/lib/construction-planning/types';
 import { sortProjectsBySequence } from './site-storage';
 import { compressFileBeforeUpload } from '../common/file-compression';
 
@@ -213,7 +213,7 @@ export async function uploadFileToStorage(
  * Strictly saves the relative storage path in `file_url`, never hardcoded host domains.
  */
 export async function createProjectFileRecord(
-  fileData: Omit<ProjectFile, 'id' | 'created_at'>
+  fileData: Omit<ProjectFile, 'id' | 'created_at'> & { created_at?: string }
 ): Promise<ProjectFile | null> {
   try {
     // Exclude relational nested 'project' and helper 'storage_path' field on insert
@@ -490,4 +490,98 @@ export async function downloadProjectFile(
   // 4. Fallback if no URL exists
   onNotice?.('No valid file link found for this document.', 'error');
   return false;
+}
+
+/**
+ * Upsert or remove a user's approval decision on a document (`project_files.approvals`).
+ * Fetches the latest `approvals` array first so concurrent marks by different users are preserved.
+ */
+export async function updateProjectFileApproval(
+  fileId: string,
+  entry: DocumentApprovalEntry | null,
+  currentUserId?: string,
+  currentUserEmail?: string
+): Promise<{ data: DocumentApprovalEntry[] | null; status?: string; error: string | null }> {
+  try {
+    const { data: existingRow, error: fetchErr } = await supabase
+      .from('project_files')
+      .select('approvals')
+      .eq('id', fileId)
+      .single();
+
+    if (fetchErr) {
+      return { data: null, error: fetchErr.message || 'Failed to load current approvals' };
+    }
+
+    const existingList: DocumentApprovalEntry[] = Array.isArray(existingRow?.approvals)
+      ? existingRow.approvals
+      : [];
+
+    const filtered = existingList.filter((item) => {
+      if (currentUserId && item.user_id && item.user_id === currentUserId) return false;
+      if (
+        currentUserEmail &&
+        item.user_email &&
+        item.user_email.toLowerCase() === currentUserEmail.toLowerCase()
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const updatedApprovals = entry ? [entry, ...filtered] : filtered;
+
+    // Derive summary status for backwards compatibility
+    const hasRejected = updatedApprovals.some((a) => a.decision === 'rejected');
+    const hasApprovedOrNotReq = updatedApprovals.some(
+      (a) => a.decision === 'approved' || a.decision === 'not_required'
+    );
+    const derivedStatus = hasRejected
+      ? 'rejected'
+      : hasApprovedOrNotReq
+      ? 'approved'
+      : 'pending';
+
+    const { error: updateErr } = await supabase
+      .from('project_files')
+      .update({
+        approvals: updatedApprovals,
+        status: derivedStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', fileId);
+
+    if (updateErr) {
+      return { data: null, error: updateErr.message || 'Failed to save approval' };
+    }
+
+    return { data: updatedApprovals, status: derivedStatus, error: null };
+  } catch (err: any) {
+    return { data: null, error: err?.message || 'Unexpected error saving approval' };
+  }
+}
+
+/**
+ * Update a document's upload/record date (`project_files.created_at`) in Supabase.
+ */
+export async function updateProjectFileDate(
+  fileId: string,
+  newCreatedAtIso: string
+): Promise<{ error: string | null }> {
+  try {
+    const { error } = await supabase
+      .from('project_files')
+      .update({
+        created_at: newCreatedAtIso,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', fileId);
+
+    if (error) {
+      return { error: error.message || 'Failed to update document date' };
+    }
+    return { error: null };
+  } catch (err: any) {
+    return { error: err?.message || 'Unexpected error updating document date' };
+  }
 }

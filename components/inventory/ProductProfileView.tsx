@@ -96,6 +96,12 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
   const [minimumAlertStock, setMinimumAlertStock] = useState<number | ''>(20);
   const [hsnCode, setHsnCode] = useState('');
   const [description, setDescription] = useState('');
+  const [boqCostCode, setBoqCostCode] = useState('');
+  const [boqSection, setBoqSection] = useState('');
+  const [boqPlannedQty, setBoqPlannedQty] = useState<string>('');
+  const [boqPlannedRate, setBoqPlannedRate] = useState<string>('');
+  const [boqPlannedAmount, setBoqPlannedAmount] = useState<string>('');
+  const [boqCostPerSft, setBoqCostPerSft] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Load from Supabase profile_product table
@@ -157,6 +163,12 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
     setMinimumAlertStock(20);
     setHsnCode('');
     setDescription('');
+    setBoqCostCode('');
+    setBoqSection('');
+    setBoqPlannedQty('');
+    setBoqPlannedRate('');
+    setBoqPlannedAmount('');
+    setBoqCostPerSft('');
     setIsModalOpen(true);
   };
 
@@ -183,6 +195,12 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
     setMinimumAlertStock(p.minimum_alert_stock ?? 0);
     setHsnCode(p.hsn_code || '');
     setDescription(p.description || '');
+    setBoqCostCode(p.boq_cost_code || '');
+    setBoqSection(p.boq_section || '');
+    setBoqPlannedQty(p.boq_planned_qty ? String(p.boq_planned_qty) : '');
+    setBoqPlannedRate(p.boq_planned_rate ? String(p.boq_planned_rate) : '');
+    setBoqPlannedAmount(p.boq_planned_amount ? String(p.boq_planned_amount) : '');
+    setBoqCostPerSft(p.boq_meta?.cost_per_sft ? String(p.boq_meta.cost_per_sft) : '');
     setIsModalOpen(true);
   };
 
@@ -210,6 +228,18 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
         typeof minimumAlertStock === 'number' ? minimumAlertStock : 0,
       hsn_code: hsnCode.trim() || undefined,
       description: description.trim() || undefined,
+      boq_cost_code: boqCostCode.trim() || null,
+      boq_section: boqSection.trim() || null,
+      boq_planned_qty: Number(boqPlannedQty || 0),
+      boq_planned_rate: Number(boqPlannedRate || 0),
+      boq_planned_amount: Number(
+        boqPlannedAmount ||
+          (Number(boqPlannedQty || 0) * Number(boqPlannedRate || 0)).toFixed(2)
+      ),
+      boq_meta: {
+        ...(editingProduct?.boq_meta || {}),
+        ...(boqCostPerSft ? { cost_per_sft: Number(boqCostPerSft) } : {}),
+      },
     };
 
     if (editingProduct) {
@@ -869,6 +899,119 @@ export const ProductProfileView: React.FC<ProductProfileViewProps> = ({
                     onChange={(e) => setHsnCode(e.target.value)}
                     className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-hidden focus:border-purple-600"
                   />
+                </div>
+              </div>
+
+              {/* BOQ & Budget Planning Section */}
+              <div className="p-3.5 rounded-xl bg-purple-50/50 border border-purple-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-purple-900">
+                      BOQ / Planned Budget (For Director Comparison)
+                    </span>
+                    <p className="text-[10.5px] text-slate-600">
+                      Enter planned BOQ quantity, rate &amp; amount to track budget vs actual purchases.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Cost Code
+                    </label>
+                    <input
+                      type="text"
+                      value={boqCostCode}
+                      onChange={(e) => setBoqCostCode(e.target.value)}
+                      placeholder="e.g. A-i-01"
+                      className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      BOQ Section / Head
+                    </label>
+                    <input
+                      type="text"
+                      value={boqSection}
+                      onChange={(e) => setBoqSection(e.target.value)}
+                      placeholder="e.g. Civil Works - Sub Structure"
+                      className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Planned Qty ({unit === '__custom__' ? customUnit || 'Unit' : unit})
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={boqPlannedQty}
+                      onChange={(e) => {
+                        const q = e.target.value;
+                        setBoqPlannedQty(q);
+                        const amt = (Number(q || 0) * Number(boqPlannedRate || 0)).toFixed(2);
+                        setBoqPlannedAmount(Number(amt) > 0 ? amt : '');
+                      }}
+                      placeholder="0"
+                      className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Planned Rate (Rs.)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={boqPlannedRate}
+                      onChange={(e) => {
+                        const r = e.target.value;
+                        setBoqPlannedRate(r);
+                        const amt = (Number(boqPlannedQty || 0) * Number(r || 0)).toFixed(2);
+                        setBoqPlannedAmount(Number(amt) > 0 ? amt : '');
+                      }}
+                      placeholder="0.00"
+                      className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Planned Amount (Rs.)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={boqPlannedAmount}
+                      onChange={(e) => setBoqPlannedAmount(e.target.value)}
+                      placeholder="Auto"
+                      className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-purple-800 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Cost / SFT (Opt.)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={boqCostPerSft}
+                      onChange={(e) => setBoqCostPerSft(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-900 focus:outline-hidden focus:border-purple-600"
+                    />
+                  </div>
                 </div>
               </div>
 
