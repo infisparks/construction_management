@@ -88,6 +88,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
   const [activeTab, setActiveTab] = useState<PurchaseTab>('quotations');
   const [siteFilter, setSiteFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [insideQuoteSearch, setInsideQuoteSearch] = useState('');
 
   // Quotations State
   const [inquiries, setInquiries] = useState<PurchaseQuotationInquiry[]>([]);
@@ -205,7 +206,14 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
         inq.heading.toLowerCase().includes(q) ||
         (inq.description || '').toLowerCase().includes(q) ||
         inq.inquiry_code.toLowerCase().includes(q) ||
-        inq.quotations.some((qt) => qt.vendor_name.toLowerCase().includes(q))
+        inq.quotations.some(
+          (qt) =>
+            (qt.heading || '').toLowerCase().includes(q) ||
+            (qt.vendor_name || '').toLowerCase().includes(q) ||
+            (qt.description || '').toLowerCase().includes(q) ||
+            (qt.notes || '').toLowerCase().includes(q) ||
+            (qt.file_name || '').toLowerCase().includes(q)
+        )
     );
   }, [inquiries, searchQuery]);
 
@@ -575,7 +583,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               activeTab === 'quotations'
-                ? 'Search inquiry heading, code, or vendor name...'
+                ? 'Search inquiry or vendor quotation heading, vendor, code...'
                 : 'Search requisition title, code, or requester...'
             }
             className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50/50 focus:outline-hidden focus:border-[#653ef1]"
@@ -677,13 +685,27 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
 
               {/* Uploaded Quotations Inside This Inquiry */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 sm:p-5 shadow-2xs">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-[#111827]">
-                    Uploaded Quotations ({selectedInquiry.quotations.length})
-                  </h3>
-                  <span className="text-[11px] text-[#6B7280]">
-                    Select 1 or 2 quotations to finalize
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#111827]">
+                      Uploaded Quotations ({selectedInquiry.quotations.length})
+                    </h3>
+                    <span className="text-[11px] text-[#6B7280]">
+                      Select 1 or 2 quotations to finalize
+                    </span>
+                  </div>
+                  {selectedInquiry.quotations.length > 0 && (
+                    <div className="relative w-full sm:w-72">
+                      <Search className="w-3.5 h-3.5 text-[#653ef1] absolute left-3 top-2.5 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={insideQuoteSearch}
+                        onChange={(e) => setInsideQuoteSearch(e.target.value)}
+                        placeholder="Search quotation heading, file, notes..."
+                        className="w-full h-8.5 pl-8 pr-3 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50/50 focus:outline-hidden focus:border-[#653ef1]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {selectedInquiry.quotations.length === 0 ? (
@@ -702,9 +724,32 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                       <span>Upload First Quotation</span>
                     </button>
                   </div>
-                ) : (
+                ) : (() => {
+                  const iq = insideQuoteSearch.trim().toLowerCase();
+                  const visibleQuotes = !iq
+                    ? selectedInquiry.quotations
+                    : selectedInquiry.quotations.filter(
+                        (qt) =>
+                          (qt.heading || '').toLowerCase().includes(iq) ||
+                          (qt.vendor_name || '').toLowerCase().includes(iq) ||
+                          (qt.description || '').toLowerCase().includes(iq) ||
+                          (qt.notes || '').toLowerCase().includes(iq) ||
+                          (qt.file_name || '').toLowerCase().includes(iq)
+                      );
+
+                  if (visibleQuotes.length === 0) {
+                    return (
+                      <div className="p-6 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center text-xs text-slate-500">
+                        No vendor quotations match &ldquo;{insideQuoteSearch}&rdquo;.
+                      </div>
+                    );
+                  }
+
+                  return (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {selectedInquiry.quotations.map((qt, qIdx) => (
+                    {visibleQuotes.map((qt) => {
+                      const originalIdx = selectedInquiry.quotations.findIndex((item) => item.id === qt.id);
+                      return (
                       <div
                         key={qt.id}
                         className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between gap-2.5 ${
@@ -734,7 +779,7 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                               setViewerState({
                                 isOpen: true,
                                 attachments: viewerAtts,
-                                initialIndex: qIdx,
+                                initialIndex: originalIdx >= 0 ? originalIdx : 0,
                                 voucherNumber: selectedInquiry.inquiry_code,
                               })
                             }
@@ -758,9 +803,11 @@ export const PurchaseOutflowView: React.FC<PurchaseOutflowViewProps> = ({
                           </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           );
